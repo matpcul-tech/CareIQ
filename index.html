@@ -3,1226 +3,500 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CareIQ — Preventive Intelligence for Community Health</title>
+<title>CareIQ OS — Community Health Intelligence Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root {
-  --void:        #050A0F;
-  --deep:        #080F18;
-  --surface:     #0C1520;
-  --panel:       #101D2A;
-  --card:        #142030;
-  --border:      #1C3040;
-  --borderLight: #2A4560;
-  --forest:      #0D3D2A;
-  --green:       #1A6A48;
-  --greenLight:  #22A070;
-  --greenGlow:   #0A2A1C;
-  --gold:        #C8A020;
-  --goldLight:   #E0BC40;
-  --bone:        #E8DCC8;
-  --boneDim:     #8A7A60;
-  --cream:       #F5EDD8;
-  --teal:        #1A6A7A;
-  --tealLight:   #22A0B8;
-  --red:         #8A2010;
-  --redLight:    #C43018;
-  --muted:       #3A5060;
-  --slate:       #1A2A38;
-}
+:root{--void:#050A0F;--deep:#080F18;--surface:#0C1520;--panel:#101D2A;--card:#142030;--border:#1C3040;--borderLight:#2A4560;--forest:#0D3D2A;--green:#1A6A48;--greenLight:#22A070;--greenGlow:#0A2A1C;--gold:#C8A020;--goldLight:#E0BC40;--bone:#E8DCC8;--boneDim:#8A7A60;--cream:#F5EDD8;--teal:#1A6A7A;--tealLight:#22A0B8;--red:#C43018;--muted:#3A5060;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--void);color:var(--bone);font-family:'Cormorant Garamond',Georgia,serif;min-height:100vh;overflow-x:hidden;}
+.sf{position:fixed;inset:0;pointer-events:none;z-index:0;}
+.st{position:absolute;border-radius:50%;background:var(--bone);}
+@keyframes tw{0%,100%{opacity:var(--o1,.1)}50%{opacity:var(--o2,.4)}}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shieldGlow{0%,100%{box-shadow:0 0 8px rgba(26,106,72,.2)}50%{box-shadow:0 0 24px rgba(26,106,72,.6)}}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* MODAL */
+.overlay{position:fixed;inset:0;z-index:1000;background:rgba(5,10,15,.94);display:flex;align-items:center;justify-content:center;}
+.modal{background:var(--surface);border:1px solid var(--green);border-radius:20px;padding:36px;max-width:500px;width:92%;text-align:center;box-shadow:0 0 60px rgba(26,106,72,.3);animation:fadeUp .4s ease;}
+.modal-icon{font-size:52px;color:var(--greenLight);margin-bottom:14px;filter:drop-shadow(0 0 12px rgba(34,160,112,.6));}
+.modal-title{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;letter-spacing:2px;color:var(--greenLight);margin-bottom:8px;}
+.modal-desc{font-size:14px;color:var(--boneDim);line-height:1.75;margin-bottom:20px;}
+.hash-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:24px;}
+.hash-chip{background:var(--panel);border:1px solid rgba(26,106,72,.4);border-radius:6px;padding:5px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--greenLight);}
+.hash-chip span{color:var(--muted);font-size:9px;}
+.modal-btn{background:linear-gradient(135deg,var(--forest),var(--green));color:var(--cream);border:none;border-radius:10px;padding:13px 32px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;cursor:pointer;box-shadow:0 0 20px rgba(26,106,72,.4);transition:all .2s;}
+.modal-btn:hover{box-shadow:0 0 36px rgba(26,106,72,.7);transform:translateY(-2px);}
 
-body {
-  background: var(--void);
-  color: var(--bone);
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
+/* SHELL */
+.shell{display:flex;min-height:100vh;position:relative;z-index:1;}
 
-/* STAR FIELD */
-.starfield {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-.star {
-  position: absolute;
-  border-radius: 50%;
-  background: var(--bone);
-  animation: twinkle var(--d, 3s) ease-in-out infinite;
-}
-@keyframes twinkle {
-  0%,100% { opacity: var(--o1, 0.1); }
-  50%      { opacity: var(--o2, 0.4); }
-}
+/* SIDEBAR */
+.sidebar{width:64px;flex-shrink:0;background:var(--deep);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;position:fixed;top:0;bottom:0;left:0;z-index:50;padding:16px 0;}
+.sb-logo{width:40px;height:40px;background:linear-gradient(135deg,var(--forest),var(--green));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 16px rgba(26,106,72,.5);margin-bottom:24px;cursor:pointer;}
+.sb-nav{display:flex;flex-direction:column;gap:4px;width:100%;padding:0 8px;}
+.sb-item{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px;border-radius:10px;cursor:pointer;transition:all .2s;border:1px solid transparent;gap:3px;}
+.sb-item:hover{background:rgba(26,106,72,.1);}
+.sb-item.active{background:rgba(26,106,72,.15);border-color:rgba(26,106,72,.3);}
+.sb-icon{font-size:18px;line-height:1;}
+.sb-label{font-family:'Rajdhani',sans-serif;font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);}
+.sb-item.active .sb-label{color:var(--greenLight);}
+.sb-bottom{margin-top:auto;}
+.sh-dot{width:8px;height:8px;border-radius:50%;background:var(--greenLight);box-shadow:0 0 8px var(--greenLight);animation:pulse 2s ease-in-out infinite;}
 
-/* NAV */
-nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  background: rgba(5,10,15,0.92);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  padding: 0 24px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.nav-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.nav-icon {
-  width: 32px; height: 32px;
-  background: linear-gradient(135deg, var(--forest), var(--green));
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px;
-  box-shadow: 0 0 16px rgba(26,106,72,0.5);
-}
-.nav-brand {
-  font-family: 'Rajdhani', sans-serif;
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: 2px;
-  color: var(--goldLight);
-  animation: goldGlow 3s ease-in-out infinite;
-}
-@keyframes goldGlow {
-  0%,100% { text-shadow: 0 0 10px rgba(200,160,32,0.4); }
-  50%      { text-shadow: 0 0 24px rgba(200,160,32,0.8), 0 0 48px rgba(200,160,32,0.3); }
-}
-.nav-tag {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 9px;
-  letter-spacing: 2px;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-.nav-links {
-  display: flex;
-  gap: 6px;
-}
-.nav-pill {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 5px 12px;
-  border-radius: 20px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: transparent;
-  color: var(--boneDim);
-}
-.nav-pill:hover { color: var(--bone); border-color: var(--border); }
-.nav-pill.primary {
-  background: linear-gradient(135deg, var(--forest), var(--green));
-  color: var(--cream);
-  border-color: var(--green);
-  box-shadow: 0 0 12px rgba(26,106,72,0.4);
-}
-.nav-pill.primary:hover { box-shadow: 0 0 20px rgba(26,106,72,0.7); }
+/* MAIN */
+.main{margin-left:64px;flex:1;display:flex;flex-direction:column;}
+.topbar{background:rgba(8,15,24,.96);border-bottom:1px solid var(--border);padding:0 20px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;backdrop-filter:blur(12px);}
+.tb-left{display:flex;align-items:center;gap:12px;}
+.tb-title{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;color:var(--bone);}
+.sh-pill{display:flex;align-items:center;gap:5px;background:var(--greenGlow);border:1px solid rgba(26,106,72,.35);border-radius:20px;padding:3px 10px;animation:shieldGlow 3s ease-in-out infinite;}
+.sh-pill-txt{font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--greenLight);}
+.tb-right{display:flex;align-items:center;gap:10px;}
+.fac-tag{font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);letter-spacing:.5px;}
+.u-av{width:32px;height:32px;border-radius:50%;background:var(--panel);border:1px solid var(--borderLight);display:flex;align-items:center;justify-content:center;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;color:var(--gold);}
 
-/* SECTIONS */
-section { position: relative; z-index: 1; }
+/* PAGES */
+.page{display:none;padding:20px;animation:fadeUp .3s ease;}
+.page.active{display:block;}
+.ph{margin-bottom:20px;}
+.ph-title{font-size:clamp(20px,3vw,30px);font-weight:700;color:var(--cream);}
+.ph-desc{font-size:13px;color:var(--boneDim);font-style:italic;margin-top:4px;}
+.grad{height:2px;background:linear-gradient(90deg,transparent,var(--green),var(--gold),var(--green),transparent);margin-bottom:20px;}
 
-/* HERO */
-.hero {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 24px 60px;
-  text-align: center;
-}
-.hero-inner { max-width: 900px; }
+/* GRIDS */
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:20px;}
+@media(max-width:900px){.g4{grid-template-columns:repeat(2,1fr);}.g3{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:600px){.g4,.g3,.g2{grid-template-columns:1fr;}}
 
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--greenGlow);
-  border: 1px solid rgba(26,106,72,0.4);
-  border-radius: 24px;
-  padding: 6px 16px;
-  margin-bottom: 32px;
-  animation: fadeUp 0.6s ease forwards;
-}
-.hero-badge-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--greenLight);
-  box-shadow: 0 0 8px var(--greenLight);
-  animation: pulse 2s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
-.hero-badge-text {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--greenLight);
-}
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;}
+.card-sm{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;}
 
-.hero-title {
-  font-size: clamp(42px, 7vw, 80px);
-  font-weight: 700;
-  color: var(--cream);
-  line-height: 1.1;
-  margin-bottom: 8px;
-  animation: fadeUp 0.6s 0.1s ease both;
-}
-.hero-title span { color: var(--greenLight); }
+/* METRIC */
+.mc{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden;}
+.mc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--mc,var(--greenLight));width:var(--mw,50%);}
+.mc-val{font-family:'Rajdhani',sans-serif;font-size:34px;font-weight:700;color:var(--mc,var(--greenLight));line-height:1;}
+.mc-label{font-family:'Rajdhani',sans-serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-top:6px;}
+.mc-trend{font-family:'Rajdhani',sans-serif;font-size:10px;margin-top:4px;color:var(--mc,var(--greenLight));}
 
-.hero-sub {
-  font-size: clamp(18px, 3vw, 28px);
-  color: var(--gold);
-  font-style: italic;
-  margin-bottom: 24px;
-  animation: fadeUp 0.6s 0.2s ease both;
-}
+/* RING */
+.ring-card{display:flex;flex-direction:column;align-items:center;padding:20px;background:var(--card);border:1px solid var(--border);border-radius:14px;position:relative;}
+.ring-svg{width:110px;height:110px;transform:rotate(-90deg);}
+.ring-bg{fill:none;stroke:var(--border);stroke-width:10;}
+.ring-fill{fill:none;stroke-width:10;stroke-linecap:round;}
+.ring-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-18%);text-align:center;}
+.ring-val{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;line-height:1;}
+.ring-sub{font-family:'Rajdhani',sans-serif;font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.ring-name{font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:10px;}
+.ring-status{font-size:11px;color:var(--boneDim);font-style:italic;margin-top:2px;}
 
-.hero-desc {
-  font-size: 16px;
-  color: var(--boneDim);
-  line-height: 1.8;
-  max-width: 640px;
-  margin: 0 auto 40px;
-  animation: fadeUp 0.6s 0.3s ease both;
-}
+/* SECTION HEAD */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.sh-title{font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.sh-action{font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--greenLight);cursor:pointer;}
 
-.hero-stats {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 40px;
-  animation: fadeUp 0.6s 0.4s ease both;
-}
-.stat-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 24px;
-  text-align: center;
-  min-width: 120px;
-}
-.stat-num {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--greenLight);
-  line-height: 1;
-}
-.stat-label {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-top: 4px;
-}
+/* SCORE BAR */
+.sbar-row{display:flex;align-items:center;gap:8px;}
+.sbar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.sbar-fill{height:100%;border-radius:3px;}
+.sbar-val{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;width:26px;text-align:right;}
 
-.hero-ctas {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  animation: fadeUp 0.6s 0.5s ease both;
-}
-.btn {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 14px 28px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-primary {
-  background: linear-gradient(135deg, var(--forest), var(--green));
-  color: var(--cream);
-  box-shadow: 0 0 20px rgba(26,106,72,0.4);
-}
-.btn-primary:hover { box-shadow: 0 0 32px rgba(26,106,72,0.7); transform: translateY(-2px); }
-.btn-secondary {
-  background: transparent;
-  color: var(--bone);
-  border: 1px solid var(--borderLight);
-}
-.btn-secondary:hover { border-color: var(--gold); color: var(--goldLight); transform: translateY(-2px); }
+/* BADGE */
+.badge{font-family:'Rajdhani',sans-serif;font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:10px;display:inline-block;flex-shrink:0;}
+.bh{background:rgba(196,48,24,.2);color:#E05040;border:1px solid rgba(196,48,24,.35);}
+.bm{background:rgba(200,160,32,.18);color:var(--gold);border:1px solid rgba(200,160,32,.35);}
+.bl{background:rgba(26,106,72,.2);color:var(--greenLight);border:1px solid rgba(26,106,72,.35);}
 
-@keyframes fadeUp {
-  from { opacity:0; transform:translateY(16px); }
-  to   { opacity:1; transform:translateY(0); }
-}
+/* TABLE */
+.pt{width:100%;border-collapse:collapse;}
+.pt th{font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
+.pt td{padding:11px 12px;border-bottom:1px solid rgba(28,48,64,.5);font-size:13px;vertical-align:middle;}
+.pt tr:hover td{background:rgba(26,106,72,.05);cursor:pointer;}
+.pt-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;flex-shrink:0;}
 
-/* GRADIENT LINE */
-.gradient-line {
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--green), var(--gold), var(--green), transparent);
-  margin: 0;
-}
+/* AI BOX */
+.ai-box{background:var(--greenGlow);border:1px solid rgba(26,106,72,.4);border-radius:12px;padding:14px;margin-bottom:14px;animation:shieldGlow 3s ease-in-out infinite;}
+.ai-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.ai-label{font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--greenLight);}
+.ai-text{font-size:13px;color:var(--bone);line-height:1.75;}
 
-/* FEATURES */
-.features {
-  padding: 80px 24px;
-  max-width: 1100px;
-  margin: 0 auto;
-}
-.section-label {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: var(--greenLight);
-  text-align: center;
-  margin-bottom: 12px;
-}
-.section-title {
-  font-size: clamp(28px, 4vw, 44px);
-  font-weight: 700;
-  color: var(--cream);
-  text-align: center;
-  margin-bottom: 8px;
-}
-.section-sub {
-  font-size: 16px;
-  color: var(--boneDim);
-  text-align: center;
-  font-style: italic;
-  margin-bottom: 56px;
-}
+/* GAP */
+.gap-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;}
+.gap-ico{font-size:15px;flex-shrink:0;}
+.gap-txt{flex:1;font-size:13px;color:var(--bone);}
 
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-}
-.feature-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 28px;
-  transition: all 0.3s;
-  position: relative;
-  overflow: hidden;
-}
-.feature-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent, var(--green)), transparent);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.feature-card:hover { transform: translateY(-4px); border-color: var(--borderLight); }
-.feature-card:hover::before { opacity: 1; }
-.feature-icon {
-  font-size: 28px;
-  margin-bottom: 16px;
-  color: var(--accent, var(--greenLight));
-}
-.feature-title {
-  font-family: 'Rajdhani', sans-serif;
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: 0.5px;
-  color: var(--accent, var(--greenLight));
-  margin-bottom: 10px;
-}
-.feature-desc {
-  font-size: 14px;
-  color: var(--boneDim);
-  line-height: 1.7;
-}
+/* BIO */
+.bio{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;}
+.bio-ico{font-size:18px;flex-shrink:0;}
+.bio-label{font-family:'Rajdhani',sans-serif;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.bio-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:500;}
+.bio-unit{font-size:10px;color:var(--muted);margin-left:2px;}
+.bio-bar{height:3px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden;}
+.bio-fill{height:100%;border-radius:2px;}
+.bio-status{font-family:'Rajdhani',sans-serif;font-size:9px;margin-top:2px;}
 
-/* DEMO */
-.demo-section {
-  padding: 80px 24px;
-  background: var(--deep);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.demo-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-.demo-grid {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 20px;
-  min-height: 600px;
-}
+/* PROTOCOL */
+.proto{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;}
+.proto-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.proto-name{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;color:var(--bone);}
+.proto-pct{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;}
+.proto-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.proto-fill{height:100%;border-radius:3px;}
+.proto-sub{font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:5px;}
 
-/* PATIENT LIST */
-.patient-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.panel-header {
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.panel-title {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.panel-count {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 11px;
-  color: var(--greenLight);
-  font-weight: 700;
-}
-.patient-list { flex: 1; overflow-y: auto; }
-.patient-item {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(28,48,64,0.5);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.patient-item:hover { background: rgba(26,106,72,0.08); }
-.patient-item.active { background: rgba(26,106,72,0.12); border-left: 2px solid var(--greenLight); }
-.patient-avatar {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.patient-info { flex: 1; min-width: 0; }
-.patient-name {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--bone);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.patient-meta {
-  font-size: 10px;
-  color: var(--muted);
-  font-family: 'Rajdhani', sans-serif;
-  margin-top: 2px;
-}
-.risk-badge {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 10px;
-  flex-shrink: 0;
-}
-.risk-high   { background: rgba(138,32,16,0.25); color: #E05040; border: 1px solid rgba(138,32,16,0.4); }
-.risk-medium { background: rgba(200,160,32,0.18); color: var(--gold); border: 1px solid rgba(200,160,32,0.35); }
-.risk-low    { background: rgba(26,106,72,0.2); color: var(--greenLight); border: 1px solid rgba(26,106,72,0.35); }
+/* FLOW */
+.flow{display:flex;gap:14px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;}
+.flow-num{width:32px;height:32px;border-radius:50%;background:var(--greenGlow);border:1px solid rgba(26,106,72,.4);display:flex;align-items:center;justify-content:center;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--greenLight);flex-shrink:0;}
+.flow-title{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--bone);margin-bottom:2px;}
+.flow-desc{font-size:12px;color:var(--boneDim);line-height:1.6;}
 
-/* PATIENT DETAIL */
-.detail-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.detail-header {
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.detail-avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-}
-.detail-name {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--bone);
-}
-.detail-meta {
-  font-size: 12px;
-  color: var(--muted);
-  font-family: 'Rajdhani', sans-serif;
-  margin-top: 2px;
-}
-.detail-body { flex: 1; overflow-y: auto; padding: 20px; }
+/* HASH */
+.hash-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(28,48,64,.5);}
+.hash-row:last-child{border-bottom:none;}
+.hash-in{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--bone);flex:1;}
+.hash-arr{color:var(--greenLight);font-size:13px;}
+.hash-out{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--greenLight);flex:1;word-break:break-all;}
 
-/* SCORE RING */
-.scores-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 20px;
-}
-.score-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-.score-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 3px;
-  background: var(--bar-color, var(--green));
-  width: var(--bar-w, 50%);
-  transition: width 1s ease;
-}
-.score-value {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--score-color, var(--greenLight));
-}
-.score-label {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-top: 6px;
-}
-.score-trend {
-  font-size: 10px;
-  margin-top: 4px;
-  font-family: 'Rajdhani', sans-serif;
-}
+/* BENEFIT */
+.benefit{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--bc,var(--green));border-radius:14px;padding:20px;}
+.benefit-ico{font-size:28px;margin-bottom:10px;}
+.benefit-title{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--bc,var(--greenLight));margin-bottom:8px;}
+.benefit-desc{font-size:13px;color:var(--boneDim);line-height:1.7;margin-bottom:12px;}
+.benefit-stat{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;color:var(--bc,var(--greenLight));}
+.benefit-stat-lbl{font-family:'Rajdhani',sans-serif;font-size:9px;color:var(--muted);letter-spacing:1px;}
 
-/* GAPS */
-.gaps-section { margin-bottom: 20px; }
-.gaps-title {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
-}
-.gap-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-bottom: 8px;
-}
-.gap-icon { font-size: 14px; flex-shrink: 0; }
-.gap-text { flex: 1; font-size: 13px; color: var(--bone); }
-.gap-priority {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 8px;
-}
-.gap-critical { background: rgba(138,32,16,0.25); color: #E05040; border: 1px solid rgba(138,32,16,0.4); }
-.gap-moderate { background: rgba(200,160,32,0.18); color: var(--gold); border: 1px solid rgba(200,160,32,0.35); }
-.gap-routine  { background: rgba(26,106,72,0.2); color: var(--greenLight); border: 1px solid rgba(26,106,72,0.35); }
+/* UDS */
+.uds-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;}
+.uds-m{flex:1;font-size:13px;color:var(--bone);}
+.uds-cur{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;width:44px;text-align:center;}
+.uds-tgt{font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);width:60px;text-align:center;}
 
-/* AI INSIGHT BOX */
-.ai-box {
-  background: var(--greenGlow);
-  border: 1px solid rgba(26,106,72,0.4);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 20px;
-  animation: shieldGlow 3s ease-in-out infinite;
-}
-@keyframes shieldGlow {
-  0%,100% { box-shadow: 0 0 8px rgba(26,106,72,0.2); }
-  50%      { box-shadow: 0 0 20px rgba(26,106,72,0.5); }
-}
-.ai-box-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.ai-box-icon { font-size: 14px; color: var(--greenLight); }
-.ai-box-label {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--greenLight);
-}
-.ai-box-text {
-  font-size: 13px;
-  color: var(--bone);
-  line-height: 1.7;
-}
-
-/* BIOMARKERS */
-.biomarker-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-.biomarker {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.biomarker-bar-wrap {
-  flex: 1;
-}
-.biomarker-label {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-.biomarker-val {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  color: var(--bone);
-  font-weight: 500;
-}
-.biomarker-bar {
-  height: 3px;
-  background: var(--border);
-  border-radius: 2px;
-  margin-top: 4px;
-  overflow: hidden;
-}
-.biomarker-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 1s ease;
-}
-
-/* FQHC SECTION */
-.fqhc-section {
-  padding: 80px 24px;
-  max-width: 1100px;
-  margin: 0 auto;
-}
-.fqhc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
-  margin-top: 48px;
-}
-.fqhc-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 24px;
-}
-.fqhc-number {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 42px;
-  font-weight: 700;
-  color: var(--gold);
-  line-height: 1;
-  margin-bottom: 4px;
-}
-.fqhc-desc {
-  font-size: 13px;
-  color: var(--boneDim);
-  line-height: 1.6;
-}
-
-/* FOOTER */
-footer {
-  background: var(--deep);
-  border-top: 1px solid var(--border);
-  padding: 40px 24px;
-  text-align: center;
-  position: relative;
-  z-index: 1;
-}
-.footer-logo {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--goldLight);
-  margin-bottom: 8px;
-}
-.footer-sub {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 20px;
-}
-.footer-pills {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.footer-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 10px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.footer-copy {
-  font-size: 11px;
-  color: var(--muted);
-  font-family: 'Rajdhani', sans-serif;
-  letter-spacing: 0.5px;
-}
-
-@media (max-width: 700px) {
-  .demo-grid { grid-template-columns: 1fr; }
-  .scores-row { grid-template-columns: repeat(3,1fr); gap: 8px; }
-  .biomarker-grid { grid-template-columns: 1fr; }
-  nav { padding: 0 12px; }
-  .nav-links { gap: 4px; }
-}
+/* BACK */
+.back{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--greenLight);font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:18px;width:fit-content;}
+.back:hover{color:var(--goldLight);}
 </style>
 </head>
 <body>
+<div class="sf" id="sf"></div>
 
-<!-- STAR FIELD -->
-<div class="starfield" id="starfield"></div>
-
-<!-- NAV -->
-<nav>
-  <div class="nav-logo">
-    <div class="nav-icon">⊕</div>
-    <div>
-      <div class="nav-brand">CAREIQ</div>
-      <div class="nav-tag">Sovereign Shield Technologies</div>
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-icon">⬡</div>
+    <div class="modal-title">Sovereign Shield Active</div>
+    <div class="modal-desc">Before any patient data loads, CareIQ hashes all personally identifiable and clinically sensitive information at your device edge. What reaches the AI engine is protected — never raw patient data.</div>
+    <div class="hash-chips">
+      <div class="hash-chip">Maria T. <span>ZK:A4F2C891</span></div>
+      <div class="hash-chip">DOB:1966-03-12 <span>ZK:B7E3D204</span></div>
+      <div class="hash-chip">MRN:00124893 <span>ZK:C1A9F563</span></div>
+      <div class="hash-chip">DX:E11.65 <span>ZK:D8B2E417</span></div>
+      <div class="hash-chip">SSN:***-**-4821 <span>ZK:E5C7A028</span></div>
+      <div class="hash-chip">Address <span>ZK:F3D1B796</span></div>
     </div>
+    <button class="modal-btn" onclick="document.getElementById('overlay').style.display='none'">Enter CareIQ OS ⬡</button>
   </div>
-  <div class="nav-links">
-    <button class="nav-pill" onclick="scrollTo('features')">Platform</button>
-    <button class="nav-pill" onclick="scrollTo('demo')">Demo</button>
-    <button class="nav-pill" onclick="scrollTo('fqhc')">For FQHCs</button>
-    <button class="nav-pill primary" onclick="scrollTo('demo')">Request Access ⊕</button>
-  </div>
-</nav>
+</div>
 
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-badge">
-      <div class="hero-badge-dot"></div>
-      <span class="hero-badge-text">Now Available for FQHC Pilot Programs</span>
+<div class="shell">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-logo" onclick="nav('dashboard')">⊕</div>
+    <div class="sb-nav">
+      <div class="sb-item active" id="nav-dashboard" onclick="nav('dashboard')"><span class="sb-icon">◈</span><span class="sb-label">Panel</span></div>
+      <div class="sb-item" id="nav-patients" onclick="nav('patients')"><span class="sb-icon">◉</span><span class="sb-label">Patients</span></div>
+      <div class="sb-item" id="nav-gaps" onclick="nav('gaps')"><span class="sb-icon">◎</span><span class="sb-label">Gaps</span></div>
+      <div class="sb-item" id="nav-reports" onclick="nav('reports')"><span class="sb-icon">◆</span><span class="sb-label">UDS</span></div>
+      <div class="sb-item" id="nav-protection" onclick="nav('protection')"><span class="sb-icon">⬡</span><span class="sb-label">Shield</span></div>
+      <div class="sb-item" id="nav-benefits" onclick="nav('benefits')"><span class="sb-icon">★</span><span class="sb-label">Why</span></div>
     </div>
+    <div class="sb-bottom"><div class="sh-dot"></div></div>
+  </div>
 
-    <h1 class="hero-title">Preventive Intelligence<br>for <span>Community Health</span></h1>
-    <div class="hero-sub">Know who needs care before they need emergency care.</div>
-    <p class="hero-desc">CareIQ is an AI-powered preventive health intelligence platform built for Federally Qualified Health Centers. Risk stratification, care gap identification, and patient health scoring in one sovereign, secure platform.</p>
-
-    <div class="hero-stats">
-      <div class="stat-card">
-        <div class="stat-num">1,400+</div>
-        <div class="stat-label">FQHC Organizations</div>
+  <div class="main">
+    <div class="topbar">
+      <div class="tb-left">
+        <span class="tb-title" id="topTitle">Population Dashboard</span>
+        <div class="sh-pill"><div class="sh-dot" style="width:6px;height:6px;"></div><span class="sh-pill-txt">ZK Shield On</span></div>
       </div>
-      <div class="stat-card">
-        <div class="stat-num">30M</div>
-        <div class="stat-label">Patients Served</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num">62%</div>
-        <div class="stat-label">Avg. Preventive Gap</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num">$4.1B</div>
-        <div class="stat-label">Preventable Costs Annually</div>
+      <div class="tb-right">
+        <span class="fac-tag">Riverside Community Health — FQHC Demo</span>
+        <div class="u-av">RC</div>
       </div>
     </div>
 
-    <div class="hero-ctas">
-      <button class="btn btn-primary" onclick="scrollTo('demo')">See Live Demo ⊕</button>
-      <button class="btn btn-secondary" onclick="scrollTo('fqhc')">FQHC Pilot Program</button>
-    </div>
-  </div>
-</section>
-
-<div class="gradient-line"></div>
-
-<!-- FEATURES -->
-<section class="features" id="features">
-  <div class="section-label">Platform Capabilities</div>
-  <h2 class="section-title">Three Pillars of Preventive Intelligence</h2>
-  <p class="section-sub">Built for the realities of community health, not the assumptions of enterprise software.</p>
-
-  <div class="feature-grid">
-    <div class="feature-card" style="--accent: #E05040;">
-      <div class="feature-icon" style="color:#E05040;">◈</div>
-      <div class="feature-title" style="color:#E05040;">Risk Stratification</div>
-      <div class="feature-desc">CareIQ continuously scores every patient on composite risk across chronic disease, social determinants, and utilization history. High-risk patients surface automatically so your care team acts before a crisis develops.</div>
-    </div>
-    <div class="feature-card" style="--accent: #C8A020;">
-      <div class="feature-icon" style="color:#C8A020;">◎</div>
-      <div class="feature-title" style="color:#C8A020;">Preventive Care Gap Identification</div>
-      <div class="feature-desc">Real-time mapping of overdue screenings, missed immunizations, and lapsed chronic disease management across your entire patient panel. Prioritized by clinical urgency so your team closes the most critical gaps first.</div>
-    </div>
-    <div class="feature-card" style="--accent: #22A070;">
-      <div class="feature-icon" style="color:#22A070;">⊕</div>
-      <div class="feature-title" style="color:#22A070;">Patient Health Scoring</div>
-      <div class="feature-desc">Longitudinal health scores that track patient trajectory over time. See who is improving, who is declining, and who needs immediate outreach. Actionable intelligence, not raw data.</div>
-    </div>
-    <div class="feature-card" style="--accent: #22A0B8;">
-      <div class="feature-icon" style="color:#22A0B8;">⬡</div>
-      <div class="feature-title" style="color:#22A0B8;">Data Sovereignty Protection</div>
-      <div class="feature-desc">Patient data never leaves your infrastructure unprotected. CareIQ's Sovereign Shield layer hashes sensitive information at the edge. Built for HIPAA compliance from the architecture up, not bolted on after.</div>
-    </div>
-    <div class="feature-card" style="--accent: #C8A020;">
-      <div class="feature-icon" style="color:#C8A020;">◆</div>
-      <div class="feature-title" style="color:#C8A020;">FQHC Quality Measure Alignment</div>
-      <div class="feature-desc">Built around UDS reporting requirements and HRSA quality benchmarks. CareIQ maps directly to the measures your health center is already accountable for, turning compliance reporting into a byproduct of care delivery.</div>
-    </div>
-    <div class="feature-card" style="--accent: #22A070;">
-      <div class="feature-icon" style="color:#22A070;">◉</div>
-      <div class="feature-title" style="color:#22A070;">Community Health Intelligence</div>
-      <div class="feature-desc">Population-level views that identify patterns across your patient panel. Social determinants mapping, neighborhood health clustering, and outreach prioritization for community health workers.</div>
-    </div>
-  </div>
-</section>
-
-<div class="gradient-line"></div>
-
-<!-- DEMO -->
-<section class="demo-section" id="demo">
-  <div class="demo-inner">
-    <div class="section-label">Interactive Demo</div>
-    <h2 class="section-title" style="margin-bottom:8px;">CareIQ Intelligence Platform</h2>
-    <p class="section-sub">Select a patient to see risk stratification, care gaps, and AI-generated clinical insight.</p>
-
-    <div class="demo-grid">
-
-      <!-- PATIENT LIST -->
-      <div class="patient-panel">
-        <div class="panel-header">
-          <span class="panel-title">Patient Panel</span>
-          <span class="panel-count">8 Patients</span>
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="ph"><div class="ph-title">Population Dashboard</div><div class="ph-desc">Real-time preventive intelligence across your patient panel.</div></div>
+      <div class="grad"></div>
+      <div class="g4">
+        <div class="mc" style="--mc:#E05040;--mw:18%;"><div class="mc-val" style="color:#E05040;">18</div><div class="mc-label">High Risk Patients</div><div class="mc-trend" style="color:#E05040;">▲ 3 from last month</div></div>
+        <div class="mc" style="--mc:var(--gold);--mw:34%;"><div class="mc-val" style="color:var(--gold);">34</div><div class="mc-label">Moderate Risk</div><div class="mc-trend" style="color:var(--gold);">▼ 2 improving</div></div>
+        <div class="mc" style="--mc:var(--greenLight);--mw:62%;"><div class="mc-val">247</div><div class="mc-label">Open Care Gaps</div><div class="mc-trend">▼ 41 closed this month</div></div>
+        <div class="mc" style="--mc:var(--tealLight);--mw:71%;"><div class="mc-val" style="color:var(--tealLight);">71%</div><div class="mc-label">UDS Compliance</div><div class="mc-trend" style="color:var(--tealLight);">▲ 6pts from Q1</div></div>
+      </div>
+      <div class="g3" style="margin-bottom:20px;">
+        <div class="ring-card">
+          <svg class="ring-svg" viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fill" cx="50" cy="50" r="45" stroke="#E05040" stroke-dasharray="283" stroke-dashoffset="234"/></svg>
+          <div class="ring-center"><div class="ring-val" style="color:#E05040;">17%</div><div class="ring-sub">at risk</div></div>
+          <div class="ring-name" style="color:#E05040;">High Risk</div><div class="ring-status">18 patients need action</div>
         </div>
-        <div class="patient-list" id="patientList"></div>
+        <div class="ring-card">
+          <svg class="ring-svg" viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fill" cx="50" cy="50" r="45" stroke="var(--gold)" stroke-dasharray="283" stroke-dashoffset="82"/></svg>
+          <div class="ring-center"><div class="ring-val" style="color:var(--gold);">71%</div><div class="ring-sub">UDS score</div></div>
+          <div class="ring-name" style="color:var(--gold);">Quality Score</div><div class="ring-status">14 of 18 measures passing</div>
+        </div>
+        <div class="ring-card">
+          <svg class="ring-svg" viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fill" cx="50" cy="50" r="45" stroke="var(--greenLight)" stroke-dasharray="283" stroke-dashoffset="82"/></svg>
+          <div class="ring-center"><div class="ring-val">71%</div><div class="ring-sub">gaps closed</div></div>
+          <div class="ring-name">Gap Closure</div><div class="ring-status">247 gaps remaining</div>
+        </div>
       </div>
-
-      <!-- DETAIL -->
-      <div class="detail-panel">
-        <div class="detail-header" id="detailHeader">
-          <div class="detail-avatar" id="detailAvatar" style="background:rgba(26,106,72,0.2);color:#22A070;">MT</div>
-          <div>
-            <div class="detail-name" id="detailName">Select a Patient</div>
-            <div class="detail-meta" id="detailMeta">Click any patient from the panel to view their CareIQ profile</div>
+      <div class="g2">
+        <div class="card">
+          <div class="sh"><span class="sh-title">Risk Distribution</span><span class="sh-action" onclick="nav('patients')">View All</span></div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-family:'Rajdhani',sans-serif;font-size:12px;color:#E05040;font-weight:700;">HIGH RISK</span><span style="font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--muted);">18 patients</span></div><div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:6%;height:100%;background:#E05040;border-radius:4px;"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-family:'Rajdhani',sans-serif;font-size:12px;color:var(--gold);font-weight:700;">MODERATE RISK</span><span style="font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--muted);">34 patients</span></div><div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:11%;height:100%;background:var(--gold);border-radius:4px;"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-family:'Rajdhani',sans-serif;font-size:12px;color:var(--greenLight);font-weight:700;">LOW RISK</span><span style="font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--muted);">253 patients</span></div><div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:83%;height:100%;background:var(--greenLight);border-radius:4px;"></div></div></div>
           </div>
         </div>
-        <div class="detail-body" id="detailBody">
-          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:1px;text-align:center;padding:40px;">
-            SELECT A PATIENT FROM THE LIST<br>TO VIEW THEIR CAREIQ PROFILE
+        <div class="card">
+          <div class="sh"><span class="sh-title">Top Gap Categories</span><span class="sh-action" onclick="nav('gaps')">Manage</span></div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-size:13px;color:var(--bone);">Diabetes Management</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);">87 patients</div></div><div style="width:80px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:87%;height:100%;background:#E05040;border-radius:3px;"></div></div></div></div>
+            <div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-size:13px;color:var(--bone);">Cancer Screenings</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);">64 patients</div></div><div style="width:80px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:64%;height:100%;background:var(--gold);border-radius:3px;"></div></div></div></div>
+            <div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-size:13px;color:var(--bone);">Cardiovascular</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);">51 patients</div></div><div style="width:80px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:51%;height:100%;background:var(--gold);border-radius:3px;"></div></div></div></div>
+            <div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-size:13px;color:var(--bone);">Immunizations</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);">38 patients</div></div><div style="width:80px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:38%;height:100%;background:var(--greenLight);border-radius:3px;"></div></div></div></div>
+            <div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-size:13px;color:var(--bone);">Behavioral Health</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);">27 patients</div></div><div style="width:80px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:27%;height:100%;background:var(--tealLight);border-radius:3px;"></div></div></div></div>
           </div>
         </div>
       </div>
-
+      <div class="card">
+        <div class="sh"><span class="sh-title">High Priority — Action Required</span><span class="sh-action" onclick="nav('patients')">View All</span></div>
+        <table class="pt"><thead><tr><th>Patient</th><th>Condition</th><th>Risk Score</th><th>Health Score</th><th>Top Gap</th><th></th></tr></thead><tbody id="dashTable"></tbody></table>
+      </div>
     </div>
+
+    <!-- PATIENTS -->
+    <div class="page" id="page-patients">
+      <div class="ph"><div class="ph-title">Patient Panel</div><div class="ph-desc">Full panel with risk stratification and care gap status.</div></div>
+      <div class="grad"></div>
+      <div class="card"><table class="pt"><thead><tr><th>Patient</th><th>Age</th><th>Condition</th><th>Risk</th><th>Risk Score</th><th>Health Score</th><th>Gaps</th></tr></thead><tbody id="fullTable"></tbody></table></div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="page" id="page-detail">
+      <div class="back" onclick="nav('patients')">&#8592; Back to Patients</div>
+      <div id="detailContent"></div>
+    </div>
+
+    <!-- GAPS -->
+    <div class="page" id="page-gaps">
+      <div class="ph"><div class="ph-title">Care Gap Management</div><div class="ph-desc">Priority-ordered preventive care gaps across your panel.</div></div>
+      <div class="grad"></div>
+      <div class="g3">
+        <div class="mc" style="--mc:#E05040;--mw:22%;"><div class="mc-val" style="color:#E05040;">54</div><div class="mc-label">Critical Gaps</div><div class="mc-trend" style="color:#E05040;">Immediate action required</div></div>
+        <div class="mc" style="--mc:var(--gold);--mw:47%;"><div class="mc-val" style="color:var(--gold);">118</div><div class="mc-label">Moderate Gaps</div><div class="mc-trend" style="color:var(--gold);">Schedule within 30 days</div></div>
+        <div class="mc" style="--mc:var(--greenLight);--mw:75%;"><div class="mc-val">75</div><div class="mc-label">Routine Gaps</div><div class="mc-trend">Next scheduled visit</div></div>
+      </div>
+      <div class="card">
+        <div class="sh"><span class="sh-title">Critical Gaps — Immediate Action</span></div>
+        <div class="gap-item"><span class="gap-ico">🏥</span><div style="flex:1;"><div class="gap-txt">Post-hospitalization follow-up overdue 3 weeks</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">Rosa L. — Heart Failure</div></div><span class="badge bh">Critical</span></div>
+        <div class="gap-item"><span class="gap-ico">🫘</span><div style="flex:1;"><div class="gap-txt">Nephrology co-management referral urgent</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">Carlos M. — CKD Stage 3</div></div><span class="badge bh">Critical</span></div>
+        <div class="gap-item"><span class="gap-ico">👁</span><div style="flex:1;"><div class="gap-txt">Retinal eye exam overdue 14 months</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">Maria T. — Diabetes</div></div><span class="badge bh">Critical</span></div>
+        <div class="gap-item"><span class="gap-ico">💉</span><div style="flex:1;"><div class="gap-txt">Pneumococcal vaccine not on record</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">Rosa L. — COPD</div></div><span class="badge bh">Critical</span></div>
+        <div class="gap-item"><span class="gap-ico">💊</span><div style="flex:1;"><div class="gap-txt">ACE inhibitor dosage review needed</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">Carlos M. — CKD/HTN</div></div><span class="badge bh">Critical</span></div>
+        <div class="gap-item"><span class="gap-ico">🦴</span><div style="flex:1;"><div class="gap-txt">Bisphosphonate therapy discontinuation review</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">Agnes W. — Osteoporosis</div></div><span class="badge bh">Critical</span></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="sh"><span class="sh-title">Moderate Gaps — Schedule Within 30 Days</span></div>
+        <div class="gap-item"><span class="gap-ico">🏃</span><div style="flex:1;"><div class="gap-txt">Diabetes Prevention Program referral pending</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">James R. — Pre-Diabetes</div></div><span class="badge bm">Moderate</span></div>
+        <div class="gap-item"><span class="gap-ico">🩸</span><div style="flex:1;"><div class="gap-txt">Repeat A1C test due in 3 months</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">James R. — Pre-Diabetes</div></div><span class="badge bm">Moderate</span></div>
+        <div class="gap-item"><span class="gap-ico">📋</span><div style="flex:1;"><div class="gap-txt">Colorectal cancer screening overdue 2 years</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">James R. — Age 44</div></div><span class="badge bm">Moderate</span></div>
+        <div class="gap-item"><span class="gap-ico">🎗</span><div style="flex:1;"><div class="gap-txt">Mammography declined last visit — navigator outreach needed</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);margin-top:2px;">Linda S. — Age 52</div></div><span class="badge bm">Moderate</span></div>
+      </div>
+    </div>
+
+    <!-- UDS -->
+    <div class="page" id="page-reports">
+      <div class="ph"><div class="ph-title">UDS Quality Measures</div><div class="ph-desc">Uniform Data System reporting aligned with HRSA requirements.</div></div>
+      <div class="grad"></div>
+      <div class="g2">
+        <div class="mc" style="--mc:var(--greenLight);--mw:71%;"><div class="mc-val">71%</div><div class="mc-label">Overall Compliance</div><div class="mc-trend">▲ 6pts from Q1 2026</div></div>
+        <div class="mc" style="--mc:var(--gold);--mw:85%;"><div class="mc-val" style="color:var(--gold);">14/18</div><div class="mc-label">Measures at or above target</div><div class="mc-trend" style="color:var(--gold);">4 measures need improvement</div></div>
+      </div>
+      <div class="card">
+        <div class="sh"><span class="sh-title">Measure Performance</span></div>
+        <div class="uds-row"><div class="uds-m">Diabetes: HbA1c Control (&lt;8%)</div><div class="uds-cur" style="color:var(--gold);">68%</div><div class="uds-tgt">Goal: 70%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:68%;height:100%;background:var(--gold);border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Hypertension: BP Control (&lt;140/90)</div><div class="uds-cur" style="color:var(--greenLight);">74%</div><div class="uds-tgt">Goal: 70%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:74%;height:100%;background:var(--greenLight);border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Cervical Cancer Screening</div><div class="uds-cur" style="color:var(--gold);">62%</div><div class="uds-tgt">Goal: 65%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:62%;height:100%;background:var(--gold);border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Colorectal Cancer Screening</div><div class="uds-cur" style="color:#E05040;">55%</div><div class="uds-tgt">Goal: 60%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:55%;height:100%;background:#E05040;border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Child Immunization Status</div><div class="uds-cur" style="color:var(--greenLight);">82%</div><div class="uds-tgt">Goal: 75%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:82%;height:100%;background:var(--greenLight);border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Depression Screening (PHQ-9)</div><div class="uds-cur" style="color:var(--greenLight);">71%</div><div class="uds-tgt">Goal: 68%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:71%;height:100%;background:var(--greenLight);border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">HIV Screening</div><div class="uds-cur" style="color:#E05040;">44%</div><div class="uds-tgt">Goal: 50%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:44%;height:100%;background:#E05040;border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Asthma Pharmacologic Therapy</div><div class="uds-cur" style="color:var(--greenLight);">78%</div><div class="uds-tgt">Goal: 75%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:78%;height:100%;background:var(--greenLight);border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Prenatal Care: Early Entry</div><div class="uds-cur" style="color:var(--gold);">67%</div><div class="uds-tgt">Goal: 70%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:67%;height:100%;background:var(--gold);border-radius:3px;"></div></div></div></div>
+        <div class="uds-row"><div class="uds-m">Tobacco Use: Screening and Cessation</div><div class="uds-cur" style="color:var(--greenLight);">88%</div><div class="uds-tgt">Goal: 80%</div><div style="width:100px;"><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:88%;height:100%;background:var(--greenLight);border-radius:3px;"></div></div></div></div>
+      </div>
+    </div>
+
+    <!-- PROTECTION -->
+    <div class="page" id="page-protection">
+      <div class="ph"><div class="ph-title">Data Protection</div><div class="ph-desc">How Sovereign Shield keeps your patient data protected at every step.</div></div>
+      <div class="grad"></div>
+      <div style="background:var(--greenGlow);border:1px solid rgba(26,106,72,.3);border-radius:16px;padding:28px;text-align:center;margin-bottom:20px;animation:shieldGlow 3s ease-in-out infinite;">
+        <div style="font-size:52px;color:var(--greenLight);margin-bottom:12px;filter:drop-shadow(0 0 12px rgba(34,160,112,.6));">⬡</div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;letter-spacing:2px;color:var(--greenLight);margin-bottom:8px;">Sovereign Shield Technology</div>
+        <div style="font-size:14px;color:var(--boneDim);line-height:1.75;max-width:560px;margin:0 auto;">CareIQ does not send raw patient data to AI systems. Every sensitive identifier is hashed at your device edge using zero-knowledge cryptography. Your patients' privacy is protected by architecture, not just policy.</div>
+      </div>
+      <div class="g2">
+        <div>
+          <div class="sh"><span class="sh-title">How It Works</span></div>
+          <div class="flow"><div class="flow-num">1</div><div><div class="flow-title">Data Enters the Platform</div><div class="flow-desc">Patient records load from your EHR or manual entry. All data stays local to your device and network.</div></div></div>
+          <div class="flow"><div class="flow-num">2</div><div><div class="flow-title">Shield Detects Sensitive Terms</div><div class="flow-desc">The Sovereign Shield layer scans for names, DOBs, MRNs, diagnoses, addresses, and all PHI before any query is formed.</div></div></div>
+          <div class="flow"><div class="flow-num">3</div><div><div class="flow-title">Zero-Knowledge Hashing at Edge</div><div class="flow-desc">Sensitive terms are converted to cryptographic hashes at your device. The original values never leave your local environment.</div></div></div>
+          <div class="flow"><div class="flow-num">4</div><div><div class="flow-title">Protected Query Sent to AI</div><div class="flow-desc">Only the hashed, anonymized query reaches the CareIQ intelligence engine. Clinical insight returns without raw PHI.</div></div></div>
+          <div class="flow"><div class="flow-num">5</div><div><div class="flow-title">Results Displayed Locally</div><div class="flow-desc">AI insights map back to your local patient records. Everything stays within your controlled environment.</div></div></div>
+        </div>
+        <div>
+          <div class="sh"><span class="sh-title">Live Hash Demonstration</span></div>
+          <div style="font-size:13px;color:var(--boneDim);margin-bottom:14px;font-style:italic;">How patient identifiers are protected before leaving your device:</div>
+          <div class="card-sm" style="margin-bottom:14px;">
+            <div class="hash-row"><div class="hash-in">Maria Torres</div><div class="hash-arr">⬡</div><div class="hash-out">ZK:A4F2C891B3D7E506</div><span class="badge bl">Protected</span></div>
+            <div class="hash-row"><div class="hash-in">DOB: 03/12/1966</div><div class="hash-arr">⬡</div><div class="hash-out">ZK:B7E3D2041A9C8F52</div><span class="badge bl">Protected</span></div>
+            <div class="hash-row"><div class="hash-in">MRN: 00124893</div><div class="hash-arr">⬡</div><div class="hash-out">ZK:C1A9F5638E2D7B04</div><span class="badge bl">Protected</span></div>
+            <div class="hash-row"><div class="hash-in">DX: Type 2 Diabetes</div><div class="hash-arr">⬡</div><div class="hash-out">ZK:D8B2E4170F6C3A91</div><span class="badge bl">Protected</span></div>
+            <div class="hash-row"><div class="hash-in">123 Maple St, Ada OK</div><div class="hash-arr">⬡</div><div class="hash-out">ZK:E5C7A0289D4F1B63</div><span class="badge bl">Protected</span></div>
+          </div>
+          <div class="card-sm">
+            <div style="font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--greenLight);margin-bottom:12px;">Compliance Framework</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="color:var(--greenLight);">✓</span><span style="font-size:13px;color:var(--boneDim);">HIPAA Privacy Rule alignment</span></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="color:var(--greenLight);">✓</span><span style="font-size:13px;color:var(--boneDim);">No raw PHI transmitted to external systems</span></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="color:var(--greenLight);">✓</span><span style="font-size:13px;color:var(--boneDim);">Cryptographic audit trail for all queries</span></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="color:var(--greenLight);">✓</span><span style="font-size:13px;color:var(--boneDim);">Configurable sensitivity thresholds</span></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="color:var(--greenLight);">✓</span><span style="font-size:13px;color:var(--boneDim);">Zero third-party data sharing</span></div>
+            <div style="display:flex;align-items:center;gap:8px;"><span style="color:var(--greenLight);">✓</span><span style="font-size:13px;color:var(--boneDim);">FHIR-ready integration architecture</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BENEFITS -->
+    <div class="page" id="page-benefits">
+      <div class="ph"><div class="ph-title">Why CareIQ</div><div class="ph-desc">The measurable impact of preventive intelligence in community health settings.</div></div>
+      <div class="grad"></div>
+      <div class="g3">
+        <div class="benefit" style="--bc:#E05040;"><div class="benefit-ico">🏥</div><div class="benefit-title" style="color:#E05040;">Reduce Avoidable ED Visits</div><div class="benefit-desc">CareIQ identifies high-risk patients before they reach crisis. Early outreach and care coordination reduce avoidable emergency department utilization across your panel.</div><div class="benefit-stat" style="color:#E05040;">32%</div><div class="benefit-stat-lbl">Average ED reduction in comparable FQHC deployments</div></div>
+        <div class="benefit" style="--bc:var(--gold);"><div class="benefit-ico">📋</div><div class="benefit-title" style="color:var(--gold);">Improve UDS Performance</div><div class="benefit-desc">CareIQ maps every patient to the UDS measures your health center is accountable for. Gap closure drives measure improvement automatically as care is delivered.</div><div class="benefit-stat" style="color:var(--gold);">+11pts</div><div class="benefit-stat-lbl">Average UDS measure improvement in year one</div></div>
+        <div class="benefit" style="--bc:var(--greenLight);"><div class="benefit-ico">💰</div><div class="benefit-title">Protect Federal Funding</div><div class="benefit-desc">HRSA quality benchmarks directly affect Section 330 grant renewals. CareIQ's continuous measure tracking means you are never surprised by a performance gap at reporting time.</div><div class="benefit-stat">$340K</div><div class="benefit-stat-lbl">Average funding at risk from UDS underperformance per site</div></div>
+        <div class="benefit" style="--bc:var(--tealLight);"><div class="benefit-ico">⬡</div><div class="benefit-title" style="color:var(--tealLight);">Patient Data You Control</div><div class="benefit-desc">Unlike cloud analytics platforms, CareIQ's Sovereign Shield means patient data never leaves your environment unprotected. Your patients' trust is your most valuable asset.</div><div class="benefit-stat" style="color:var(--tealLight);">100%</div><div class="benefit-stat-lbl">Of PHI hashed before leaving local environment</div></div>
+        <div class="benefit" style="--bc:var(--gold);"><div class="benefit-ico">🏃</div><div class="benefit-title" style="color:var(--gold);">30-Day Deployment</div><div class="benefit-desc">No 18-month enterprise implementation. CareIQ pilots deploy in 30 days with your existing patient data. Your care team is using it before the next quarterly review.</div><div class="benefit-stat" style="color:var(--gold);">30</div><div class="benefit-stat-lbl">Days from agreement to live deployment</div></div>
+        <div class="benefit" style="--bc:#E05040;"><div class="benefit-ico">🫀</div><div class="benefit-title" style="color:#E05040;">Close the Health Equity Gap</div><div class="benefit-desc">FQHC patients face documented health disparities. CareIQ's risk stratification surfaces the highest-need patients specifically, enabling targeted outreach where it matters most.</div><div class="benefit-stat" style="color:#E05040;">62%</div><div class="benefit-stat-lbl">Of FQHC patients have at least one unaddressed preventive gap</div></div>
+      </div>
+      <div class="card" style="text-align:center;padding:36px;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--greenLight);margin-bottom:10px;">Pilot Program Open Now</div>
+        <div style="font-size:26px;color:var(--cream);margin-bottom:10px;font-weight:700;">Ready to bring CareIQ to your health center?</div>
+        <div style="font-size:14px;color:var(--boneDim);font-style:italic;max-width:500px;margin:0 auto 24px;line-height:1.75;">30-day deployment, no long contract, working preventive intelligence from day one.</div>
+        <a href="mailto:matpcul@gmail.com?subject=CareIQ FQHC Pilot Request" style="text-decoration:none;"><button style="background:linear-gradient(135deg,var(--forest),var(--green));color:var(--cream);border:none;border-radius:10px;padding:13px 30px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;cursor:pointer;box-shadow:0 0 20px rgba(26,106,72,.4);">Request a Pilot ⊕</button></a>
+      </div>
+    </div>
+
   </div>
-</section>
-
-<!-- FQHC -->
-<section class="fqhc-section" id="fqhc">
-  <div class="section-label">Built for FQHCs</div>
-  <h2 class="section-title">The Community Health Market</h2>
-  <p class="section-sub">Federally Qualified Health Centers serve 30 million patients. CareIQ is built for exactly this environment.</p>
-
-  <div class="fqhc-grid">
-    <div class="fqhc-card">
-      <div class="fqhc-number">1,400+</div>
-      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">FQHC Organizations</div>
-      <div class="fqhc-desc">Operating 14,000 delivery sites across every state, serving underserved urban and rural communities where preventive care gaps are widest.</div>
-    </div>
-    <div class="fqhc-card">
-      <div class="fqhc-number">$7.8B</div>
-      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">Annual Federal Funding</div>
-      <div class="fqhc-desc">Section 330 grants and Medicaid enhanced reimbursements create stable, recurring budgets specifically allocated for quality improvement and technology.</div>
-    </div>
-    <div class="fqhc-card">
-      <div class="fqhc-number">UDS</div>
-      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">Reporting Alignment</div>
-      <div class="fqhc-desc">CareIQ maps directly to Uniform Data System quality measures. Every clinical insight connects to a metric your health center is already accountable for.</div>
-    </div>
-    <div class="fqhc-card">
-      <div class="fqhc-number">62%</div>
-      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">Average Preventive Gap</div>
-      <div class="fqhc-desc">The average FQHC patient panel has significant unmet preventive care needs. CareIQ surfaces and prioritizes these gaps before they become emergency visits.</div>
-    </div>
-  </div>
-
-  <div style="margin-top:48px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;text-align:center;">
-    <div style="font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--greenLight);margin-bottom:12px;">Pilot Program Now Open</div>
-    <h3 style="font-size:28px;color:var(--cream);margin-bottom:12px;">Ready to see CareIQ in your health center?</h3>
-    <p style="font-size:15px;color:var(--boneDim);font-style:italic;max-width:560px;margin:0 auto 28px;line-height:1.7;">We are accepting FQHC pilot partners now. No enterprise contract. No long implementation timeline. A working deployment in your environment with your patient data in 30 days.</p>
-    <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
-      <a href="mailto:matpcul@gmail.com?subject=CareIQ FQHC Pilot Inquiry" style="text-decoration:none;">
-        <button class="btn btn-primary">Request a Pilot ⊕</button>
-      </a>
-      <a href="mailto:matpcul@gmail.com?subject=CareIQ Demo Request" style="text-decoration:none;">
-        <button class="btn btn-secondary">Schedule a Demo</button>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- FOOTER -->
-<footer>
-  <div class="footer-logo">CAREIQ</div>
-  <div class="footer-sub">Preventive Intelligence for Community Health</div>
-  <div class="footer-sub" style="margin-bottom:16px;font-size:9px;">A Sovereign Shield Technologies LLC Product</div>
-  <div class="footer-pills">
-    <span class="footer-pill">⬡ HIPAA Aligned</span>
-    <span class="footer-pill">◉ Sovereign Data Protection</span>
-    <span class="footer-pill">⊕ FQHC Ready</span>
-    <span class="footer-pill">◎ UDS Mapped</span>
-  </div>
-  <div class="footer-copy">matpcul@gmail.com &nbsp;|&nbsp; Sovereign Shield Technologies LLC &nbsp;|&nbsp; Ada, Oklahoma &nbsp;|&nbsp; 2026</div>
-</footer>
+</div>
 
 <script>
-// ── STAR FIELD ──
-(function(){
-  const sf = document.getElementById('starfield');
-  for(let i=0;i<90;i++){
-    const s = document.createElement('div');
-    s.className = 'star';
-    const x = (i*137.508)%100;
-    const y = (i*97.3)%100;
-    const r = i%5===0?1.4:i%3===0?0.9:0.45;
-    const d = 2.5+(i%7)*0.5;
-    const o1 = 0.08+(i%5)*0.04;
-    const o2 = 0.3+(i%4)*0.1;
-    s.style.cssText = `left:${x}%;top:${y}%;width:${r*2}px;height:${r*2}px;--d:${d}s;--o1:${o1};--o2:${o2};animation-delay:${(i%7)*0.3}s;`;
-    sf.appendChild(s);
-  }
-})();
+// STARS
+(function(){const sf=document.getElementById('sf');for(let i=0;i<80;i++){const s=document.createElement('div');s.className='st';const x=(i*137.508)%100,y=(i*97.3)%100,r=i%5===0?1.3:i%3===0?0.8:0.4,d=2.5+(i%7)*.4,o1=.08+(i%5)*.04,o2=.3+(i%4)*.1;s.style.cssText=`left:${x}%;top:${y}%;width:${r*2}px;height:${r*2}px;--o1:${o1};--o2:${o2};animation:tw ${d}s ease-in-out ${(i%7)*.3}s infinite;`;sf.appendChild(s);}})();
 
-// ── SCROLL ──
-function scrollTo(id){ document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
-
-// ── PATIENT DATA ──
-const patients = [
-  {
-    id:1, name:"Maria T.", age:58, gender:"F", initials:"MT",
-    condition:"Type 2 Diabetes, Hypertension", risk:"high",
-    avatarBg:"rgba(138,32,16,0.25)", avatarColor:"#E05040",
-    riskScore:87, careGapScore:42, healthScore:54,
-    ai:"Maria presents with poorly controlled A1C trending upward over three visits. Combined with a 14-month gap in retinal screening and uncontrolled blood pressure, she is at high risk for diabetic complications within 12 months without intervention. Recommend immediate nephrology referral and diabetes care management enrollment.",
-    gaps:[
-      {icon:"👁", text:"Retinal eye exam overdue 14 months", priority:"critical"},
-      {icon:"🫀", text:"Blood pressure follow-up needed within 2 weeks", priority:"critical"},
-      {icon:"🩺", text:"Podiatry referral for foot exam", priority:"moderate"},
-      {icon:"💉", text:"Flu vaccination not on record this season", priority:"routine"},
-    ],
-    biomarkers:[
-      {label:"A1C", val:"9.2%", fill:85, color:"#E05040"},
-      {label:"Blood Pressure", val:"148/94", fill:78, color:"#E05040"},
-      {label:"BMI", val:"34.1", fill:70, color:"#C8A020"},
-      {label:"eGFR", val:"61", fill:55, color:"#C8A020"},
-    ]
-  },
-  {
-    id:2, name:"James R.", age:44, gender:"M", initials:"JR",
-    condition:"Pre-Diabetes, Obesity", risk:"medium",
-    avatarBg:"rgba(200,160,32,0.2)", avatarColor:"#C8A020",
-    riskScore:61, careGapScore:68, healthScore:63,
-    ai:"James is at a critical intervention window. Pre-diabetic A1C combined with elevated BMI places him on a trajectory toward Type 2 Diabetes within 2 to 3 years without lifestyle modification. He is an ideal candidate for the National Diabetes Prevention Program. Enrollment now could prevent progression entirely.",
-    gaps:[
-      {icon:"🏃", text:"Diabetes Prevention Program referral pending", priority:"critical"},
-      {icon:"🩸", text:"Repeat A1C test due in 3 months", priority:"moderate"},
-      {icon:"📋", text:"Colorectal cancer screening overdue 2 years", priority:"moderate"},
-      {icon:"🫁", text:"Annual wellness visit not completed", priority:"routine"},
-    ],
-    biomarkers:[
-      {label:"A1C", val:"6.3%", fill:55, color:"#C8A020"},
-      {label:"Blood Pressure", val:"128/82", fill:50, color:"#C8A020"},
-      {label:"BMI", val:"31.8", fill:65, color:"#C8A020"},
-      {label:"Cholesterol", val:"214", fill:58, color:"#C8A020"},
-    ]
-  },
-  {
-    id:3, name:"Rosa L.", age:67, gender:"F", initials:"RL",
-    condition:"COPD, Heart Failure", risk:"high",
-    avatarBg:"rgba(138,32,16,0.25)", avatarColor:"#E05040",
-    riskScore:92, careGapScore:35, healthScore:41,
-    ai:"Rosa has the highest 30-day readmission risk in the current panel. Her last hospitalization for decompensated heart failure was 6 weeks ago. She is missing key follow-up visits and has not received pneumococcal vaccination. Immediate care coordination contact is recommended within 48 hours.",
-    gaps:[
-      {icon:"🏥", text:"Post-hospitalization follow-up overdue 3 weeks", priority:"critical"},
-      {icon:"💨", text:"Pulmonology follow-up for COPD management", priority:"critical"},
-      {icon:"💉", text:"Pneumococcal vaccine not on record", priority:"moderate"},
-      {icon:"⚖️", text:"Daily weight monitoring protocol not initiated", priority:"moderate"},
-    ],
-    biomarkers:[
-      {label:"SpO2", val:"91%", fill:40, color:"#E05040"},
-      {label:"Blood Pressure", val:"156/98", fill:82, color:"#E05040"},
-      {label:"BNP", val:"890", fill:90, color:"#E05040"},
-      {label:"FEV1", val:"48%", fill:45, color:"#E05040"},
-    ]
-  },
-  {
-    id:4, name:"David K.", age:35, gender:"M", initials:"DK",
-    condition:"Anxiety, Hypertension", risk:"medium",
-    avatarBg:"rgba(200,160,32,0.2)", avatarColor:"#C8A020",
-    riskScore:48, careGapScore:72, healthScore:71,
-    ai:"David's anxiety and hypertension are interacting in a clinically meaningful way. His blood pressure variability correlates with reported stress events. A behavioral health co-location referral may produce better blood pressure control than medication adjustment alone. He is also overdue for a lipid panel.",
-    gaps:[
-      {icon:"🧠", text:"Behavioral health integration referral recommended", priority:"moderate"},
-      {icon:"🩸", text:"Lipid panel overdue 18 months", priority:"moderate"},
-      {icon:"💊", text:"Medication adherence check at next visit", priority:"routine"},
-      {icon:"📋", text:"Depression screening PHQ-9 not completed this year", priority:"routine"},
-    ],
-    biomarkers:[
-      {label:"Blood Pressure", val:"138/88", fill:62, color:"#C8A020"},
-      {label:"Heart Rate", val:"88 bpm", fill:55, color:"#C8A020"},
-      {label:"BMI", val:"27.4", fill:48, color:"#22A070"},
-      {label:"Cholesterol", val:"198", fill:45, color:"#22A070"},
-    ]
-  },
-  {
-    id:5, name:"Linda S.", age:52, gender:"F", initials:"LS",
-    condition:"Well Visit, Preventive", risk:"low",
-    avatarBg:"rgba(26,106,72,0.2)", avatarColor:"#22A070",
-    riskScore:22, careGapScore:88, healthScore:84,
-    ai:"Linda is a model preventive care patient with consistently strong engagement. Her only outstanding gap is a mammography screening, which she declined last year citing scheduling barriers. A patient navigator outreach with flexible scheduling options is likely to result in completion. No acute concerns identified.",
-    gaps:[
-      {icon:"🎗", text:"Mammography screening declined last visit", priority:"moderate"},
-      {icon:"💉", text:"Tdap booster due this year", priority:"routine"},
-      {icon:"🦴", text:"Bone density screening due at age 55 in 3 years", priority:"routine"},
-    ],
-    biomarkers:[
-      {label:"Blood Pressure", val:"118/74", fill:30, color:"#22A070"},
-      {label:"BMI", val:"24.2", fill:35, color:"#22A070"},
-      {label:"Cholesterol", val:"172", fill:32, color:"#22A070"},
-      {label:"A1C", val:"5.2%", fill:25, color:"#22A070"},
-    ]
-  },
-  {
-    id:6, name:"Carlos M.", age:61, gender:"M", initials:"CM",
-    condition:"CKD Stage 3, Diabetes", risk:"high",
-    avatarBg:"rgba(138,32,16,0.25)", avatarColor:"#E05040",
-    riskScore:79, careGapScore:51, healthScore:49,
-    ai:"Carlos is approaching the threshold for CKD Stage 4 based on eGFR trajectory over the past 18 months. Combined with his diabetes, proactive nephrology co-management now is critical to delay or prevent dialysis initiation. His current ACE inhibitor dosage may need adjustment based on recent labs.",
-    gaps:[
-      {icon:"🫘", text:"Nephrology co-management referral urgent", priority:"critical"},
-      {icon:"🩺", text:"ACE inhibitor dosage review needed", priority:"critical"},
-      {icon:"👁", text:"Annual diabetic retinal exam overdue 8 months", priority:"moderate"},
-      {icon:"🦶", text:"Diabetic foot exam overdue", priority:"moderate"},
-    ],
-    biomarkers:[
-      {label:"eGFR", val:"38", fill:35, color:"#E05040"},
-      {label:"A1C", val:"8.4%", fill:78, color:"#E05040"},
-      {label:"Creatinine", val:"1.9", fill:72, color:"#C8A020"},
-      {label:"Blood Pressure", val:"142/90", fill:68, color:"#C8A020"},
-    ]
-  },
-  {
-    id:7, name:"Agnes W.", age:74, gender:"F", initials:"AW",
-    condition:"Osteoporosis, Hypertension", risk:"medium",
-    avatarBg:"rgba(200,160,32,0.2)", avatarColor:"#C8A020",
-    riskScore:55, careGapScore:61, healthScore:66,
-    ai:"Agnes has documented osteoporosis but her bisphosphonate therapy was discontinued 2 years ago without documented clinical rationale. Her fall risk score is moderate and she has not received a home safety assessment. These combined factors place her at meaningful fracture risk that is addressable with current evidence-based interventions.",
-    gaps:[
-      {icon:"🦴", text:"Bisphosphonate therapy discontinuation review", priority:"critical"},
-      {icon:"🏠", text:"Home safety fall assessment not completed", priority:"moderate"},
-      {icon:"💊", text:"Calcium and Vitamin D supplementation review", priority:"moderate"},
-      {icon:"👁", text:"Cataracts screening overdue", priority:"routine"},
-    ],
-    biomarkers:[
-      {label:"Blood Pressure", val:"132/80", fill:52, color:"#22A070"},
-      {label:"BMI", val:"22.1", fill:28, color:"#22A070"},
-      {label:"T-Score", val:"-2.8", fill:68, color:"#E05040"},
-      {label:"Vitamin D", val:"18 ng/mL", fill:30, color:"#C8A020"},
-    ]
-  },
-  {
-    id:8, name:"Tyrone B.", age:29, gender:"M", initials:"TB",
-    condition:"Asthma, Uninsured", risk:"low",
-    avatarBg:"rgba(26,106,72,0.2)", avatarColor:"#22A070",
-    riskScore:18, careGapScore:91, healthScore:88,
-    ai:"Tyrone is young and generally healthy with well-controlled asthma. His primary care gap is STI screening, which is guideline-recommended for his age and risk profile. He is also an excellent candidate for the health center's enrollment assistance program, which may help him qualify for Medicaid or marketplace coverage.",
-    gaps:[
-      {icon:"📋", text:"STI screening not completed per age guidelines", priority:"moderate"},
-      {icon:"🏥", text:"Coverage enrollment assistance eligibility", priority:"moderate"},
-      {icon:"💨", text:"Asthma action plan needs annual update", priority:"routine"},
-      {icon:"🦷", text:"Dental referral for unmet oral health needs", priority:"routine"},
-    ],
-    biomarkers:[
-      {label:"Blood Pressure", val:"112/70", fill:22, color:"#22A070"},
-      {label:"BMI", val:"23.6", fill:30, color:"#22A070"},
-      {label:"Peak Flow", val:"94%", fill:88, color:"#22A070"},
-      {label:"SpO2", val:"98%", fill:92, color:"#22A070"},
-    ]
-  }
+const pts=[
+  {n:'Maria T.',id:'MRN-00124',age:58,sex:'F',cond:'T2 Diabetes, Hypertension',risk:'high',rs:87,hs:54,gaps:4,ab:'rgba(138,32,16,.25)',ac:'#E05040',ai:'Maria presents with poorly controlled A1C trending upward over three visits. Combined with a 14-month gap in retinal screening and uncontrolled blood pressure, she is at high risk for diabetic complications within 12 months without intervention. Recommend immediate nephrology referral and diabetes care management enrollment.',gapList:[{i:'👁',t:'Retinal eye exam overdue 14 months',p:'bh'},{i:'🫀',t:'Blood pressure follow-up within 2 weeks',p:'bh'},{i:'🩺',t:'Podiatry referral for foot exam',p:'bm'},{i:'💉',t:'Flu vaccination not on record',p:'bl'}],bio:[{ico:'🩸',l:'A1C',v:'9.2',u:'%',f:85,c:'#E05040',s:'Above target'},{ico:'❤️',l:'Blood Pressure',v:'148/94',u:'mmHg',f:78,c:'#E05040',s:'Uncontrolled'},{ico:'⚖️',l:'BMI',v:'34.1',u:'kg/m²',f:70,c:'var(--gold)',s:'Obese'},{ico:'🔬',l:'eGFR',v:'61',u:'mL/min',f:55,c:'var(--gold)',s:'Moderate decline'}],protos:[{n:'Diabetes Management',pct:28,c:'#E05040',sub:'A1C target 7.0% — Week 4 of 18'},{n:'Blood Pressure Protocol',pct:45,c:'var(--gold)',sub:'Target <130/80 — Medication review needed'}]},
+  {n:'James R.',id:'MRN-00512',age:44,sex:'M',cond:'Pre-Diabetes, Obesity',risk:'medium',rs:61,hs:63,gaps:4,ab:'rgba(200,160,32,.2)',ac:'var(--gold)',ai:'James is at a critical intervention window. Pre-diabetic A1C with elevated BMI places him on a trajectory toward Type 2 Diabetes within 2 to 3 years without lifestyle modification. He is an ideal NDPP candidate. Enrollment now could prevent progression entirely.',gapList:[{i:'🏃',t:'Diabetes Prevention Program referral pending',p:'bh'},{i:'🩸',t:'Repeat A1C test due in 3 months',p:'bm'},{i:'📋',t:'Colorectal cancer screening overdue 2 years',p:'bm'},{i:'🫁',t:'Annual wellness visit not completed',p:'bl'}],bio:[{ico:'🩸',l:'A1C',v:'6.3',u:'%',f:55,c:'var(--gold)',s:'Pre-diabetic range'},{ico:'❤️',l:'Blood Pressure',v:'128/82',u:'mmHg',f:50,c:'var(--gold)',s:'Stage 1 HTN'},{ico:'⚖️',l:'BMI',v:'31.8',u:'kg/m²',f:65,c:'var(--gold)',s:'Obese class I'},{ico:'🔬',l:'Cholesterol',v:'214',u:'mg/dL',f:58,c:'var(--gold)',s:'Borderline high'}],protos:[{n:'NDPP Referral',pct:10,c:'var(--gold)',sub:'Pending enrollment — contact patient'},{n:'Lifestyle Modification',pct:20,c:'var(--gold)',sub:'Weight target 185 lbs — 6 months'}]},
+  {n:'Rosa L.',id:'MRN-00389',age:67,sex:'F',cond:'COPD, Heart Failure',risk:'high',rs:92,hs:41,gaps:4,ab:'rgba(138,32,16,.25)',ac:'#E05040',ai:'Rosa has the highest 30-day readmission risk in the current panel. Her last hospitalization for decompensated heart failure was 6 weeks ago. She is missing key follow-up visits and has not received pneumococcal vaccination. Immediate care coordination contact is recommended within 48 hours.',gapList:[{i:'🏥',t:'Post-hospitalization follow-up overdue 3 weeks',p:'bh'},{i:'💨',t:'Pulmonology follow-up for COPD management',p:'bh'},{i:'💉',t:'Pneumococcal vaccine not on record',p:'bm'},{i:'⚖️',t:'Daily weight monitoring not initiated',p:'bm'}],bio:[{ico:'🫁',l:'SpO2',v:'91',u:'%',f:40,c:'#E05040',s:'Below normal'},{ico:'❤️',l:'Blood Pressure',v:'156/98',u:'mmHg',f:82,c:'#E05040',s:'Stage 2 HTN'},{ico:'🔬',l:'BNP',v:'890',u:'pg/mL',f:90,c:'#E05040',s:'Elevated'},{ico:'🫁',l:'FEV1',v:'48',u:'%',f:45,c:'#E05040',s:'Severe obstruction'}],protos:[{n:'Heart Failure Protocol',pct:15,c:'#E05040',sub:'Daily weight — contact overdue 3 weeks'},{n:'COPD Management',pct:30,c:'#E05040',sub:'Pulmonology referral pending'}]},
+  {n:'David K.',id:'MRN-00741',age:35,sex:'M',cond:'Anxiety, Hypertension',risk:'medium',rs:48,hs:71,gaps:4,ab:'rgba(200,160,32,.2)',ac:'var(--gold)',ai:"David's anxiety and hypertension are interacting in a clinically meaningful way. His blood pressure variability correlates with reported stress events. A behavioral health co-location referral may produce better blood pressure control than medication adjustment alone.",gapList:[{i:'🧠',t:'Behavioral health integration referral recommended',p:'bm'},{i:'🩸',t:'Lipid panel overdue 18 months',p:'bm'},{i:'💊',t:'Medication adherence check at next visit',p:'bl'},{i:'📋',t:'Depression screening PHQ-9 not completed',p:'bl'}],bio:[{ico:'❤️',l:'Blood Pressure',v:'138/88',u:'mmHg',f:62,c:'var(--gold)',s:'Stage 1 HTN'},{ico:'⚡',l:'Heart Rate',v:'88',u:'bpm',f:55,c:'var(--gold)',s:'Elevated at rest'},{ico:'⚖️',l:'BMI',v:'27.4',u:'kg/m²',f:48,c:'var(--greenLight)',s:'Overweight'},{ico:'🔬',l:'Cholesterol',v:'198',u:'mg/dL',f:45,c:'var(--greenLight)',s:'Near optimal'}],protos:[{n:'BP Management',pct:52,c:'var(--gold)',sub:'Target <130/80 — Stable with medication'},{n:'Behavioral Health',pct:5,c:'var(--tealLight)',sub:'Referral not yet initiated'}]},
+  {n:'Linda S.',id:'MRN-00295',age:52,sex:'F',cond:'Preventive, Well Visit',risk:'low',rs:22,hs:84,gaps:3,ab:'rgba(26,106,72,.2)',ac:'var(--greenLight)',ai:'Linda is a model preventive care patient with consistently strong engagement. Her only outstanding gap is a mammography screening declined last year citing scheduling barriers. A patient navigator outreach with flexible scheduling is likely to result in completion.',gapList:[{i:'🎗',t:'Mammography screening declined last visit',p:'bm'},{i:'💉',t:'Tdap booster due this year',p:'bl'},{i:'🦴',t:'Bone density screening due at age 55',p:'bl'}],bio:[{ico:'❤️',l:'Blood Pressure',v:'118/74',u:'mmHg',f:30,c:'var(--greenLight)',s:'Optimal'},{ico:'⚖️',l:'BMI',v:'24.2',u:'kg/m²',f:35,c:'var(--greenLight)',s:'Normal range'},{ico:'🔬',l:'Cholesterol',v:'172',u:'mg/dL',f:32,c:'var(--greenLight)',s:'Optimal'},{ico:'🩸',l:'A1C',v:'5.2',u:'%',f:25,c:'var(--greenLight)',s:'Normal'}],protos:[{n:'Preventive Wellness',pct:88,c:'var(--greenLight)',sub:'Mammography outstanding — navigator outreach'}]},
+  {n:'Carlos M.',id:'MRN-00271',age:61,sex:'M',cond:'CKD Stage 3, Diabetes',risk:'high',rs:79,hs:49,gaps:4,ab:'rgba(138,32,16,.25)',ac:'#E05040',ai:'Carlos is approaching the threshold for CKD Stage 4 based on eGFR trajectory over 18 months. Proactive nephrology co-management now is critical to delay or prevent dialysis initiation. His ACE inhibitor dosage may need adjustment based on recent labs.',gapList:[{i:'🫘',t:'Nephrology co-management referral urgent',p:'bh'},{i:'🩺',t:'ACE inhibitor dosage review needed',p:'bh'},{i:'👁',t:'Annual diabetic retinal exam overdue 8 months',p:'bm'},{i:'🦶',t:'Diabetic foot exam overdue',p:'bm'}],bio:[{ico:'🔬',l:'eGFR',v:'38',u:'mL/min',f:35,c:'#E05040',s:'Severely reduced'},{ico:'🩸',l:'A1C',v:'8.4',u:'%',f:78,c:'#E05040',s:'Poor control'},{ico:'🔬',l:'Creatinine',v:'1.9',u:'mg/dL',f:72,c:'var(--gold)',s:'Elevated'},{ico:'❤️',l:'Blood Pressure',v:'142/90',u:'mmHg',f:68,c:'var(--gold)',s:'Stage 2 HTN'}],protos:[{n:'CKD Progression Protocol',pct:22,c:'#E05040',sub:'Nephrology referral — urgent'},{n:'Diabetes Management',pct:35,c:'#E05040',sub:'A1C target <8% — not achieved'}]},
+  {n:'Agnes W.',id:'MRN-00634',age:74,sex:'F',cond:'Osteoporosis, Hypertension',risk:'medium',rs:55,hs:66,gaps:4,ab:'rgba(200,160,32,.2)',ac:'var(--gold)',ai:'Agnes has documented osteoporosis but bisphosphonate therapy was discontinued 2 years ago without documented clinical rationale. Her fall risk score is moderate and she has not received a home safety assessment. These factors place her at meaningful fracture risk that is addressable now.',gapList:[{i:'🦴',t:'Bisphosphonate therapy discontinuation review',p:'bh'},{i:'🏠',t:'Home safety fall assessment not completed',p:'bm'},{i:'💊',t:'Calcium and Vitamin D supplementation review',p:'bm'},{i:'👁',t:'Cataracts screening overdue',p:'bl'}],bio:[{ico:'❤️',l:'Blood Pressure',v:'132/80',u:'mmHg',f:52,c:'var(--greenLight)',s:'Controlled'},{ico:'⚖️',l:'BMI',v:'22.1',u:'kg/m²',f:28,c:'var(--greenLight)',s:'Normal'},{ico:'🦴',l:'T-Score',v:'-2.8',u:'SD',f:68,c:'#E05040',s:'Osteoporosis'},{ico:'🔬',l:'Vitamin D',v:'18',u:'ng/mL',f:30,c:'var(--gold)',s:'Insufficient'}],protos:[{n:'Fracture Prevention',pct:18,c:'var(--gold)',sub:'Bisphosphonate restart — review needed'},{n:'Fall Risk Reduction',pct:10,c:'var(--gold)',sub:'Home safety assessment pending'}]},
+  {n:'Tyrone B.',id:'MRN-00887',age:29,sex:'M',cond:'Asthma, Uninsured',risk:'low',rs:18,hs:88,gaps:4,ab:'rgba(26,106,72,.2)',ac:'var(--greenLight)',ai:'Tyrone is young and generally healthy with well-controlled asthma. His primary care gap is STI screening per age guidelines. He is also an excellent candidate for enrollment assistance, which may help him qualify for Medicaid or marketplace coverage.',gapList:[{i:'📋',t:'STI screening not completed per age guidelines',p:'bm'},{i:'🏥',t:'Coverage enrollment assistance eligibility',p:'bm'},{i:'💨',t:'Asthma action plan needs annual update',p:'bl'},{i:'🦷',t:'Dental referral for unmet oral health needs',p:'bl'}],bio:[{ico:'❤️',l:'Blood Pressure',v:'112/70',u:'mmHg',f:22,c:'var(--greenLight)',s:'Optimal'},{ico:'⚖️',l:'BMI',v:'23.6',u:'kg/m²',f:30,c:'var(--greenLight)',s:'Normal'},{ico:'🫁',l:'Peak Flow',v:'94',u:'%',f:88,c:'var(--greenLight)',s:'Well controlled'},{ico:'🫁',l:'SpO2',v:'98',u:'%',f:92,c:'var(--greenLight)',s:'Normal'}],protos:[{n:'Asthma Management',pct:82,c:'var(--greenLight)',sub:'Well controlled — annual action plan update due'},{n:'Coverage Enrollment',pct:5,c:'var(--tealLight)',sub:'Medicaid eligibility screening recommended'}]},
 ];
 
-// ── RENDER PATIENT LIST ──
-function renderList(){
-  const list = document.getElementById('patientList');
-  list.innerHTML = patients.map(p=>`
-    <div class="patient-item" id="item-${p.id}" onclick="selectPatient(${p.id})">
-      <div class="patient-avatar" style="background:${p.avatarBg};color:${p.avatarColor};">${p.initials}</div>
-      <div class="patient-info">
-        <div class="patient-name">${p.name}</div>
-        <div class="patient-meta">${p.age}${p.gender} &middot; ${p.condition}</div>
-      </div>
-      <div class="risk-badge risk-${p.risk}">${p.risk}</div>
-    </div>
-  `).join('');
+const titles={dashboard:'Population Dashboard',patients:'Patient Panel',detail:'Patient Profile',gaps:'Care Gap Management',reports:'UDS Quality Measures',protection:'Data Protection',benefits:'Why CareIQ'};
+
+function nav(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  const el=document.getElementById('nav-'+page);
+  if(el)el.classList.add('active');
+  document.getElementById('topTitle').textContent=titles[page]||'CareIQ OS';
+  if(page==='patients')renderFull();
 }
 
-// ── SELECT PATIENT ──
-let selected = null;
-function selectPatient(id){
-  if(selected) document.getElementById('item-'+selected)?.classList.remove('active');
-  selected = id;
-  document.getElementById('item-'+id)?.classList.add('active');
-  const p = patients.find(x=>x.id===id);
-  renderDetail(p);
+function row(p,i,showGap){
+  const init=p.n.split(' ').map(x=>x[0]).join('');
+  const hc=p.hs>65?'var(--greenLight)':p.hs>45?'var(--gold)':'#E05040';
+  const gc=p.gaps>3?'#E05040':p.gaps>1?'var(--gold)':'var(--greenLight)';
+  return `<tr onclick="openPt(${i})">
+    <td><div style="display:flex;align-items:center;gap:10px;"><div class="pt-av" style="background:${p.ab};color:${p.ac};">${init}</div><div><div style="font-weight:600;color:var(--bone);">${p.n}</div><div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:var(--muted);">${p.id}</div></div></div></td>
+    ${showGap?'':`<td style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--boneDim);">${p.age}${p.sex}</td>`}
+    <td style="font-size:12px;color:var(--boneDim);">${p.cond}</td>
+    <td><span class="badge ${p.risk==='high'?'bh':p.risk==='medium'?'bm':'bl'}">${p.risk}</span></td>
+    <td><div class="sbar-row"><div class="sbar"><div class="sbar-fill" style="width:${p.rs}%;background:${p.ac};"></div></div><span class="sbar-val" style="color:${p.ac};">${p.rs}</span></div></td>
+    <td><div class="sbar-row"><div class="sbar"><div class="sbar-fill" style="width:${p.hs}%;background:${hc};"></div></div><span class="sbar-val" style="color:${hc};">${p.hs}</span></div></td>
+    ${showGap?`<td style="font-size:12px;color:var(--boneDim);">${p.gapList[0].t}</td>`:`<td><span style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:${gc};">${p.gaps}</span></td>`}
+    <td><span class="badge bm">Review</span></td>
+  </tr>`;
 }
 
-function scoreColor(v){
-  if(v>=75) return '#E05040';
-  if(v>=50) return '#C8A020';
-  return '#22A070';
-}
-function scoreLabel(v){ return v>=75?'High Risk':v>=50?'Moderate':'Low Risk'; }
-function gapScoreColor(v){ return v>=75?'#22A070':v>=50?'#C8A020':'#E05040'; }
+document.getElementById('dashTable').innerHTML=[0,2,5,1,6].map(i=>row(pts[i],i,true)).join('');
 
-function renderDetail(p){
-  document.getElementById('detailAvatar').style.background = p.avatarBg;
-  document.getElementById('detailAvatar').style.color = p.avatarColor;
-  document.getElementById('detailAvatar').textContent = p.initials;
-  document.getElementById('detailName').textContent = p.name;
-  document.getElementById('detailMeta').textContent = `Age ${p.age} &middot; ${p.condition}`.replace('&middot;','·');
+function renderFull(){document.getElementById('fullTable').innerHTML=pts.map((p,i)=>row(p,i,false)).join('');}
 
-  const rsc = scoreColor(p.riskScore);
-  const gsc = gapScoreColor(p.careGapScore);
-  const hsc = p.healthScore>=70?'#22A070':p.healthScore>=50?'#C8A020':'#E05040';
+function openPt(i){
+  const p=pts[i];
+  const init=p.n.split(' ').map(x=>x[0]).join('');
+  const hc=p.hs>65?'var(--greenLight)':p.hs>45?'var(--gold)':'#E05040';
+  const hLbl=p.hs>=70?'Stable':p.hs>=50?'Declining':'Critical';
+  const rLbl=p.rs>=75?'High Risk':p.rs>=50?'Moderate':'Low Risk';
+  const gLbl=p.gaps>3?'Immediate attention':'Action needed';
+  const gc=p.gaps>3?'#E05040':p.gaps>1?'var(--gold)':'var(--greenLight)';
+  const offset=v=>283-(283*v/100);
 
-  document.getElementById('detailBody').innerHTML = `
-
-    <div class="scores-row">
-      <div class="score-card" style="--bar-color:${rsc};--bar-w:${p.riskScore}%;">
-        <div class="score-value" style="color:${rsc};">${p.riskScore}</div>
-        <div class="score-label">Risk Score</div>
-        <div class="score-trend" style="color:${rsc};">${scoreLabel(p.riskScore)}</div>
-      </div>
-      <div class="score-card" style="--bar-color:${gsc};--bar-w:${p.careGapScore}%;">
-        <div class="score-value" style="color:${gsc};">${p.careGapScore}</div>
-        <div class="score-label">Gap Closure</div>
-        <div class="score-trend" style="color:${gsc};">${p.careGapScore>=75?'On Track':p.careGapScore>=50?'Moderate':'Needs Attention'}</div>
-      </div>
-      <div class="score-card" style="--bar-color:${hsc};--bar-w:${p.healthScore}%;">
-        <div class="score-value" style="color:${hsc};">${p.healthScore}</div>
-        <div class="score-label">Health Score</div>
-        <div class="score-trend" style="color:${hsc};">${p.healthScore>=70?'Stable':p.healthScore>=50?'Declining':'Critical'}</div>
-      </div>
+  document.getElementById('detailContent').innerHTML=`
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;">
+      <div class="pt-av" style="width:50px;height:50px;font-size:18px;background:${p.ab};color:${p.ac};">${init}</div>
+      <div style="flex:1;"><div style="font-size:22px;font-weight:700;color:var(--cream);">${p.n}</div><div style="font-family:'Rajdhani',sans-serif;font-size:11px;color:var(--muted);margin-top:3px;">${p.id} · Age ${p.age}${p.sex} · ${p.cond}</div></div>
+      <span class="badge ${p.risk==='high'?'bh':p.risk==='medium'?'bm':'bl'}" style="font-size:10px;padding:5px 12px;">${p.risk} risk</span>
     </div>
-
-    <div class="ai-box">
-      <div class="ai-box-header">
-        <span class="ai-box-icon">⬡</span>
-        <span class="ai-box-label">CareIQ Clinical Intelligence</span>
-      </div>
-      <div class="ai-box-text">${p.ai}</div>
+    <div class="g3" style="margin-bottom:20px;">
+      <div class="ring-card"><svg class="ring-svg" viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fill" cx="50" cy="50" r="45" stroke="${p.ac}" stroke-dasharray="283" stroke-dashoffset="${offset(p.rs)}"/></svg><div class="ring-center"><div class="ring-val" style="color:${p.ac};">${p.rs}</div><div class="ring-sub">risk</div></div><div class="ring-name" style="color:${p.ac};">Risk Score</div><div class="ring-status">${rLbl}</div></div>
+      <div class="ring-card"><svg class="ring-svg" viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fill" cx="50" cy="50" r="45" stroke="${hc}" stroke-dasharray="283" stroke-dashoffset="${offset(p.hs)}"/></svg><div class="ring-center"><div class="ring-val" style="color:${hc};">${p.hs}</div><div class="ring-sub">health</div></div><div class="ring-name" style="color:${hc};">Health Score</div><div class="ring-status">${hLbl}</div></div>
+      <div class="ring-card"><svg class="ring-svg" viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="45"/><circle class="ring-fill" cx="50" cy="50" r="45" stroke="${gc}" stroke-dasharray="283" stroke-dashoffset="${offset(p.gaps*20)}"/></svg><div class="ring-center"><div class="ring-val" style="color:${gc};">${p.gaps}</div><div class="ring-sub">gaps</div></div><div class="ring-name" style="color:${gc};">Care Gaps</div><div class="ring-status">${gLbl}</div></div>
     </div>
-
-    <div class="gaps-section">
-      <div class="gaps-title">Preventive Care Gaps</div>
-      ${p.gaps.map(g=>`
-        <div class="gap-item">
-          <span class="gap-icon">${g.icon}</span>
-          <span class="gap-text">${g.text}</span>
-          <span class="gap-priority gap-${g.priority}">${g.priority}</span>
+    <div class="g2">
+      <div>
+        <div class="ai-box"><div class="ai-head"><span style="color:var(--greenLight);font-size:14px;">⬡</span><span class="ai-label">CareIQ Clinical Intelligence</span></div><div class="ai-text">${p.ai}</div></div>
+        <div class="sh"><span class="sh-title">Biomarkers</span></div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
+          ${p.bio.map(b=>`<div class="bio"><span class="bio-ico">${b.ico}</span><div><div class="bio-label">${b.l}</div><div><span class="bio-val" style="color:${b.c};">${b.v}</span><span class="bio-unit">${b.u}</span></div><div class="bio-bar"><div class="bio-fill" style="width:${b.f}%;background:${b.c};"></div></div><div class="bio-status" style="color:${b.c};">${b.s}</div></div></div>`).join('')}
         </div>
-      `).join('')}
-    </div>
+      </div>
+      <div>
+        <div class="sh"><span class="sh-title">Care Gaps</span></div>
+        ${p.gapList.map(g=>`<div class="gap-item"><span class="gap-ico">${g.i}</span><span class="gap-txt">${g.t}</span><span class="badge ${g.p}">${g.p==='bh'?'Critical':g.p==='bm'?'Moderate':'Routine'}</span></div>`).join('')}
+        <div class="sh" style="margin-top:16px;"><span class="sh-title">Active Protocols</span></div>
+        ${p.protos.map(pr=>`<div class="proto"><div class="proto-head"><span class="proto-name">${pr.n}</span><span class="proto-pct" style="color:${pr.c};">${pr.pct}%</span></div><div class="proto-bar"><div class="proto-fill" style="width:${pr.pct}%;background:${pr.c};"></div></div><div class="proto-sub">${pr.sub}</div></div>`).join('')}
+      </div>
+    </div>`;
 
-    <div class="gaps-title">Biomarker Snapshot</div>
-    <div class="biomarker-grid">
-      ${p.biomarkers.map(b=>`
-        <div class="biomarker">
-          <div class="biomarker-bar-wrap">
-            <div class="biomarker-label">${b.label}</div>
-            <div class="biomarker-val">${b.val}</div>
-            <div class="biomarker-bar"><div class="biomarker-fill" style="width:${b.fill}%;background:${b.color};"></div></div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-detail').classList.add('active');
+  document.querySelectorAll('.sb-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('topTitle').textContent=pts[i].n+' — Patient Profile';
 }
-
-renderList();
+renderFull();
 </script>
 </body>
 </html>
+
