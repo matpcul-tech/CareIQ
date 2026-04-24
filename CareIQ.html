@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CareIQ — Preventive Intelligence for Community Health</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void:        #050A0F;
+  --deep:        #080F18;
+  --surface:     #0C1520;
+  --panel:       #101D2A;
+  --card:        #142030;
+  --border:      #1C3040;
+  --borderLight: #2A4560;
+  --forest:      #0D3D2A;
+  --green:       #1A6A48;
+  --greenLight:  #22A070;
+  --greenGlow:   #0A2A1C;
+  --gold:        #C8A020;
+  --goldLight:   #E0BC40;
+  --bone:        #E8DCC8;
+  --boneDim:     #8A7A60;
+  --cream:       #F5EDD8;
+  --teal:        #1A6A7A;
+  --tealLight:   #22A0B8;
+  --red:         #8A2010;
+  --redLight:    #C43018;
+  --muted:       #3A5060;
+  --slate:       #1A2A38;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--void);
+  color: var(--bone);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* STAR FIELD */
+.starfield {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--bone);
+  animation: twinkle var(--d, 3s) ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%,100% { opacity: var(--o1, 0.1); }
+  50%      { opacity: var(--o2, 0.4); }
+}
+
+/* NAV */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(5,10,15,0.92);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--forest), var(--green));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 0 16px rgba(26,106,72,0.5);
+}
+.nav-brand {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 2px;
+  color: var(--goldLight);
+  animation: goldGlow 3s ease-in-out infinite;
+}
+@keyframes goldGlow {
+  0%,100% { text-shadow: 0 0 10px rgba(200,160,32,0.4); }
+  50%      { text-shadow: 0 0 24px rgba(200,160,32,0.8), 0 0 48px rgba(200,160,32,0.3); }
+}
+.nav-tag {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.nav-links {
+  display: flex;
+  gap: 6px;
+}
+.nav-pill {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+  color: var(--boneDim);
+}
+.nav-pill:hover { color: var(--bone); border-color: var(--border); }
+.nav-pill.primary {
+  background: linear-gradient(135deg, var(--forest), var(--green));
+  color: var(--cream);
+  border-color: var(--green);
+  box-shadow: 0 0 12px rgba(26,106,72,0.4);
+}
+.nav-pill.primary:hover { box-shadow: 0 0 20px rgba(26,106,72,0.7); }
+
+/* SECTIONS */
+section { position: relative; z-index: 1; }
+
+/* HERO */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px 60px;
+  text-align: center;
+}
+.hero-inner { max-width: 900px; }
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--greenGlow);
+  border: 1px solid rgba(26,106,72,0.4);
+  border-radius: 24px;
+  padding: 6px 16px;
+  margin-bottom: 32px;
+  animation: fadeUp 0.6s ease forwards;
+}
+.hero-badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--greenLight);
+  box-shadow: 0 0 8px var(--greenLight);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+.hero-badge-text {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--greenLight);
+}
+
+.hero-title {
+  font-size: clamp(42px, 7vw, 80px);
+  font-weight: 700;
+  color: var(--cream);
+  line-height: 1.1;
+  margin-bottom: 8px;
+  animation: fadeUp 0.6s 0.1s ease both;
+}
+.hero-title span { color: var(--greenLight); }
+
+.hero-sub {
+  font-size: clamp(18px, 3vw, 28px);
+  color: var(--gold);
+  font-style: italic;
+  margin-bottom: 24px;
+  animation: fadeUp 0.6s 0.2s ease both;
+}
+
+.hero-desc {
+  font-size: 16px;
+  color: var(--boneDim);
+  line-height: 1.8;
+  max-width: 640px;
+  margin: 0 auto 40px;
+  animation: fadeUp 0.6s 0.3s ease both;
+}
+
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+  animation: fadeUp 0.6s 0.4s ease both;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 24px;
+  text-align: center;
+  min-width: 120px;
+}
+.stat-num {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--greenLight);
+  line-height: 1;
+}
+.stat-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.hero-ctas {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  animation: fadeUp 0.6s 0.5s ease both;
+}
+.btn {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 14px 28px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--forest), var(--green));
+  color: var(--cream);
+  box-shadow: 0 0 20px rgba(26,106,72,0.4);
+}
+.btn-primary:hover { box-shadow: 0 0 32px rgba(26,106,72,0.7); transform: translateY(-2px); }
+.btn-secondary {
+  background: transparent;
+  color: var(--bone);
+  border: 1px solid var(--borderLight);
+}
+.btn-secondary:hover { border-color: var(--gold); color: var(--goldLight); transform: translateY(-2px); }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(16px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* GRADIENT LINE */
+.gradient-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--green), var(--gold), var(--green), transparent);
+  margin: 0;
+}
+
+/* FEATURES */
+.features {
+  padding: 80px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.section-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--greenLight);
+  text-align: center;
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 700;
+  color: var(--cream);
+  text-align: center;
+  margin-bottom: 8px;
+}
+.section-sub {
+  font-size: 16px;
+  color: var(--boneDim);
+  text-align: center;
+  font-style: italic;
+  margin-bottom: 56px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent, var(--green)), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.feature-card:hover { transform: translateY(-4px); border-color: var(--borderLight); }
+.feature-card:hover::before { opacity: 1; }
+.feature-icon {
+  font-size: 28px;
+  margin-bottom: 16px;
+  color: var(--accent, var(--greenLight));
+}
+.feature-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.5px;
+  color: var(--accent, var(--greenLight));
+  margin-bottom: 10px;
+}
+.feature-desc {
+  font-size: 14px;
+  color: var(--boneDim);
+  line-height: 1.7;
+}
+
+/* DEMO */
+.demo-section {
+  padding: 80px 24px;
+  background: var(--deep);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.demo-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.demo-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  min-height: 600px;
+}
+
+/* PATIENT LIST */
+.patient-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.panel-header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.panel-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.panel-count {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  color: var(--greenLight);
+  font-weight: 700;
+}
+.patient-list { flex: 1; overflow-y: auto; }
+.patient-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(28,48,64,0.5);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.patient-item:hover { background: rgba(26,106,72,0.08); }
+.patient-item.active { background: rgba(26,106,72,0.12); border-left: 2px solid var(--greenLight); }
+.patient-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.patient-info { flex: 1; min-width: 0; }
+.patient-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bone);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.patient-meta {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'Rajdhani', sans-serif;
+  margin-top: 2px;
+}
+.risk-badge {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.risk-high   { background: rgba(138,32,16,0.25); color: #E05040; border: 1px solid rgba(138,32,16,0.4); }
+.risk-medium { background: rgba(200,160,32,0.18); color: var(--gold); border: 1px solid rgba(200,160,32,0.35); }
+.risk-low    { background: rgba(26,106,72,0.2); color: var(--greenLight); border: 1px solid rgba(26,106,72,0.35); }
+
+/* PATIENT DETAIL */
+.detail-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.detail-header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detail-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+.detail-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--bone);
+}
+.detail-meta {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: 'Rajdhani', sans-serif;
+  margin-top: 2px;
+}
+.detail-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+/* SCORE RING */
+.scores-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.score-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.score-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--bar-color, var(--green));
+  width: var(--bar-w, 50%);
+  transition: width 1s ease;
+}
+.score-value {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--score-color, var(--greenLight));
+}
+.score-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.score-trend {
+  font-size: 10px;
+  margin-top: 4px;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+/* GAPS */
+.gaps-section { margin-bottom: 20px; }
+.gaps-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.gap-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.gap-icon { font-size: 14px; flex-shrink: 0; }
+.gap-text { flex: 1; font-size: 13px; color: var(--bone); }
+.gap-priority {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+.gap-critical { background: rgba(138,32,16,0.25); color: #E05040; border: 1px solid rgba(138,32,16,0.4); }
+.gap-moderate { background: rgba(200,160,32,0.18); color: var(--gold); border: 1px solid rgba(200,160,32,0.35); }
+.gap-routine  { background: rgba(26,106,72,0.2); color: var(--greenLight); border: 1px solid rgba(26,106,72,0.35); }
+
+/* AI INSIGHT BOX */
+.ai-box {
+  background: var(--greenGlow);
+  border: 1px solid rgba(26,106,72,0.4);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  animation: shieldGlow 3s ease-in-out infinite;
+}
+@keyframes shieldGlow {
+  0%,100% { box-shadow: 0 0 8px rgba(26,106,72,0.2); }
+  50%      { box-shadow: 0 0 20px rgba(26,106,72,0.5); }
+}
+.ai-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ai-box-icon { font-size: 14px; color: var(--greenLight); }
+.ai-box-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--greenLight);
+}
+.ai-box-text {
+  font-size: 13px;
+  color: var(--bone);
+  line-height: 1.7;
+}
+
+/* BIOMARKERS */
+.biomarker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.biomarker {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.biomarker-bar-wrap {
+  flex: 1;
+}
+.biomarker-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.biomarker-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--bone);
+  font-weight: 500;
+}
+.biomarker-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.biomarker-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+
+/* FQHC SECTION */
+.fqhc-section {
+  padding: 80px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.fqhc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 48px;
+}
+.fqhc-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+}
+.fqhc-number {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.fqhc-desc {
+  font-size: 13px;
+  color: var(--boneDim);
+  line-height: 1.6;
+}
+
+/* FOOTER */
+footer {
+  background: var(--deep);
+  border-top: 1px solid var(--border);
+  padding: 40px 24px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+.footer-logo {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--goldLight);
+  margin-bottom: 8px;
+}
+.footer-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+.footer-pills {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.footer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.footer-copy {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 700px) {
+  .demo-grid { grid-template-columns: 1fr; }
+  .scores-row { grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .biomarker-grid { grid-template-columns: 1fr; }
+  nav { padding: 0 12px; }
+  .nav-links { gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<!-- STAR FIELD -->
+<div class="starfield" id="starfield"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-icon">⊕</div>
+    <div>
+      <div class="nav-brand">CAREIQ</div>
+      <div class="nav-tag">Sovereign Shield Technologies</div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <button class="nav-pill" onclick="scrollTo('features')">Platform</button>
+    <button class="nav-pill" onclick="scrollTo('demo')">Demo</button>
+    <button class="nav-pill" onclick="scrollTo('fqhc')">For FQHCs</button>
+    <button class="nav-pill primary" onclick="scrollTo('demo')">Request Access ⊕</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      <span class="hero-badge-text">Now Available for FQHC Pilot Programs</span>
+    </div>
+
+    <h1 class="hero-title">Preventive Intelligence<br>for <span>Community Health</span></h1>
+    <div class="hero-sub">Know who needs care before they need emergency care.</div>
+    <p class="hero-desc">CareIQ is an AI-powered preventive health intelligence platform built for Federally Qualified Health Centers. Risk stratification, care gap identification, and patient health scoring in one sovereign, secure platform.</p>
+
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-num">1,400+</div>
+        <div class="stat-label">FQHC Organizations</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">30M</div>
+        <div class="stat-label">Patients Served</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">62%</div>
+        <div class="stat-label">Avg. Preventive Gap</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">$4.1B</div>
+        <div class="stat-label">Preventable Costs Annually</div>
+      </div>
+    </div>
+
+    <div class="hero-ctas">
+      <button class="btn btn-primary" onclick="scrollTo('demo')">See Live Demo ⊕</button>
+      <button class="btn btn-secondary" onclick="scrollTo('fqhc')">FQHC Pilot Program</button>
+    </div>
+  </div>
+</section>
+
+<div class="gradient-line"></div>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="section-label">Platform Capabilities</div>
+  <h2 class="section-title">Three Pillars of Preventive Intelligence</h2>
+  <p class="section-sub">Built for the realities of community health, not the assumptions of enterprise software.</p>
+
+  <div class="feature-grid">
+    <div class="feature-card" style="--accent: #E05040;">
+      <div class="feature-icon" style="color:#E05040;">◈</div>
+      <div class="feature-title" style="color:#E05040;">Risk Stratification</div>
+      <div class="feature-desc">CareIQ continuously scores every patient on composite risk across chronic disease, social determinants, and utilization history. High-risk patients surface automatically so your care team acts before a crisis develops.</div>
+    </div>
+    <div class="feature-card" style="--accent: #C8A020;">
+      <div class="feature-icon" style="color:#C8A020;">◎</div>
+      <div class="feature-title" style="color:#C8A020;">Preventive Care Gap Identification</div>
+      <div class="feature-desc">Real-time mapping of overdue screenings, missed immunizations, and lapsed chronic disease management across your entire patient panel. Prioritized by clinical urgency so your team closes the most critical gaps first.</div>
+    </div>
+    <div class="feature-card" style="--accent: #22A070;">
+      <div class="feature-icon" style="color:#22A070;">⊕</div>
+      <div class="feature-title" style="color:#22A070;">Patient Health Scoring</div>
+      <div class="feature-desc">Longitudinal health scores that track patient trajectory over time. See who is improving, who is declining, and who needs immediate outreach. Actionable intelligence, not raw data.</div>
+    </div>
+    <div class="feature-card" style="--accent: #22A0B8;">
+      <div class="feature-icon" style="color:#22A0B8;">⬡</div>
+      <div class="feature-title" style="color:#22A0B8;">Data Sovereignty Protection</div>
+      <div class="feature-desc">Patient data never leaves your infrastructure unprotected. CareIQ's Sovereign Shield layer hashes sensitive information at the edge. Built for HIPAA compliance from the architecture up, not bolted on after.</div>
+    </div>
+    <div class="feature-card" style="--accent: #C8A020;">
+      <div class="feature-icon" style="color:#C8A020;">◆</div>
+      <div class="feature-title" style="color:#C8A020;">FQHC Quality Measure Alignment</div>
+      <div class="feature-desc">Built around UDS reporting requirements and HRSA quality benchmarks. CareIQ maps directly to the measures your health center is already accountable for, turning compliance reporting into a byproduct of care delivery.</div>
+    </div>
+    <div class="feature-card" style="--accent: #22A070;">
+      <div class="feature-icon" style="color:#22A070;">◉</div>
+      <div class="feature-title" style="color:#22A070;">Community Health Intelligence</div>
+      <div class="feature-desc">Population-level views that identify patterns across your patient panel. Social determinants mapping, neighborhood health clustering, and outreach prioritization for community health workers.</div>
+    </div>
+  </div>
+</section>
+
+<div class="gradient-line"></div>
+
+<!-- DEMO -->
+<section class="demo-section" id="demo">
+  <div class="demo-inner">
+    <div class="section-label">Interactive Demo</div>
+    <h2 class="section-title" style="margin-bottom:8px;">CareIQ Intelligence Platform</h2>
+    <p class="section-sub">Select a patient to see risk stratification, care gaps, and AI-generated clinical insight.</p>
+
+    <div class="demo-grid">
+
+      <!-- PATIENT LIST -->
+      <div class="patient-panel">
+        <div class="panel-header">
+          <span class="panel-title">Patient Panel</span>
+          <span class="panel-count">8 Patients</span>
+        </div>
+        <div class="patient-list" id="patientList"></div>
+      </div>
+
+      <!-- DETAIL -->
+      <div class="detail-panel">
+        <div class="detail-header" id="detailHeader">
+          <div class="detail-avatar" id="detailAvatar" style="background:rgba(26,106,72,0.2);color:#22A070;">MT</div>
+          <div>
+            <div class="detail-name" id="detailName">Select a Patient</div>
+            <div class="detail-meta" id="detailMeta">Click any patient from the panel to view their CareIQ profile</div>
+          </div>
+        </div>
+        <div class="detail-body" id="detailBody">
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:1px;text-align:center;padding:40px;">
+            SELECT A PATIENT FROM THE LIST<br>TO VIEW THEIR CAREIQ PROFILE
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- FQHC -->
+<section class="fqhc-section" id="fqhc">
+  <div class="section-label">Built for FQHCs</div>
+  <h2 class="section-title">The Community Health Market</h2>
+  <p class="section-sub">Federally Qualified Health Centers serve 30 million patients. CareIQ is built for exactly this environment.</p>
+
+  <div class="fqhc-grid">
+    <div class="fqhc-card">
+      <div class="fqhc-number">1,400+</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">FQHC Organizations</div>
+      <div class="fqhc-desc">Operating 14,000 delivery sites across every state, serving underserved urban and rural communities where preventive care gaps are widest.</div>
+    </div>
+    <div class="fqhc-card">
+      <div class="fqhc-number">$7.8B</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">Annual Federal Funding</div>
+      <div class="fqhc-desc">Section 330 grants and Medicaid enhanced reimbursements create stable, recurring budgets specifically allocated for quality improvement and technology.</div>
+    </div>
+    <div class="fqhc-card">
+      <div class="fqhc-number">UDS</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">Reporting Alignment</div>
+      <div class="fqhc-desc">CareIQ maps directly to Uniform Data System quality measures. Every clinical insight connects to a metric your health center is already accountable for.</div>
+    </div>
+    <div class="fqhc-card">
+      <div class="fqhc-number">62%</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;">Average Preventive Gap</div>
+      <div class="fqhc-desc">The average FQHC patient panel has significant unmet preventive care needs. CareIQ surfaces and prioritizes these gaps before they become emergency visits.</div>
+    </div>
+  </div>
+
+  <div style="margin-top:48px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;text-align:center;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--greenLight);margin-bottom:12px;">Pilot Program Now Open</div>
+    <h3 style="font-size:28px;color:var(--cream);margin-bottom:12px;">Ready to see CareIQ in your health center?</h3>
+    <p style="font-size:15px;color:var(--boneDim);font-style:italic;max-width:560px;margin:0 auto 28px;line-height:1.7;">We are accepting FQHC pilot partners now. No enterprise contract. No long implementation timeline. A working deployment in your environment with your patient data in 30 days.</p>
+    <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+      <a href="mailto:matpcul@gmail.com?subject=CareIQ FQHC Pilot Inquiry" style="text-decoration:none;">
+        <button class="btn btn-primary">Request a Pilot ⊕</button>
+      </a>
+      <a href="mailto:matpcul@gmail.com?subject=CareIQ Demo Request" style="text-decoration:none;">
+        <button class="btn btn-secondary">Schedule a Demo</button>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">CAREIQ</div>
+  <div class="footer-sub">Preventive Intelligence for Community Health</div>
+  <div class="footer-sub" style="margin-bottom:16px;font-size:9px;">A Sovereign Shield Technologies LLC Product</div>
+  <div class="footer-pills">
+    <span class="footer-pill">⬡ HIPAA Aligned</span>
+    <span class="footer-pill">◉ Sovereign Data Protection</span>
+    <span class="footer-pill">⊕ FQHC Ready</span>
+    <span class="footer-pill">◎ UDS Mapped</span>
+  </div>
+  <div class="footer-copy">matpcul@gmail.com &nbsp;|&nbsp; Sovereign Shield Technologies LLC &nbsp;|&nbsp; Ada, Oklahoma &nbsp;|&nbsp; 2026</div>
+</footer>
+
+<script>
+// ── STAR FIELD ──
+(function(){
+  const sf = document.getElementById('starfield');
+  for(let i=0;i<90;i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    const x = (i*137.508)%100;
+    const y = (i*97.3)%100;
+    const r = i%5===0?1.4:i%3===0?0.9:0.45;
+    const d = 2.5+(i%7)*0.5;
+    const o1 = 0.08+(i%5)*0.04;
+    const o2 = 0.3+(i%4)*0.1;
+    s.style.cssText = `left:${x}%;top:${y}%;width:${r*2}px;height:${r*2}px;--d:${d}s;--o1:${o1};--o2:${o2};animation-delay:${(i%7)*0.3}s;`;
+    sf.appendChild(s);
+  }
+})();
+
+// ── SCROLL ──
+function scrollTo(id){ document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
+
+// ── PATIENT DATA ──
+const patients = [
+  {
+    id:1, name:"Maria T.", age:58, gender:"F", initials:"MT",
+    condition:"Type 2 Diabetes, Hypertension", risk:"high",
+    avatarBg:"rgba(138,32,16,0.25)", avatarColor:"#E05040",
+    riskScore:87, careGapScore:42, healthScore:54,
+    ai:"Maria presents with poorly controlled A1C trending upward over three visits. Combined with a 14-month gap in retinal screening and uncontrolled blood pressure, she is at high risk for diabetic complications within 12 months without intervention. Recommend immediate nephrology referral and diabetes care management enrollment.",
+    gaps:[
+      {icon:"👁", text:"Retinal eye exam overdue 14 months", priority:"critical"},
+      {icon:"🫀", text:"Blood pressure follow-up needed within 2 weeks", priority:"critical"},
+      {icon:"🩺", text:"Podiatry referral for foot exam", priority:"moderate"},
+      {icon:"💉", text:"Flu vaccination not on record this season", priority:"routine"},
+    ],
+    biomarkers:[
+      {label:"A1C", val:"9.2%", fill:85, color:"#E05040"},
+      {label:"Blood Pressure", val:"148/94", fill:78, color:"#E05040"},
+      {label:"BMI", val:"34.1", fill:70, color:"#C8A020"},
+      {label:"eGFR", val:"61", fill:55, color:"#C8A020"},
+    ]
+  },
+  {
+    id:2, name:"James R.", age:44, gender:"M", initials:"JR",
+    condition:"Pre-Diabetes, Obesity", risk:"medium",
+    avatarBg:"rgba(200,160,32,0.2)", avatarColor:"#C8A020",
+    riskScore:61, careGapScore:68, healthScore:63,
+    ai:"James is at a critical intervention window. Pre-diabetic A1C combined with elevated BMI places him on a trajectory toward Type 2 Diabetes within 2 to 3 years without lifestyle modification. He is an ideal candidate for the National Diabetes Prevention Program. Enrollment now could prevent progression entirely.",
+    gaps:[
+      {icon:"🏃", text:"Diabetes Prevention Program referral pending", priority:"critical"},
+      {icon:"🩸", text:"Repeat A1C test due in 3 months", priority:"moderate"},
+      {icon:"📋", text:"Colorectal cancer screening overdue 2 years", priority:"moderate"},
+      {icon:"🫁", text:"Annual wellness visit not completed", priority:"routine"},
+    ],
+    biomarkers:[
+      {label:"A1C", val:"6.3%", fill:55, color:"#C8A020"},
+      {label:"Blood Pressure", val:"128/82", fill:50, color:"#C8A020"},
+      {label:"BMI", val:"31.8", fill:65, color:"#C8A020"},
+      {label:"Cholesterol", val:"214", fill:58, color:"#C8A020"},
+    ]
+  },
+  {
+    id:3, name:"Rosa L.", age:67, gender:"F", initials:"RL",
+    condition:"COPD, Heart Failure", risk:"high",
+    avatarBg:"rgba(138,32,16,0.25)", avatarColor:"#E05040",
+    riskScore:92, careGapScore:35, healthScore:41,
+    ai:"Rosa has the highest 30-day readmission risk in the current panel. Her last hospitalization for decompensated heart failure was 6 weeks ago. She is missing key follow-up visits and has not received pneumococcal vaccination. Immediate care coordination contact is recommended within 48 hours.",
+    gaps:[
+      {icon:"🏥", text:"Post-hospitalization follow-up overdue 3 weeks", priority:"critical"},
+      {icon:"💨", text:"Pulmonology follow-up for COPD management", priority:"critical"},
+      {icon:"💉", text:"Pneumococcal vaccine not on record", priority:"moderate"},
+      {icon:"⚖️", text:"Daily weight monitoring protocol not initiated", priority:"moderate"},
+    ],
+    biomarkers:[
+      {label:"SpO2", val:"91%", fill:40, color:"#E05040"},
+      {label:"Blood Pressure", val:"156/98", fill:82, color:"#E05040"},
+      {label:"BNP", val:"890", fill:90, color:"#E05040"},
+      {label:"FEV1", val:"48%", fill:45, color:"#E05040"},
+    ]
+  },
+  {
+    id:4, name:"David K.", age:35, gender:"M", initials:"DK",
+    condition:"Anxiety, Hypertension", risk:"medium",
+    avatarBg:"rgba(200,160,32,0.2)", avatarColor:"#C8A020",
+    riskScore:48, careGapScore:72, healthScore:71,
+    ai:"David's anxiety and hypertension are interacting in a clinically meaningful way. His blood pressure variability correlates with reported stress events. A behavioral health co-location referral may produce better blood pressure control than medication adjustment alone. He is also overdue for a lipid panel.",
+    gaps:[
+      {icon:"🧠", text:"Behavioral health integration referral recommended", priority:"moderate"},
+      {icon:"🩸", text:"Lipid panel overdue 18 months", priority:"moderate"},
+      {icon:"💊", text:"Medication adherence check at next visit", priority:"routine"},
+      {icon:"📋", text:"Depression screening PHQ-9 not completed this year", priority:"routine"},
+    ],
+    biomarkers:[
+      {label:"Blood Pressure", val:"138/88", fill:62, color:"#C8A020"},
+      {label:"Heart Rate", val:"88 bpm", fill:55, color:"#C8A020"},
+      {label:"BMI", val:"27.4", fill:48, color:"#22A070"},
+      {label:"Cholesterol", val:"198", fill:45, color:"#22A070"},
+    ]
+  },
+  {
+    id:5, name:"Linda S.", age:52, gender:"F", initials:"LS",
+    condition:"Well Visit, Preventive", risk:"low",
+    avatarBg:"rgba(26,106,72,0.2)", avatarColor:"#22A070",
+    riskScore:22, careGapScore:88, healthScore:84,
+    ai:"Linda is a model preventive care patient with consistently strong engagement. Her only outstanding gap is a mammography screening, which she declined last year citing scheduling barriers. A patient navigator outreach with flexible scheduling options is likely to result in completion. No acute concerns identified.",
+    gaps:[
+      {icon:"🎗", text:"Mammography screening declined last visit", priority:"moderate"},
+      {icon:"💉", text:"Tdap booster due this year", priority:"routine"},
+      {icon:"🦴", text:"Bone density screening due at age 55 in 3 years", priority:"routine"},
+    ],
+    biomarkers:[
+      {label:"Blood Pressure", val:"118/74", fill:30, color:"#22A070"},
+      {label:"BMI", val:"24.2", fill:35, color:"#22A070"},
+      {label:"Cholesterol", val:"172", fill:32, color:"#22A070"},
+      {label:"A1C", val:"5.2%", fill:25, color:"#22A070"},
+    ]
+  },
+  {
+    id:6, name:"Carlos M.", age:61, gender:"M", initials:"CM",
+    condition:"CKD Stage 3, Diabetes", risk:"high",
+    avatarBg:"rgba(138,32,16,0.25)", avatarColor:"#E05040",
+    riskScore:79, careGapScore:51, healthScore:49,
+    ai:"Carlos is approaching the threshold for CKD Stage 4 based on eGFR trajectory over the past 18 months. Combined with his diabetes, proactive nephrology co-management now is critical to delay or prevent dialysis initiation. His current ACE inhibitor dosage may need adjustment based on recent labs.",
+    gaps:[
+      {icon:"🫘", text:"Nephrology co-management referral urgent", priority:"critical"},
+      {icon:"🩺", text:"ACE inhibitor dosage review needed", priority:"critical"},
+      {icon:"👁", text:"Annual diabetic retinal exam overdue 8 months", priority:"moderate"},
+      {icon:"🦶", text:"Diabetic foot exam overdue", priority:"moderate"},
+    ],
+    biomarkers:[
+      {label:"eGFR", val:"38", fill:35, color:"#E05040"},
+      {label:"A1C", val:"8.4%", fill:78, color:"#E05040"},
+      {label:"Creatinine", val:"1.9", fill:72, color:"#C8A020"},
+      {label:"Blood Pressure", val:"142/90", fill:68, color:"#C8A020"},
+    ]
+  },
+  {
+    id:7, name:"Agnes W.", age:74, gender:"F", initials:"AW",
+    condition:"Osteoporosis, Hypertension", risk:"medium",
+    avatarBg:"rgba(200,160,32,0.2)", avatarColor:"#C8A020",
+    riskScore:55, careGapScore:61, healthScore:66,
+    ai:"Agnes has documented osteoporosis but her bisphosphonate therapy was discontinued 2 years ago without documented clinical rationale. Her fall risk score is moderate and she has not received a home safety assessment. These combined factors place her at meaningful fracture risk that is addressable with current evidence-based interventions.",
+    gaps:[
+      {icon:"🦴", text:"Bisphosphonate therapy discontinuation review", priority:"critical"},
+      {icon:"🏠", text:"Home safety fall assessment not completed", priority:"moderate"},
+      {icon:"💊", text:"Calcium and Vitamin D supplementation review", priority:"moderate"},
+      {icon:"👁", text:"Cataracts screening overdue", priority:"routine"},
+    ],
+    biomarkers:[
+      {label:"Blood Pressure", val:"132/80", fill:52, color:"#22A070"},
+      {label:"BMI", val:"22.1", fill:28, color:"#22A070"},
+      {label:"T-Score", val:"-2.8", fill:68, color:"#E05040"},
+      {label:"Vitamin D", val:"18 ng/mL", fill:30, color:"#C8A020"},
+    ]
+  },
+  {
+    id:8, name:"Tyrone B.", age:29, gender:"M", initials:"TB",
+    condition:"Asthma, Uninsured", risk:"low",
+    avatarBg:"rgba(26,106,72,0.2)", avatarColor:"#22A070",
+    riskScore:18, careGapScore:91, healthScore:88,
+    ai:"Tyrone is young and generally healthy with well-controlled asthma. His primary care gap is STI screening, which is guideline-recommended for his age and risk profile. He is also an excellent candidate for the health center's enrollment assistance program, which may help him qualify for Medicaid or marketplace coverage.",
+    gaps:[
+      {icon:"📋", text:"STI screening not completed per age guidelines", priority:"moderate"},
+      {icon:"🏥", text:"Coverage enrollment assistance eligibility", priority:"moderate"},
+      {icon:"💨", text:"Asthma action plan needs annual update", priority:"routine"},
+      {icon:"🦷", text:"Dental referral for unmet oral health needs", priority:"routine"},
+    ],
+    biomarkers:[
+      {label:"Blood Pressure", val:"112/70", fill:22, color:"#22A070"},
+      {label:"BMI", val:"23.6", fill:30, color:"#22A070"},
+      {label:"Peak Flow", val:"94%", fill:88, color:"#22A070"},
+      {label:"SpO2", val:"98%", fill:92, color:"#22A070"},
+    ]
+  }
+];
+
+// ── RENDER PATIENT LIST ──
+function renderList(){
+  const list = document.getElementById('patientList');
+  list.innerHTML = patients.map(p=>`
+    <div class="patient-item" id="item-${p.id}" onclick="selectPatient(${p.id})">
+      <div class="patient-avatar" style="background:${p.avatarBg};color:${p.avatarColor};">${p.initials}</div>
+      <div class="patient-info">
+        <div class="patient-name">${p.name}</div>
+        <div class="patient-meta">${p.age}${p.gender} &middot; ${p.condition}</div>
+      </div>
+      <div class="risk-badge risk-${p.risk}">${p.risk}</div>
+    </div>
+  `).join('');
+}
+
+// ── SELECT PATIENT ──
+let selected = null;
+function selectPatient(id){
+  if(selected) document.getElementById('item-'+selected)?.classList.remove('active');
+  selected = id;
+  document.getElementById('item-'+id)?.classList.add('active');
+  const p = patients.find(x=>x.id===id);
+  renderDetail(p);
+}
+
+function scoreColor(v){
+  if(v>=75) return '#E05040';
+  if(v>=50) return '#C8A020';
+  return '#22A070';
+}
+function scoreLabel(v){ return v>=75?'High Risk':v>=50?'Moderate':'Low Risk'; }
+function gapScoreColor(v){ return v>=75?'#22A070':v>=50?'#C8A020':'#E05040'; }
+
+function renderDetail(p){
+  document.getElementById('detailAvatar').style.background = p.avatarBg;
+  document.getElementById('detailAvatar').style.color = p.avatarColor;
+  document.getElementById('detailAvatar').textContent = p.initials;
+  document.getElementById('detailName').textContent = p.name;
+  document.getElementById('detailMeta').textContent = `Age ${p.age} &middot; ${p.condition}`.replace('&middot;','·');
+
+  const rsc = scoreColor(p.riskScore);
+  const gsc = gapScoreColor(p.careGapScore);
+  const hsc = p.healthScore>=70?'#22A070':p.healthScore>=50?'#C8A020':'#E05040';
+
+  document.getElementById('detailBody').innerHTML = `
+
+    <div class="scores-row">
+      <div class="score-card" style="--bar-color:${rsc};--bar-w:${p.riskScore}%;">
+        <div class="score-value" style="color:${rsc};">${p.riskScore}</div>
+        <div class="score-label">Risk Score</div>
+        <div class="score-trend" style="color:${rsc};">${scoreLabel(p.riskScore)}</div>
+      </div>
+      <div class="score-card" style="--bar-color:${gsc};--bar-w:${p.careGapScore}%;">
+        <div class="score-value" style="color:${gsc};">${p.careGapScore}</div>
+        <div class="score-label">Gap Closure</div>
+        <div class="score-trend" style="color:${gsc};">${p.careGapScore>=75?'On Track':p.careGapScore>=50?'Moderate':'Needs Attention'}</div>
+      </div>
+      <div class="score-card" style="--bar-color:${hsc};--bar-w:${p.healthScore}%;">
+        <div class="score-value" style="color:${hsc};">${p.healthScore}</div>
+        <div class="score-label">Health Score</div>
+        <div class="score-trend" style="color:${hsc};">${p.healthScore>=70?'Stable':p.healthScore>=50?'Declining':'Critical'}</div>
+      </div>
+    </div>
+
+    <div class="ai-box">
+      <div class="ai-box-header">
+        <span class="ai-box-icon">⬡</span>
+        <span class="ai-box-label">CareIQ Clinical Intelligence</span>
+      </div>
+      <div class="ai-box-text">${p.ai}</div>
+    </div>
+
+    <div class="gaps-section">
+      <div class="gaps-title">Preventive Care Gaps</div>
+      ${p.gaps.map(g=>`
+        <div class="gap-item">
+          <span class="gap-icon">${g.icon}</span>
+          <span class="gap-text">${g.text}</span>
+          <span class="gap-priority gap-${g.priority}">${g.priority}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="gaps-title">Biomarker Snapshot</div>
+    <div class="biomarker-grid">
+      ${p.biomarkers.map(b=>`
+        <div class="biomarker">
+          <div class="biomarker-bar-wrap">
+            <div class="biomarker-label">${b.label}</div>
+            <div class="biomarker-val">${b.val}</div>
+            <div class="biomarker-bar"><div class="biomarker-fill" style="width:${b.fill}%;background:${b.color};"></div></div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+renderList();
+</script>
+</body>
+</html>
