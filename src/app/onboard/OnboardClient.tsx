@@ -198,19 +198,14 @@ function Step1Email() {
   const [error, setError] = useState("");
   const [cooldown, setCooldown] = useState(0);
 
-  // Hydrate cooldown from localStorage on mount so refreshing the page
-  // can't shortcut the wait.
   useEffect(() => {
     const remaining = readStoredCooldown();
     if (remaining > 0) {
       setCooldown(remaining);
-      // We don't know the exact email if the page was refreshed; show the
-      // generic "check your email" state without a specific address.
       setSentEmail((prev) => prev || "your email");
     }
   }, []);
 
-  // Tick the countdown.
   useEffect(() => {
     if (cooldown <= 0) return;
     const id = window.setInterval(() => {
@@ -265,7 +260,6 @@ function Step1Email() {
   const inCooldown = cooldown > 0;
   const sendDisabled = busy || !email || inCooldown;
 
-  // Pre-send screen
   if (!sentEmail && !inCooldown) {
     return (
       <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
@@ -292,7 +286,6 @@ function Step1Email() {
     );
   }
 
-  // Post-send screen (with cooldown + resend)
   return (
     <div className="flex flex-col gap-3">
       <h1 className="text-2xl font-bold">Check your email</h1>
@@ -617,17 +610,16 @@ function Step4Upload({
     }
   }
 
-  const canFinish = (labStatus?.ok || wearableStatus?.ok) ?? false;
-
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Upload your data</h1>
+      <h1 className="text-2xl font-bold">Upload your data (optional)</h1>
       <p className="text-ink-soft">
         Files are scanned, stripped of metadata, encrypted, and stored on sovereign infrastructure.
+        You can skip this step now and upload later from the dashboard.
       </p>
 
       <div className="rounded-xl border border-dashed border-slate-400 bg-slate-50 p-4">
-        <div className="font-bold">Zone A: Lab results</div>
+        <div className="font-bold">Zone A: Lab results (optional)</div>
         <div className="mb-2 text-sm text-ink-soft">PDF, PNG, JPG, or HEIC. 10MB max.</div>
         <input
           type="file"
@@ -647,7 +639,7 @@ function Step4Upload({
       </div>
 
       <div className="rounded-xl border border-dashed border-slate-400 bg-slate-50 p-4">
-        <div className="font-bold">Zone B: Wearable export</div>
+        <div className="font-bold">Zone B: Wearable export (optional)</div>
         <div className="mb-2 text-sm text-ink-soft">
           CSV, JSON, or XML from any device. The raw file is parsed and discarded; only key
           metrics are encrypted and stored.
@@ -688,11 +680,12 @@ function Step4Upload({
       </details>
 
       <button
+        type="button"
         onClick={onDone}
-        disabled={!canFinish}
+        disabled={busy !== null}
         className="btn-primary mt-2"
       >
-        Continue to dashboard
+        {busy ? "Uploading..." : "Continue to dashboard"}
       </button>
     </div>
   );
