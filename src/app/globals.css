@@ -1,9 +1,147 @@
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:#07101f;font-family:'Outfit',sans-serif;color:#eef2f8}
-#__next{height:100%}
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:2px}
-@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
-@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html, body {
+    @apply min-h-full bg-sov-bg text-ink;
+    font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #07101f;
+    background-image:
+      radial-gradient(ellipse 90% 50% at 15% 5%, rgba(0, 212, 184, 0.07) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 70% at 85% 95%, rgba(128, 96, 204, 0.07) 0%, transparent 55%);
+    background-attachment: fixed;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  a { @apply text-sov-link underline-offset-2; }
+  h1, h2, h3, h4, h5, h6 { font-family: "Playfair Display", Georgia, serif; letter-spacing: -0.01em; }
+  /* Make Tailwind's bg-white / bg-slate-50 / etc. resolve to dark surfaces.
+     This keeps existing utility classes used inside large components
+     (OnboardClient et al.) from punching holes through the dark theme. */
+  .bg-white { background-color: #0d1a30 !important; }
+  .bg-slate-50 { background-color: #11243d !important; }
+  .border-slate-200 { border-color: #1e3a5f !important; }
+  .border-slate-300 { border-color: #1e3a5f !important; }
+  .border-slate-400 { border-color: #2a4a72 !important; }
+}
+
+@layer components {
+  /* Primary CTA: gold on navy. Matches the clinical OS gold accent. */
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sov-gold disabled:cursor-not-allowed disabled:opacity-60;
+    background: linear-gradient(135deg, #d4a843, #b8902f);
+    color: #07101f;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 4px 16px rgba(212, 168, 67, 0.18);
+  }
+  .btn-primary:hover { background: linear-gradient(135deg, #e0b455, #c89a37); }
+
+  /* Secondary CTA: teal outline on dark. */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sov-teal disabled:cursor-not-allowed disabled:opacity-60;
+    background: rgba(0, 212, 184, 0.08);
+    color: #00d4b8;
+    border: 1px solid rgba(0, 212, 184, 0.4);
+  }
+  .btn-secondary:hover {
+    background: rgba(0, 212, 184, 0.16);
+    border-color: rgba(0, 212, 184, 0.7);
+  }
+
+  .field-label {
+    @apply mt-2 text-xs font-semibold uppercase tracking-[0.18em];
+    color: #a3b5cc;
+  }
+  .field-input,
+  .field-textarea {
+    @apply w-full rounded-lg px-3 py-2.5 text-[15px] shadow-sm focus:outline-none;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid #1e3a5f;
+    color: #eef2f8;
+  }
+  .field-input::placeholder,
+  .field-textarea::placeholder { color: #7a9bbf; }
+  .field-input:focus,
+  .field-textarea:focus {
+    border-color: #d4a843;
+    box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.25);
+  }
+
+  .card {
+    @apply rounded-2xl p-6 shadow-card;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(0, 212, 184, 0.14);
+    color: #eef2f8;
+  }
+
+  .alert-success {
+    @apply rounded-lg px-3 py-2 text-sm;
+    background: rgba(74, 222, 128, 0.1);
+    border: 1px solid rgba(74, 222, 128, 0.35);
+    color: #4ade80;
+  }
+  .alert-error {
+    @apply rounded-lg px-3 py-2 text-sm;
+    background: rgba(232, 82, 110, 0.1);
+    border: 1px solid rgba(232, 82, 110, 0.35);
+    color: #e8526e;
+  }
+  .alert-warn {
+    @apply rounded-lg px-3 py-2 text-sm;
+    background: rgba(212, 168, 67, 0.1);
+    border: 1px solid rgba(212, 168, 67, 0.35);
+    color: #d4a843;
+  }
+
+  /* Top-right "ZK SHIELD ON" indicator used on landing + onboard. The
+     clinical OS has its own indicator inside CareIQHealthOS.tsx. */
+  .zk-shield-pill {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em];
+    background: rgba(74, 222, 128, 0.08);
+    border-color: rgba(74, 222, 128, 0.3);
+    color: #4ade80;
+  }
+  .zk-shield-dot {
+    @apply h-1.5 w-1.5 rounded-full;
+    background: #4ade80;
+    animation: sovPulse 2s ease-in-out infinite;
+  }
+  @keyframes sovPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Step indicator pill used in the onboard header. */
+  .step-pill {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-full font-mono text-sm font-semibold;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid #1e3a5f;
+    color: #7a9bbf;
+  }
+  .step-pill-on {
+    background: linear-gradient(135deg, #d4a843, #b8902f);
+    border-color: transparent;
+    color: #07101f;
+  }
+  .step-pill-done {
+    background: rgba(212, 168, 67, 0.12);
+    border-color: rgba(212, 168, 67, 0.4);
+    color: #d4a843;
+  }
+
+  /* Gold progress bar used on onboard. */
+  .progress-track {
+    @apply h-1.5 w-full overflow-hidden rounded-full;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all;
+    background: linear-gradient(90deg, #d4a843, #e0b455);
+  }
+}
