@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * The /auth/callback route is excluded at the matcher level: middleware
- * never runs for it. That is intentional. The magic-link callback must
- * reach its route handler with no rate-limit, no session rotation, no
- * CSRF check, and no cookie writes that could collide with the sov_auth
- * cookie the handler is about to set on its redirect response.
- *
- * Static asset paths (_next/static, _next/image) and well-known files
- * (favicon, robots, sitemap) are also excluded.
+ * The /auth/callback route is excluded at the matcher level so middleware
+ * never runs for it. The magic-link callback must reach its route handler
+ * with no rate-limit, no session rotation, no CSRF check, and no cookie
+ * writes that could collide with the sov_auth cookie the handler sets on
+ * its redirect response.
  */
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|auth/callback|robots.txt|sitemap.xml).*)",
+    "/((?!_next/static|_next/image|favicon.ico|auth/callback).*)",
   ],
 };
 
@@ -152,8 +149,6 @@ export async function middleware(req: NextRequest) {
   const method = req.method.toUpperCase();
   const ip = getClientIp(req);
 
-  // 1. Rate limit. The matcher excludes /auth/callback so the magic-link
-  //    callback is never counted against this bucket.
   pruneRateBuckets();
   const rl = rateLimit(ip);
   if (!rl.ok) {
@@ -175,7 +170,6 @@ export async function middleware(req: NextRequest) {
   const existingTs = req.cookies.get(SESSION_TS_COOKIE)?.value || "";
   const existingAuth = req.cookies.get(AUTH_COOKIE)?.value || "";
 
-  // 2. 30-minute idle expiry on the rotating session cookie.
   let sessionExpired = false;
   const now = Date.now();
   if (existingSession && existingTs) {
@@ -185,15 +179,11 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 3. Authenticated users hitting /onboard go straight to /dashboard,
-  //    UNLESS they arrived via the dashboard's edit entrypoint (?edit=1)
-  //    or the rotating session has expired (so they can re-auth).
   const isEditEntry = url.searchParams.get("edit") === "1";
   if (isOnboardPath(pathname) && existingAuth && !sessionExpired && !isEditEntry) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // 4. Rotate session id per request.
   const newSessionId = randomToken(32);
   const newCsrfToken = randomToken(32);
   const newCsrfSig = csrfSecret
@@ -201,7 +191,6 @@ export async function middleware(req: NextRequest) {
     : "";
   const csrfCookieValue = newCsrfSig ? `${newCsrfToken}.${newCsrfSig}` : newCsrfToken;
 
-  // 5. CSRF check on state-changing API requests.
   const isApi = pathname.startsWith("/api/");
   const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
   if (isApi && isMutating) {
@@ -244,11 +233,6 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 6. Auth gating.
-  //    /dashboard (and protected /api/*): require sov_auth identity cookie.
-  //    Session expiry on a protected page: clear all auth cookies and
-  //    bounce to /onboard?expired=1.
-  //    Unauthenticated visitors to /dashboard: bounce to /onboard.
   const needsIdentity = isDashboardPath(pathname) || isClinicalPath(pathname) || isProtectedApi(pathname);
   if (needsIdentity) {
     if (sessionExpired) {
@@ -272,7 +256,6 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 7. Per-request CSP nonce + cookie rotation.
   const nonce = randomNonce();
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-session-id", newSessionId);
