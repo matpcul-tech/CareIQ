@@ -20,11 +20,23 @@ interface ProfilePlaintext {
   communityAffiliation?: string;
 }
 
+interface ManualLabs {
+  a1c?: number;
+  ldl?: number;
+  hdl?: number;
+  fastingGlucose?: number;
+  bpSystolic?: number;
+  bpDiastolic?: number;
+  triglycerides?: number;
+  egfr?: number;
+}
+
 interface HistoryPlaintext {
   chronicConditions?: string[];
   medications?: string;
   allergies?: string;
   familyHistory?: string;
+  manualLabs?: ManualLabs;
 }
 
 interface DailyMetric {
@@ -44,7 +56,6 @@ export default async function ClinicalPage() {
 
   const sb = getServiceClient();
 
-  // Read all four data sources in parallel.
   const [patRes, hhRes, labRes, wdRes] = await Promise.all([
     sb.from("patients").select("profile_encrypted, created_at").eq("id", session.patientId).maybeSingle(),
     sb.from("health_history").select("data_encrypted").eq("patient_id", session.patientId).maybeSingle(),
@@ -91,7 +102,6 @@ export default async function ClinicalPage() {
   });
 
   if (!hasAnyData) {
-    // Pure demo path: Matthew Culwell + banner.
     return <CareIQHealthOS demoMode={true} />;
   }
 
@@ -134,23 +144,38 @@ function buildClinicalData(args: {
     score: deriveHealthScore(history, metrics),
   };
 
-  // The patient table doesn't yet store labs as structured numbers; until a
-  // lab parser exists, the BP/A1C/LDL/Weight cards stay on demo values so
-  // the UI keeps its visual integrity. HR and SpO2 are pulled live from the
-  // most-recent wearable upload when available.
+  // Manually-entered labs override demo defaults wherever the patient typed
+  // a value. Status (ok/warn/alert) is derived from the typed value too.
+  const manual = history?.manualLabs ?? {};
   const last = metrics.length > 0 ? metrics[metrics.length - 1] : null;
-  const vitals: ClinicalVital[] = [
-    { icon: "BP", val: "118/76", unit: "mmHg", name: "Blood Pressure", s: "ok" },
-    { icon: "A1C", val: "6.4", unit: "A1C %", name: "Glycemic", s: "warn" },
-    { icon: "LDL", val: "212", unit: "mg/dL", name: "LDL Chol.", s: "alert" },
-    last?.heartRate != null
-      ? { icon: "HR", val: String(last.heartRate), unit: "bpm", name: "Heart Rate", s: hrStatus(last.heartRate) }
-      : { icon: "HR", val: "-", unit: "bpm", name: "Heart Rate", s: "ok" },
-    last?.spo2 != null
-      ? { icon: "O2", val: String(last.spo2), unit: "SpO2 %", name: "Oxygen Sat", s: spo2Status(last.spo2) }
-      : { icon: "O2", val: "-", unit: "SpO2 %", name: "Oxygen Sat", s: "ok" },
-    { icon: "WT", val: "174", unit: "lbs", name: "Body Weight", s: "warn" },
-  ];
+
+  const bpVital: ClinicalVital = manual.bpSystolic != null && manual.bpDiastolic != null
+    ? { icon: "BP", val: `${manual.bpSystolic}/${manual.bpDiastolic}`, unit: "mmHg", name: "Blood Pressure", s: bpStatus(manual.bpSystolic, manual.bpDiastolic) }
+    : { icon: "BP", val: "118/76", unit: "mmHg", name: "Blood Pressure", s: "ok" };
+
+  const a1cVital: ClinicalVital = manual.a1c != null
+    ? { icon: "A1C", val: manual.a1c.toFixed(1), unit: "A1C %", name: "Glycemic", s: a1cStatus(manual.a1c) }
+    : { icon: "A1C", val: "6.4", unit: "A1C %", name: "Glycemic", s: "warn" };
+
+  const ldlVital: ClinicalVital = manual.ldl != null
+    ? { icon: "LDL", val: String(Math.round(manual.ldl)), unit: "mg/dL", name: "LDL Chol.", s: ldlStatus(manual.ldl) }
+    : { icon: "LDL", val: "212", unit: "mg/dL", name: "LDL Chol.", s: "alert" };
+
+  const hrVital: ClinicalVital = last?.heartRate != null
+    ? { icon: "HR", val: String(last.heartRate), unit: "bpm", name: "Heart Rate", s: hrStatus(last.heartRate) }
+    : { icon: "HR", val: "-", unit: "bpm", name: "Heart Rate", s: "ok" };
+
+  const spo2Vital: ClinicalVital = last?.spo2 != null
+    ? { icon: "O2", val: String(last.spo2), unit: "SpO2 %", name: "Oxygen Sat", s: spo2Status(last.spo2) }
+    : { icon: "O2", val: "-", unit: "SpO2 %", name: "Oxygen Sat", s: "ok" };
+
+  // Glucose tile replaces the previous Body Weight tile when a manually
+  // entered fasting glucose exists. Otherwise we keep the demo weight.
+  const sixthVital: ClinicalVital = manual.fastingGlucose != null
+    ? { icon: "GLU", val: String(Math.round(manual.fastingGlucose)), unit: "mg/dL", name: "Fasting Glucose", s: glucoseStatus(manual.fastingGlucose) }
+    : { icon: "WT", val: "174", unit: "lbs", name: "Body Weight", s: "warn" };
+
+  const vitals: ClinicalVital[] = [bpVital, a1cVital, ldlVital, hrVital, spo2Vital, sixthVital];
 
   const conditions = (history?.chronicConditions ?? []).map((c) => c.toLowerCase());
   const has = (k: string) => conditions.some((c) => c.includes(k));
@@ -164,7 +189,7 @@ function buildClinicalData(args: {
   ];
 
   const insights: ClinicalInsight[] = [];
-  if (has("diabet")) {
+  if (has("diabet") || (manual.a1c != null && manual.a1c >= 5.7)) {
     insights.push({
       type: "watch",
       icon: "GLU",
@@ -174,14 +199,24 @@ function buildClinicalData(args: {
       conf: "92%",
     });
   }
-  if (has("hypert")) {
+  if (has("hypert") || (manual.bpSystolic != null && manual.bpSystolic >= 130)) {
     insights.push({
       type: "crit",
       icon: "BP",
       title: "Hypertension Follow-Up",
-      body: "Hypertension on file. Regular BP monitoring and FQHC care team review recommended within 30 days.",
+      body: "Blood pressure on file is above target. Regular BP monitoring and FQHC care team review recommended within 30 days.",
       cta: "Schedule Consult",
       conf: "94%",
+    });
+  }
+  if (manual.ldl != null && manual.ldl >= 130) {
+    insights.push({
+      type: "watch",
+      icon: "LDL",
+      title: "Elevated LDL on File",
+      body: `LDL of ${Math.round(manual.ldl)} mg/dL elevates 10-year cardiovascular risk. Discuss lipid management with your FQHC care team.`,
+      cta: "Schedule Consult",
+      conf: "92%",
     });
   }
   if (history?.allergies) {
@@ -222,6 +257,14 @@ function buildClinicalData(args: {
       date: friendlyDate(last.date),
       title: "Wearable Sync",
       text: `Latest reading from ${deviceType || "wearable device"}.`,
+    });
+  }
+  if (Object.keys(manual).length > 0) {
+    timeline.push({
+      dot: "#d4a843",
+      date: "Recent",
+      title: "Manual Lab Values Recorded",
+      text: `${Object.keys(manual).length} lab value${Object.keys(manual).length === 1 ? "" : "s"} typed in by patient.`,
     });
   }
   if (labFileCount > 0) {
@@ -290,9 +333,6 @@ function ageFromDob(dob?: string): number | null {
 }
 
 function deriveHealthScore(history: HistoryPlaintext | null, metrics: DailyMetric[]): number {
-  // A simple derived score that decreases with chronic condition count and
-  // out-of-range vitals. Range 50 to 95. Conservative by design; future
-  // versions will read from a real risk-scoring service.
   let score = 85;
   const conditions = history?.chronicConditions?.length ?? 0;
   score -= Math.min(conditions * 6, 24);
@@ -304,7 +344,13 @@ function deriveHealthScore(history: HistoryPlaintext | null, metrics: DailyMetri
     if (last.spo2 < 95) score -= 6;
     if (last.spo2 < 90) score -= 8;
   }
-  return Math.max(50, Math.min(95, score));
+  const m = history?.manualLabs ?? {};
+  if (m.a1c != null && m.a1c >= 6.5) score -= 8;
+  else if (m.a1c != null && m.a1c >= 5.7) score -= 4;
+  if (m.ldl != null && m.ldl >= 190) score -= 8;
+  else if (m.ldl != null && m.ldl >= 130) score -= 4;
+  if (m.bpSystolic != null && (m.bpSystolic >= 140 || (m.bpDiastolic != null && m.bpDiastolic >= 90))) score -= 6;
+  return Math.max(40, Math.min(95, score));
 }
 
 function hrStatus(hr: number): string {
@@ -316,6 +362,30 @@ function hrStatus(hr: number): string {
 function spo2Status(spo2: number): string {
   if (spo2 < 90) return "alert";
   if (spo2 < 95) return "warn";
+  return "ok";
+}
+
+function a1cStatus(v: number): string {
+  if (v >= 6.5) return "alert";
+  if (v >= 5.7) return "warn";
+  return "ok";
+}
+
+function ldlStatus(v: number): string {
+  if (v >= 190) return "alert";
+  if (v >= 130) return "warn";
+  return "ok";
+}
+
+function glucoseStatus(v: number): string {
+  if (v >= 126) return "alert";
+  if (v >= 100) return "warn";
+  return "ok";
+}
+
+function bpStatus(sys: number, dia: number): string {
+  if (sys >= 140 || dia >= 90) return "alert";
+  if (sys >= 130 || dia >= 80) return "warn";
   return "ok";
 }
 
