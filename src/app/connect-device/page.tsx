@@ -1,0 +1,126 @@
+import Link from "next/link";
+
+export const dynamic = "force-static";
+export const revalidate = false;
+
+interface Device {
+  name: string;
+  format: string;
+  steps: string[];
+}
+
+const DEVICES: Device[] = [
+  {
+    name: "Fitbit",
+    format: "JSON archive",
+    steps: [
+      "Open fitbit.com on a desktop browser and sign in.",
+      "Go to Settings, then Data Export.",
+      "Click Request Data, and confirm via the email Fitbit sends you.",
+      "Download the archive when ready, then unzip it on your computer.",
+      "Upload the largest .json file from inside the archive to Zone B on the dashboard.",
+    ],
+  },
+  {
+    name: "Apple Watch",
+    format: "export.xml",
+    steps: [
+      "On your iPhone, open the Health app.",
+      "Tap your profile picture in the top right.",
+      "Scroll down and tap Export All Health Data.",
+      "Wait for the export.zip to be prepared, then save it to Files.",
+      "Unzip on a computer and upload export.xml to Zone B.",
+    ],
+  },
+  {
+    name: "Garmin",
+    format: "CSV",
+    steps: [
+      "Open Garmin Connect on a desktop browser and sign in.",
+      "Go to Account Management, then Manage My Data.",
+      "Choose Export Your Data and download the archive.",
+      "Unzip and upload the activity or wellness CSV file to Zone B.",
+    ],
+  },
+  {
+    name: "Samsung Health",
+    format: "CSV",
+    steps: [
+      "Open the Samsung Health app on your phone.",
+      "Tap the menu, then Settings.",
+      "Tap Download personal data.",
+      "Confirm the download and locate the resulting CSV file.",
+      "Upload the CSV file to Zone B.",
+    ],
+  },
+  {
+    name: "Google Fit",
+    format: "JSON via Google Takeout",
+    steps: [
+      "Visit takeout.google.com on a desktop browser.",
+      "Click Deselect all, then check only Fit.",
+      "Choose JSON as the export format and create the export.",
+      "Download the archive when Google emails you, and unzip it.",
+      "Upload the daily summary JSON to Zone B.",
+    ],
+  },
+];
+
+export default function ConnectDevicePage() {
+  return (
+    <main className="px-4 py-8 sm:py-12">
+      <header className="mx-auto mb-6 max-w-3xl">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-mute">
+          CareIQ
+        </div>
+        <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Connect a wearable device</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft sm:text-base">
+          We do not connect to your device account. There is no OAuth here, no third-party
+          tracking, and no external API call. You export the data yourself and upload the file
+          you choose.
+        </p>
+      </header>
+
+      <section className="mx-auto grid max-w-3xl gap-4">
+        {DEVICES.map((d) => (
+          <article key={d.name} className="card">
+            <div className="mb-2 flex flex-wrap items-baseline gap-3">
+              <h2 className="text-lg font-bold">{d.name}</h2>
+              <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-800">
+                {d.format}
+              </span>
+            </div>
+            <ol className="mb-3 list-decimal space-y-1 pl-6 text-sm leading-relaxed text-ink">
+              {d.steps.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ol>
+            <div
+              aria-hidden="true"
+              className="grid h-28 place-items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs tracking-wider text-ink-mute"
+            >
+              {d.name} export screenshot
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="card mx-auto mt-6 max-w-3xl">
+        <h2 className="mb-2 text-lg font-bold">What happens to my file?</h2>
+        <ul className="list-disc space-y-1 pl-6 text-sm leading-relaxed text-ink">
+          <li>The raw file is parsed in memory on a sovereign server.</li>
+          <li>Only standard daily metrics (heart rate, steps, sleep, SpO2, calories) are kept.</li>
+          <li>The metrics are encrypted with AES-256-GCM before being written to the database.</li>
+          <li>The original file is discarded immediately after parsing.</li>
+          <li>No third-party service ever sees your file or its contents.</li>
+        </ul>
+      </section>
+
+      <footer className="mx-auto mt-6 max-w-3xl text-center">
+        <Link href="/dashboard" className="text-sov-link">
+          Back to your dashboard upload zone
+        </Link>
+      </footer>
+    </main>
+  );
+}
