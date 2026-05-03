@@ -1,30 +1,39 @@
-import type { Metadata, Viewport } from 'next';
-import './globals.css';
+import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'CareIQ OS — Community Health Intelligence',
-  description: 'AI-powered preventive health intelligence for Federally Qualified Health Centers. Built by Sovereign Shield Technologies LLC.',
+  title: "CareIQ",
+  description:
+    "Clinical intelligence for the safety net. Encrypted, anonymized, audited care for community health centers and FQHCs. Built by Sovereign Shield Technologies LLC.",
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: '#07101f',
+  themeColor: "#07101f",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading the nonce here is the documented Next.js pattern for nonce-based
+  // CSP. Next.js will automatically apply this nonce to any inline scripts
+  // and style tags it injects for hydration and streaming.
+  const nonce = headers().get("x-nonce") || undefined;
+
   return (
-    <html lang="en">
+    <html lang="en" className="bg-sov-bg text-ink antialiased">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com"/>
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-        <meta name="apple-mobile-web-app-capable" content="yes"/>
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+        {nonce ? <meta property="csp-nonce" content={nonce} /> : null}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body>{children}</body>
+      <body className="min-h-screen bg-sov-bg text-ink font-sans">{children}</body>
     </html>
   );
 }
