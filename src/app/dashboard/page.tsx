@@ -17,11 +17,23 @@ interface ProfilePlaintext {
   communityAffiliation?: string;
 }
 
+interface ManualLabs {
+  a1c?: number;
+  ldl?: number;
+  hdl?: number;
+  fastingGlucose?: number;
+  bpSystolic?: number;
+  bpDiastolic?: number;
+  triglycerides?: number;
+  egfr?: number;
+}
+
 interface HistoryPlaintext {
   chronicConditions?: string[];
   medications?: string;
   allergies?: string;
   familyHistory?: string;
+  manualLabs?: ManualLabs;
 }
 
 interface DailyMetric {
@@ -75,6 +87,8 @@ export default async function DashboardPage() {
       history = null;
     }
   }
+
+  const manualLabs: ManualLabs = history?.manualLabs ?? {};
 
   const { data: labRows } = await sb
     .from("lab_files")
@@ -193,6 +207,48 @@ export default async function DashboardPage() {
         </Link>
 
         <Link
+          href="/onboard?step=4&edit=1"
+          aria-label={Object.keys(manualLabs).length > 0 ? "Edit your labs" : "Add your labs"}
+          className="card group block cursor-pointer transition hover:ring-2 hover:ring-ink/20 focus:outline-none focus:ring-2 focus:ring-ink/40 md:col-span-2"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-bold">Your labs (entered manually)</h2>
+            <span className="text-xs font-semibold text-ink-mute group-hover:text-ink">
+              {Object.keys(manualLabs).length > 0 ? "Edit" : "Add"}
+            </span>
+          </div>
+          {Object.keys(manualLabs).length > 0 ? (
+            <ul className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              {manualLabs.bpSystolic != null && manualLabs.bpDiastolic != null && (
+                <LabRow label="Blood Pressure" value={`${manualLabs.bpSystolic}/${manualLabs.bpDiastolic} mmHg`} />
+              )}
+              {manualLabs.a1c != null && (
+                <LabRow label="A1C" value={`${manualLabs.a1c.toFixed(1)} %`} />
+              )}
+              {manualLabs.fastingGlucose != null && (
+                <LabRow label="Fasting Glucose" value={`${Math.round(manualLabs.fastingGlucose)} mg/dL`} />
+              )}
+              {manualLabs.ldl != null && (
+                <LabRow label="LDL" value={`${Math.round(manualLabs.ldl)} mg/dL`} />
+              )}
+              {manualLabs.hdl != null && (
+                <LabRow label="HDL" value={`${Math.round(manualLabs.hdl)} mg/dL`} />
+              )}
+              {manualLabs.triglycerides != null && (
+                <LabRow label="Triglycerides" value={`${Math.round(manualLabs.triglycerides)} mg/dL`} />
+              )}
+              {manualLabs.egfr != null && (
+                <LabRow label="eGFR" value={`${Math.round(manualLabs.egfr)} mL/min`} />
+              )}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-mute">
+              No values entered yet. Tap to type in any labs you already know (A1C, LDL, HDL, BP, etc.).
+            </p>
+          )}
+        </Link>
+
+        <Link
           href="/connect-device"
           aria-label="Connect a wearable device"
           className="card group block cursor-pointer transition hover:ring-2 hover:ring-ink/20 focus:outline-none focus:ring-2 focus:ring-ink/40 md:col-span-2"
@@ -234,6 +290,15 @@ function Row({ k, v }: { k: string; v: string }) {
     <li className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
       <span className="font-semibold text-ink-mute sm:w-40">{k}</span>
       <span className="text-ink">{v}</span>
+    </li>
+  );
+}
+
+function LabRow({ label, value }: { label: string; value: string }) {
+  return (
+    <li className="flex items-baseline justify-between gap-3 rounded-lg border border-sov-border/60 bg-sov-card/40 px-3 py-2">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-mute">{label}</span>
+      <span className="font-mono text-sm text-ink">{value}</span>
     </li>
   );
 }
