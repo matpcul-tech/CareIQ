@@ -552,6 +552,39 @@ function Step3History({
   );
 }
 
+interface ManualLabsForm {
+  a1c: string;
+  ldl: string;
+  hdl: string;
+  fastingGlucose: string;
+  bpSystolic: string;
+  bpDiastolic: string;
+  triglycerides: string;
+  egfr: string;
+}
+
+const EMPTY_LABS: ManualLabsForm = {
+  a1c: "",
+  ldl: "",
+  hdl: "",
+  fastingGlucose: "",
+  bpSystolic: "",
+  bpDiastolic: "",
+  triglycerides: "",
+  egfr: "",
+};
+
+function buildLabsPayload(form: ManualLabsForm): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(form)) {
+    const trimmed = (v as string).trim();
+    if (trimmed === "") continue;
+    const n = Number(trimmed);
+    if (Number.isFinite(n)) out[k] = n;
+  }
+  return out;
+}
+
 function Step4Upload({
   authenticated,
   onDone,
@@ -564,6 +597,9 @@ function Step4Upload({
     null,
   );
   const [busy, setBusy] = useState<"lab" | "wearable" | null>(null);
+  const [labs, setLabs] = useState<ManualLabsForm>(EMPTY_LABS);
+  const [labsStatus, setLabsStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [savingLabs, setSavingLabs] = useState(false);
 
   if (!authenticated) {
     return (
@@ -608,6 +644,36 @@ function Step4Upload({
     } finally {
       setBusy(null);
     }
+  }
+
+  async function continueToDashboard() {
+    const payload = buildLabsPayload(labs);
+    const enteredCount = Object.keys(payload).length;
+    if (enteredCount === 0) {
+      onDone();
+      return;
+    }
+    setSavingLabs(true);
+    setLabsStatus(null);
+    try {
+      const res = await postJson("/api/onboard/manual-labs", payload);
+      if (!res.ok) {
+        setLabsStatus({
+          ok: false,
+          message: "Could not save lab values. Please review the numbers.",
+        });
+        setSavingLabs(false);
+        return;
+      }
+      onDone();
+    } catch {
+      setLabsStatus({ ok: false, message: "Network error saving lab values." });
+      setSavingLabs(false);
+    }
+  }
+
+  function setLab<K extends keyof ManualLabsForm>(key: K, value: string) {
+    setLabs((prev) => ({ ...prev, [key]: value }));
   }
 
   return (
@@ -661,6 +727,148 @@ function Step4Upload({
         )}
       </div>
 
+      <div className="rounded-xl border border-slate-300 bg-slate-50 p-4">
+        <div className="font-bold">Enter labs manually (optional)</div>
+        <div className="mb-3 text-sm text-ink-soft">
+          Type any values you already know. Every field is optional. Values are encrypted before storage.
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="field-label" htmlFor="lab-a1c">A1C (%)</label>
+            <input
+              id="lab-a1c"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              max="25"
+              value={labs.a1c}
+              onChange={(e) => setLab("a1c", e.target.value)}
+              className="field-input"
+              placeholder="e.g. 5.7"
+            />
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="lab-ldl">LDL (mg/dL)</label>
+            <input
+              id="lab-ldl"
+              type="number"
+              inputMode="numeric"
+              step="1"
+              min="0"
+              max="1000"
+              value={labs.ldl}
+              onChange={(e) => setLab("ldl", e.target.value)}
+              className="field-input"
+              placeholder="e.g. 110"
+            />
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="lab-hdl">HDL (mg/dL)</label>
+            <input
+              id="lab-hdl"
+              type="number"
+              inputMode="numeric"
+              step="1"
+              min="0"
+              max="300"
+              value={labs.hdl}
+              onChange={(e) => setLab("hdl", e.target.value)}
+              className="field-input"
+              placeholder="e.g. 55"
+            />
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="lab-glucose">Fasting Glucose (mg/dL)</label>
+            <input
+              id="lab-glucose"
+              type="number"
+              inputMode="numeric"
+              step="1"
+              min="0"
+              max="1000"
+              value={labs.fastingGlucose}
+              onChange={(e) => setLab("fastingGlucose", e.target.value)}
+              className="field-input"
+              placeholder="e.g. 95"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="field-label">Blood Pressure (mmHg)</label>
+            <div className="flex items-center gap-2">
+              <input
+                aria-label="Systolic"
+                type="number"
+                inputMode="numeric"
+                step="1"
+                min="40"
+                max="300"
+                value={labs.bpSystolic}
+                onChange={(e) => setLab("bpSystolic", e.target.value)}
+                className="field-input"
+                placeholder="Systolic"
+              />
+              <span className="font-mono text-ink-soft">/</span>
+              <input
+                aria-label="Diastolic"
+                type="number"
+                inputMode="numeric"
+                step="1"
+                min="20"
+                max="200"
+                value={labs.bpDiastolic}
+                onChange={(e) => setLab("bpDiastolic", e.target.value)}
+                className="field-input"
+                placeholder="Diastolic"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="lab-trig">Triglycerides (mg/dL)</label>
+            <input
+              id="lab-trig"
+              type="number"
+              inputMode="numeric"
+              step="1"
+              min="0"
+              max="3000"
+              value={labs.triglycerides}
+              onChange={(e) => setLab("triglycerides", e.target.value)}
+              className="field-input"
+              placeholder="e.g. 130"
+            />
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="lab-egfr">eGFR (mL/min)</label>
+            <input
+              id="lab-egfr"
+              type="number"
+              inputMode="numeric"
+              step="1"
+              min="0"
+              max="250"
+              value={labs.egfr}
+              onChange={(e) => setLab("egfr", e.target.value)}
+              className="field-input"
+              placeholder="e.g. 90"
+            />
+          </div>
+        </div>
+
+        {labsStatus && (
+          <div className={`mt-3 ${labsStatus.ok ? "alert-success" : "alert-error"}`}>
+            {labsStatus.message}
+          </div>
+        )}
+      </div>
+
       <details className="mt-1 rounded-xl border border-slate-200 bg-white p-3 open:p-4">
         <summary className="cursor-pointer text-sm font-semibold text-ink">
           Supported devices and how to export
@@ -681,11 +889,11 @@ function Step4Upload({
 
       <button
         type="button"
-        onClick={onDone}
-        disabled={busy !== null}
+        onClick={continueToDashboard}
+        disabled={busy !== null || savingLabs}
         className="btn-primary mt-2"
       >
-        {busy ? "Uploading..." : "Continue to dashboard"}
+        {busy ? "Uploading..." : savingLabs ? "Saving labs..." : "Continue to dashboard"}
       </button>
     </div>
   );
