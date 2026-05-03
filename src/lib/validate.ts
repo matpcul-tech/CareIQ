@@ -71,6 +71,24 @@ export const healthHistorySchema = z.object({
 });
 export type HealthHistoryInput = z.infer<typeof healthHistorySchema>;
 
+/**
+ * Manual lab values typed in by the patient on the data-upload step. Every
+ * field is optional. Bounds are clinically generous so unusual but real
+ * readings still pass; obviously-bogus values (negative, absurdly high)
+ * are rejected.
+ */
+export const manualLabsSchema = z.object({
+  a1c:            z.number().min(0).max(25).optional(),
+  ldl:            z.number().min(0).max(1000).optional(),
+  hdl:            z.number().min(0).max(300).optional(),
+  fastingGlucose: z.number().min(0).max(1000).optional(),
+  bpSystolic:     z.number().int().min(40).max(300).optional(),
+  bpDiastolic:    z.number().int().min(20).max(200).optional(),
+  triglycerides:  z.number().min(0).max(3000).optional(),
+  egfr:           z.number().min(0).max(250).optional(),
+});
+export type ManualLabsInput = z.infer<typeof manualLabsSchema>;
+
 export const ALLOWED_LAB_TYPES = ["pdf", "png", "jpg", "heic"] as const;
 export type LabFileType = (typeof ALLOWED_LAB_TYPES)[number];
 
