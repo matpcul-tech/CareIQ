@@ -7,7 +7,8 @@ import { useState, useCallback } from "react";
  *
  * Patient-side trigger + modal for the Care Circle invite flow.
  * Calls POST /api/circle/generate-invite (cookie session auth) and
- * shows the resulting CareCircle signup URL with a copy button.
+ * shows the resulting CareCircle signup URL as a tappable hyperlink
+ * with a copy button.
  *
  * Standalone: ships its own inline styles so it can be dropped into
  * any CareIQ patient view without touching that view's stylesheet.
@@ -116,17 +117,26 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
-const urlInputStyle: React.CSSProperties = {
+// Tappable hyperlink that visually matches the previous read-only input
+// (same panel background, border, padding, mono font) but opens the URL
+// in a new tab on tap or click.
+const urlLinkStyle: React.CSSProperties = {
   flex: 1,
   minWidth: 0,
   background: "#11243d",
   border: "1px solid #1e3a5f",
   borderRadius: 8,
   padding: "9px 12px",
-  color: "#eef2f8",
+  color: "#00d4b8",
   fontFamily: FONT_MONO,
   fontSize: 11,
-  outline: "none",
+  textDecoration: "underline",
+  textDecorationColor: "rgba(0,212,184,0.45)",
+  textUnderlineOffset: 3,
+  wordBreak: "break-all",
+  display: "inline-block",
+  lineHeight: 1.4,
+  cursor: "pointer",
 };
 
 const copyBtnStyle: React.CSSProperties = {
@@ -213,10 +223,17 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      const el = document.getElementById("ciq-invite-url") as HTMLInputElement | null;
-      if (el) {
-        el.focus();
-        el.select();
+      // Clipboard API blocked: select the link's text so the patient can
+      // long-press / right-click to copy manually.
+      const el = document.getElementById("ciq-invite-url");
+      if (el && typeof window !== "undefined" && window.getSelection) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
       }
     }
   }, [invite]);
@@ -259,17 +276,21 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
                     Send the link below to your family member. When they open it they will set up their CareCircle account and start receiving alerts about you.
                   </div>
 
-                  <label htmlFor="ciq-invite-url" style={labelStyle}>
+                  <div id="ciq-invite-url-label" style={labelStyle}>
                     Signup URL
-                  </label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                    <a
                       id="ciq-invite-url"
-                      readOnly
-                      value={invite.signup_url}
-                      onFocus={(e) => e.currentTarget.select()}
-                      style={urlInputStyle}
-                    />
+                      href={invite.signup_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-labelledby="ciq-invite-url-label"
+                      aria-label={`Open Care Circle signup link for ${patientName || "patient"} in a new tab`}
+                      style={urlLinkStyle}
+                    >
+                      {invite.signup_url}
+                    </a>
                     <button type="button" onClick={copy} style={copyBtnStyle}>
                       {copied ? "Copied" : "Copy"}
                     </button>
