@@ -6,6 +6,7 @@ import { decryptJson } from "@/lib/crypto";
 import { logAudit } from "@/lib/audit";
 import HealthChart from "./HealthChart";
 import InsightButton from "./InsightButton";
+import InviteFamilyButton from "./InviteFamilyButton";
 import LabFilesCard from "./LabFilesCard";
 
 export const dynamic = "force-dynamic";
@@ -143,12 +144,15 @@ export default async function DashboardPage() {
             {profile?.firstName ? `Welcome, ${normalize(profile.firstName)}` : "Welcome"}
           </div>
         </div>
-        <Link
-          href="/clinical"
-          className="btn-primary inline-flex items-center justify-center gap-2 self-start text-sm sm:self-auto"
-        >
-          View My Health Intelligence
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <InviteFamilyButton />
+          <Link
+            href="/clinical"
+            className="btn-primary inline-flex items-center justify-center gap-2 self-start text-sm sm:self-auto"
+          >
+            View My Health Intelligence
+          </Link>
+        </div>
       </header>
 
       <section className="mx-auto grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-2">
