@@ -24,7 +24,8 @@ export type AuditAction =
   | "shield.unavailable"
   | "rate_limit.exceeded"
   | "csrf.failed"
-  | "validation.failed";
+  | "validation.failed"
+  | "carecircle.invite.created";
 
 export type DataType =
   | "none"
@@ -34,7 +35,8 @@ export type DataType =
   | "wearable"
   | "session"
   | "auth"
-  | "ai_inference";
+  | "ai_inference"
+  | "care_circle_invites";
 
 export interface AuditEntry {
   sessionId: string;
@@ -87,6 +89,8 @@ const ALLOWED_META_KEYS = new Set<string>([
   "reason_code",
   "model_id",
   "shield_version",
+  "invite_id",
+  "expires_in_days",
 ]);
 
 function sanitizeMetadata(
