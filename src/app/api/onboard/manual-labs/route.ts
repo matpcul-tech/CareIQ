@@ -18,11 +18,12 @@ export const dynamic = "force-dynamic";
  * chronic conditions / medications / allergies / family history
  * already on file are preserved.
  *
- * Empty / undefined fields are dropped before encryption, so a partial
- * submission only persists the fields the patient actually filled in.
- *
- * Storing inside health_history.data_encrypted means no schema change
- * is required: the AES-256-GCM ciphertext just gets a few more keys.
+ * After encrypting + persisting, this also upserts the same numeric
+ * values + a few shareable health-history fields into the
+ * public.patient_vitals_shared table so the patient's family circle
+ * (linked via care_circle) can read them via Supabase REST + RLS.
+ * The shared row is the source of truth for the CareCircle dashboard
+ * tabs that need real BP/A1C/LDL/HR/etc. numbers.
  */
 export async function POST(req: NextRequest) {
   const sessionId = headers().get("x-session-id") || "";
@@ -59,8 +60,6 @@ export async function POST(req: NextRequest) {
   }
   const enteredCount = Object.keys(cleaned).length;
 
-  // No-op if patient submitted an empty form. Still 200 so the client
-  // navigation isn't blocked.
   if (enteredCount === 0) {
     await logAudit({
       sessionId,
@@ -106,9 +105,6 @@ export async function POST(req: NextRequest) {
         manualLabs: { ...priorLabs, ...cleaned },
       };
     } catch {
-      // If existing ciphertext can't be decrypted (key rotation, corruption),
-      // fall back to writing only the new manual labs. The previous row
-      // becomes unreadable but we don't lose the patient's new entry.
       merged = { manualLabs: cleaned };
     }
   }
@@ -144,12 +140,91 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "could not save manual labs" }, { status: 500 });
   }
 
-  await logAudit({
-    sessionId,
-    action: "patient.history.updated",
-    dataType: "health_history",
-    success: true,
-    metadata: { metric_count: enteredCount },
+  // Mirror the merged labs + shareable history fields into the
+  // family-readable patient_vitals_shared table. Best-effort: if the
+  // mirror upsert fails, the patient's encrypted record is still
+  // saved and the request is reported as successful. Family will see
+  // stale or missing vitals until the next save retries.
+  type SharedRow = {
+    patient_id: string;
+    a1c: number | null;
+    ldl: number | null;
+    hdl: number | null;
+    fasting_glucose: number | null;
+    bp_systolic: number | null;
+    bp_diastolic: number | null;
+    triglycerides: number | null;
+    egfr: number | null;
+    chronic_conditions: string[] | null;
+    medications: string | null;
+    allergies: string | null;
+    updated_at: string;
+  };
+
+  const mergedLabs =
+    typeof merged.manualLabs === "object" && merged.manualLabs !== null
+      ? (merged.manualLabs as Record<string, number>)
+      : {};
+
+  const conditions =
+    Array.isArray((merged as Record<string, unknown>).chronicConditions)
+      ? ((merged as Record<string, unknown>).chronicConditions as string[])
+      : null;
+  const meds =
+    typeof (merged as Record<string, unknown>).medications === "string"
+      ? ((merged as Record<string, unknown>).medications as string)
+      : null;
+  const allergies =
+    typeof (merged as Record<string, unknown>).allergies === "string"
+      ? ((merged as Record<string, unknown>).allergies as string)
+      : null;
+
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+
+  const sharedRow: SharedRow = {
+    patient_id: session.patientId,
+    a1c: numOrNull(mergedLabs.a1c),
+    ldl: numOrNull(mergedLabs.ldl),
+    hdl: numOrNull(mergedLabs.hdl),
+    fasting_glucose: numOrNull(mergedLabs.fastingGlucose),
+    bp_systolic: numOrNull(mergedLabs.bpSystolic),
+    bp_diastolic: numOrNull(mergedLabs.bpDiastolic),
+    triglycerides: numOrNull(mergedLabs.triglycerides),
+    egfr: numOrNull(mergedLabs.egfr),
+    chronic_conditions: conditions,
+    medications: meds,
+    allergies,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error: mirrorErr } = await sb
+    .from("patient_vitals_shared")
+    .upsert(sharedRow, { onConflict: "patient_id" });
+
+  if (mirrorErr) {
+    await logAudit({
+      sessionId,
+      action: "patient.history.updated",
+      dataType: "health_history",
+      success: true,
+      metadata: { reason_code: "mirror_failed", metric_count: enteredCount },
+    });
+    // Eslint-disable-next-line no-console
+    console.error("[manual-labs] mirror upsert failed:", mirrorErr.code || mirrorErr.message);
+  } else {
+    await logAudit({
+      sessionId,
+      action: "patient.history.updated",
+      dataType: "health_history",
+      success: true,
+      metadata: { metric_count: enteredCount },
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    saved: enteredCount,
+    family_mirror_synced: !mirrorErr,
   });
-  return NextResponse.json({ ok: true, saved: enteredCount });
 }
