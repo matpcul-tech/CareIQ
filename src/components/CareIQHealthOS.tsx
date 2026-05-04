@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
+import InviteFamilyModal from "@/components/InviteFamilyModal";
 
 const ZK_SALT = "CARE-IQ-SOVEREIGN-SHIELD-2026";
 const ZK_TERMS = ["fqhc","careiq","sovereign","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
@@ -1068,6 +1069,9 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
               <div className="hdr-id">{patient.id}</div>
               <div className="shield-on"><div className="pulse"/>ZK SHIELD ON</div>
             </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+            <InviteFamilyModal patientName={patient.name} />
           </div>
         </div>
         {demoMode && (
