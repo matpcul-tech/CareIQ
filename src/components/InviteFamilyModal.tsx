@@ -220,7 +220,7 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
   const [invite, setInvite] = useState<InviteResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [email, setEmail] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [relationship, setRelationship] = useState(RELATIONSHIPS[0]);
   const [alertLevel, setAlertLevel] = useState<"critical" | "informational">("informational");
@@ -244,7 +244,7 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
 
   const send = useCallback(async () => {
     if (busy) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
       setError("Enter a valid email address.");
       return;
     }
@@ -258,7 +258,7 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
           "x-csrf-token": getCsrfToken(),
         },
         body: JSON.stringify({
-          recipient_email: email.trim().toLowerCase(),
+          recipient_email: recipientEmail.trim().toLowerCase(),
           recipient_name: recipientName.trim() || undefined,
           patient_name: patientName,
           personal_note: note.trim() || undefined,
@@ -278,7 +278,7 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
     } finally {
       setBusy(false);
     }
-  }, [busy, email, recipientName, patientName, note, relationship, alertLevel]);
+  }, [busy, recipientEmail, recipientName, patientName, note, relationship, alertLevel]);
 
   const copy = useCallback(async () => {
     if (!invite) return;
@@ -340,7 +340,7 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
                   </div>
                   {sentSuccessfully ? (
                     <div style={descStyle}>
-                      We emailed the signup link to <strong style={{ color: "#eef2f8" }}>{email}</strong>.
+                      We emailed the signup link to <strong style={{ color: "#eef2f8" }}>{recipientEmail}</strong>.
                       They will receive a message with the link below. The link is single-use and
                       expires{" "}
                       {new Date(invite.expires_at).toLocaleString(undefined, {
@@ -420,16 +420,17 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
                   </div>
 
                   <label htmlFor="ciq-recipient-email" style={labelStyle}>
-                    Their email
+                    Family member&apos;s email
                   </label>
                   <input
                     id="ciq-recipient-email"
                     name="recipient_email"
                     type="email"
+                    required
                     autoComplete="off"
                     placeholder="daughter@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
                     onKeyDown={onEnterSubmit}
                     style={inputStyle}
                   />
