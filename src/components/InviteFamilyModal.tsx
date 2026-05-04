@@ -300,6 +300,13 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
     }
   }, [invite]);
 
+  const onEnterSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !busy) {
+      e.preventDefault();
+      send();
+    }
+  };
+
   const sentSuccessfully = invite && invite.email_sent;
 
   return (
@@ -417,11 +424,13 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
                   </label>
                   <input
                     id="ciq-recipient-email"
+                    name="recipient_email"
                     type="email"
                     autoComplete="off"
                     placeholder="daughter@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={onEnterSubmit}
                     style={inputStyle}
                   />
 
@@ -430,10 +439,12 @@ export default function InviteFamilyModal({ patientName }: InviteFamilyModalProp
                   </label>
                   <input
                     id="ciq-recipient-name"
+                    name="recipient_name"
                     type="text"
                     placeholder="Maria"
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
+                    onKeyDown={onEnterSubmit}
                     style={inputStyle}
                   />
 
