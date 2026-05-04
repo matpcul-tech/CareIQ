@@ -47,6 +47,13 @@ interface InviteBody {
   expires_in_days?: number;
 }
 
+interface SupabaseInsertError {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}
+
 function generateCode(): string {
   const bytes = randomBytes(8);
   let code = "";
@@ -56,13 +63,37 @@ function generateCode(): string {
   return code;
 }
 
+// Short, non-PHI handle for the patient_id, used in logs only.
+function patientIdTag(id: string): string {
+  return `pid:${id.slice(0, 8)}`;
+}
+
 export async function POST(req: NextRequest) {
   const sessionId = headers().get("x-session-id") || "";
   const session = readSession();
   if (!session.patientId) {
+    console.warn("[generate-invite] 401 no session.patientId");
     return NextResponse.json(
       { error: "authentication required" },
       { status: 401 },
+    );
+  }
+  const tag = patientIdTag(session.patientId);
+
+  // Sanity check the env. Surface the missing var in logs immediately
+  // rather than letting Supabase return a cryptic auth error.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    console.error("[generate-invite]", tag, "NEXT_PUBLIC_SUPABASE_URL not set");
+    return NextResponse.json(
+      { error: "server misconfigured: NEXT_PUBLIC_SUPABASE_URL" },
+      { status: 500 },
+    );
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[generate-invite]", tag, "SUPABASE_SERVICE_ROLE_KEY not set");
+    return NextResponse.json(
+      { error: "server misconfigured: SUPABASE_SERVICE_ROLE_KEY" },
+      { status: 500 },
     );
   }
 
@@ -91,7 +122,8 @@ export async function POST(req: NextRequest) {
   const sb = getServiceClient();
 
   let inviteRow: { id: string; code: string } | null = null;
-  let lastErr = "";
+  let lastErr: SupabaseInsertError | null = null;
+
   for (let attempt = 0; attempt < 4; attempt++) {
     const code = generateCode();
     const { data, error } = await sb
@@ -111,9 +143,25 @@ export async function POST(req: NextRequest) {
       inviteRow = data as { id: string; code: string };
       break;
     }
-    lastErr = error?.message || "insert failed";
+
+    lastErr = {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+    };
+    console.error(
+      "[generate-invite]",
+      tag,
+      "insert failed (attempt",
+      attempt + 1,
+      "of 4):",
+      JSON.stringify(lastErr),
+    );
+
     // Retry only on code collision; bail on any other error.
-    if (!/duplicate|unique/i.test(lastErr)) break;
+    const isCollision = /duplicate|unique/i.test(lastErr.message || "");
+    if (!isCollision) break;
   }
 
   if (!inviteRow) {
@@ -124,8 +172,19 @@ export async function POST(req: NextRequest) {
       success: false,
       metadata: { reason_code: "db_write" },
     });
+
+    // Return the Supabase error code in the response so we can see it in
+    // browser DevTools without grepping Vercel logs. PHI safe: SQLSTATE
+    // codes and PostgREST error codes only.
     return NextResponse.json(
-      { error: "could not create invite" },
+      {
+        error: "could not create invite",
+        debug: {
+          code: lastErr?.code ?? null,
+          message: lastErr?.message ?? null,
+          hint: lastErr?.hint ?? null,
+        },
+      },
       { status: 500 },
     );
   }
