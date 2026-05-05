@@ -127,7 +127,7 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
             zIndex: 50,
             background: "rgba(7,16,31,0.85)",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-end",
             justifyContent: "center",
             padding: 16,
             fontFamily: "'Outfit', system-ui, sans-serif",
