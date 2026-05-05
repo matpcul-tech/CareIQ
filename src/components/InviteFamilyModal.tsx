@@ -136,6 +136,8 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
               borderRadius: 12,
               padding: 22,
               color: "#eef2f8",
+              maxHeight: "80vh",
+              overflowY: "auto",
             }}
           >
             <h2 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 600 }}>
