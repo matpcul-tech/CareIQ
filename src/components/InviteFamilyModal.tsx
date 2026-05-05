@@ -37,12 +37,14 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<InviteResponse | null>(null);
+  const [copied, setCopied] = useState(false);
 
   function reset() {
     setEmail("");
     setError("");
     setResult(null);
     setBusy(false);
+    setCopied(false);
   }
 
   async function send() {
@@ -76,6 +78,28 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
       setError("Network error. Please try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.signup_url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (insecure context, permission denied, etc.).
+      // Fall back to selecting the visible link so the user can copy manually.
+      const el = document.getElementById("ciq-invite-open-link");
+      if (el && typeof window !== "undefined" && window.getSelection) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
     }
   }
 
@@ -146,23 +170,54 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
 
             {result ? (
               <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                <p style={{ margin: "0 0 10px", color: "#00d4b8" }}>
+                <p style={{ margin: "0 0 14px", color: "#00d4b8" }}>
                   {result.email_sent ? "Invite sent." : "Invite created."}
                 </p>
                 {!result.email_sent && (
-                  <p style={{ margin: "0 0 10px", color: "#d4a843" }}>
+                  <p style={{ margin: "0 0 14px", color: "#d4a843" }}>
                     Email could not be sent ({result.email_error || "unknown reason"}).
                     Share this link manually:
                   </p>
                 )}
-                <a
-                  href={result.signup_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "#00d4b8", wordBreak: "break-all" }}
+
+                <button
+                  type="button"
+                  onClick={copyLink}
+                  style={{
+                    width: "100%",
+                    padding: "12px 0",
+                    borderRadius: 10,
+                    border: "none",
+                    background: copied ? "#0d1a30" : "#00d4b8",
+                    color: copied ? "#00d4b8" : "#07101f",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: copied
+                      ? "inset 0 0 0 1px #00d4b8"
+                      : "0 0 18px rgba(0,212,184,0.3)",
+                    transition: "background 0.15s, color 0.15s",
+                  }}
                 >
-                  {result.signup_url}
-                </a>
+                  {copied ? "Copied!" : "Copy Invite Link"}
+                </button>
+
+                <div style={{ textAlign: "center", marginTop: 10 }}>
+                  <a
+                    id="ciq-invite-open-link"
+                    href={result.signup_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "#7a9bbf",
+                      fontSize: 11,
+                      textDecoration: "underline",
+                      textUnderlineOffset: 3,
+                    }}
+                  >
+                    Open Link
+                  </a>
+                </div>
               </div>
             ) : (
               <>
