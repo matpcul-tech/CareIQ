@@ -1,6 +1,5 @@
 import "server-only";
 
-import { extractText, getDocumentProxy } from "unpdf";
 import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
 
 /**
@@ -10,6 +9,9 @@ import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
  * LabCorp PDF lab reports. Pipeline:
  *
  *   1. unpdf (pdfjs-dist under the hood) extracts text from the PDF.
+ *      Imported DYNAMICALLY inside extractTextFromPdf so a failure to
+ *      load the package in the Vercel serverless runtime does NOT
+ *      cascade into a module-load error on /api/onboard/upload.
  *   2. Per-biomarker regex patterns search the merged text for
  *      "<name> <value> <unit>" sequences and return the canonical
  *      biomarker key + numeric value.
@@ -39,10 +41,6 @@ interface PatternSpec {
   max: number;
 }
 
-// Helper: matches "<name> <whitespace> <number> <whitespace>? <unit?>".
-// We use lookahead-style word boundaries to avoid matching reference
-// ranges ("40 - 70") or flags ("H", "L"). The number is always the
-// FIRST decimal number that follows the name on the same logical line.
 function nameAndValue(names: string[], unitPattern: string = ""): RegExp[] {
   return names.map((name) => {
     const safeName = name
@@ -406,15 +404,23 @@ const PATTERNS: PatternSpec[] = [
 /**
  * Run unpdf on the byte array and return the merged page text.
  * Returns empty string if extraction fails for any reason.
+ *
+ * unpdf is loaded via dynamic import on first use so a module-level
+ * load failure (e.g., pdfjs-dist incompatibility with the Vercel
+ * Node serverless runtime) cannot brick the upload route. Worst
+ * case: this function returns "" and PDF parsing is silently skipped.
  */
 export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   try {
-    const pdf = await getDocumentProxy(bytes);
-    const result = await extractText(pdf, { mergePages: true });
+    const mod = await import("unpdf");
+    const pdf = await mod.getDocumentProxy(bytes);
+    const result = await mod.extractText(pdf, { mergePages: true });
     if (typeof result.text === "string") return result.text;
     if (Array.isArray(result.text)) return result.text.join("\n");
     return "";
-  } catch {
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[lab-pdf-parser] unpdf extract failed:", (err as Error)?.message || "unknown");
     return "";
   }
 }
@@ -427,9 +433,6 @@ export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
  */
 export function parseBiomarkers(text: string): Record<string, number> {
   if (!text) return {};
-  // Normalize whitespace + line breaks into single spaces. Lab PDFs use
-  // varying whitespace between the test name and value; flattening
-  // simplifies our patterns considerably.
   const flat = text.replace(/[ \s]+/g, " ");
 
   const out: Record<string, number> = {};

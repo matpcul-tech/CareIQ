@@ -11,7 +11,6 @@ import {
 } from "@/lib/validate";
 import { encryptBuffer, encryptJson } from "@/lib/crypto";
 import { parseWearable } from "@/lib/parse-wearable";
-import { parsePdfBiomarkers } from "@/lib/lab-pdf-parser";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
@@ -89,16 +88,16 @@ async function handleLab(
 
   // -------------------------------------------------------------------
   // Best-effort: parse PDF lab reports for biomarker auto-fill. The
-  // parsed values are returned to the client so the step-4 accordion
-  // can pre-populate. They are NOT persisted server-side here; the
-  // patient will review and submit via /api/onboard/manual-labs as
-  // usual. Failure is silent: upload still succeeds.
+  // parser library + unpdf are loaded via dynamic import so a module
+  // load failure cannot 500 the upload route. Parse errors are logged
+  // to console + audit metadata; the upload still succeeds.
   // -------------------------------------------------------------------
   let parsedBiomarkers: Record<string, number> | null = null;
   let parseStats: { text_chars: number; matched: number; reason?: string } | null = null;
   if (type === "pdf") {
     try {
-      const r = await parsePdfBiomarkers(stripped);
+      const mod = await import("@/lib/lab-pdf-parser");
+      const r = await mod.parsePdfBiomarkers(stripped);
       parseStats = {
         text_chars: r.text_chars,
         matched: Object.keys(r.biomarkers).length,
@@ -106,10 +105,12 @@ async function handleLab(
       };
       if (r.ok) parsedBiomarkers = r.biomarkers;
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[upload] PDF parse module failed:", (err as Error)?.message || "unknown");
       parseStats = {
         text_chars: 0,
         matched: 0,
-        reason: (err as Error).message?.slice(0, 64) || "parse_threw",
+        reason: ((err as Error).message || "parse_threw").slice(0, 64),
       };
     }
   }
@@ -125,6 +126,8 @@ async function handleLab(
       upsert: false,
     });
   if (upErr) {
+    // eslint-disable-next-line no-console
+    console.error("[upload] storage upload failed:", upErr.message);
     await logAudit({
       sessionId,
       action: "patient.lab_file.uploaded",
@@ -141,6 +144,8 @@ async function handleLab(
     file_type: type,
   });
   if (insErr) {
+    // eslint-disable-next-line no-console
+    console.error("[upload] lab_files insert failed:", insErr.code || insErr.message);
     await sb.storage.from(STORAGE_BUCKET).remove([fileRef]);
     await logAudit({
       sessionId,
