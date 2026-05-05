@@ -41,7 +41,7 @@ const CARECIRCLE_APP_URL =
   "https://care-os-uo7x.vercel.app";
 
 const RESEND_FROM_EMAIL =
-  process.env.RESEND_FROM_EMAIL || "CareCircle <care@carecircle.health>";
+  process.env.RESEND_FROM_EMAIL || "CareIQ <noreply@sovereignhealthcareos.com>";
 
 interface InviteBody {
   recipient_email?: string;
