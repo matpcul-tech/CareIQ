@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Minimal Care Circle invite modal.
  *
  * One email input, one Send button. POSTs recipient_email to
  * /api/circle/generate-invite. Status shows inline.
+ *
+ * Renders the modal through a document.body portal so it escapes any
+ * ancestor with `transform`, `filter`, `backdrop-filter`, etc., which
+ * would otherwise turn `position:fixed` into a containing-block trap
+ * (the dashboard header uses backdrop-filter: blur and was pinning the
+ * modal to the top of the screen instead of the viewport).
  */
 
 interface InviteFamilyModalProps {
@@ -36,6 +43,23 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
   const [error, setError] = useState("");
   const [result, setResult] = useState<InviteResponse | null>(null);
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Portal mount happens client-side only.
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock body scroll while modal is open so the page underneath does not
+  // scroll independently of the sheet.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   function reset() {
     setEmail("");
@@ -99,6 +123,211 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
     }
   }
 
+  const sheet = open ? (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Care Circle invite"
+      onClick={() => {
+        setOpen(false);
+        reset();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2147483647,
+        background: "rgba(7,16,31,0.85)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+        padding: 0,
+        fontFamily: "'Outfit', system-ui, sans-serif",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          background: "#0d1a30",
+          borderTop: "1px solid #1e3a5f",
+          borderRadius: "16px 16px 0 0",
+          padding: "16px 18px calc(20px + env(safe-area-inset-bottom,0px))",
+          color: "#eef2f8",
+          boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
+        }}
+      >
+        <div
+          aria-hidden
+          style={{
+            width: 36,
+            height: 4,
+            borderRadius: 2,
+            background: "rgba(255,255,255,0.18)",
+            margin: "0 auto 14px",
+          }}
+        />
+        <h2 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 600 }}>
+          Send Care Circle invite
+        </h2>
+
+        {result ? (
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+            <p style={{ margin: "0 0 14px", color: "#00d4b8" }}>
+              {result.email_sent ? "Invite sent." : "Invite created."}
+            </p>
+            {!result.email_sent && (
+              <p style={{ margin: "0 0 14px", color: "#d4a843" }}>
+                Email could not be sent ({result.email_error || "unknown reason"}).
+                Share this link manually:
+              </p>
+            )}
+
+            <a
+              id="ciq-invite-open-link"
+              href={result.signup_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "12px 0",
+                borderRadius: 10,
+                background: "#00d4b8",
+                color: "#07101f",
+                fontSize: 14,
+                fontWeight: 700,
+                textAlign: "center",
+                textDecoration: "none",
+                boxShadow: "0 0 18px rgba(0,212,184,0.3)",
+                boxSizing: "border-box",
+              }}
+            >
+              Open Link
+            </a>
+
+            <div style={{ textAlign: "center", marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={copyLink}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  color: copied ? "#00d4b8" : "#7a9bbf",
+                  fontSize: 11,
+                  fontFamily: "'Outfit', system-ui, sans-serif",
+                  textDecoration: "underline",
+                  textUnderlineOffset: 3,
+                  cursor: "pointer",
+                }}
+              >
+                {copied ? "Copied!" : "Copy Invite Link"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <label
+              htmlFor="ciq-recipient-email"
+              style={{
+                display: "block",
+                fontSize: 12,
+                color: "#a3b5cc",
+                marginBottom: 6,
+              }}
+            >
+              Family member&apos;s email
+            </label>
+            <input
+              id="ciq-recipient-email"
+              name="recipient_email"
+              type="email"
+              required
+              autoComplete="off"
+              placeholder="daughter@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !busy) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              style={{
+                width: "100%",
+                background: "#11243d",
+                border: "1px solid #1e3a5f",
+                borderRadius: 8,
+                padding: "10px 12px",
+                color: "#eef2f8",
+                fontSize: 13,
+                outline: "none",
+                marginBottom: 12,
+              }}
+            />
+
+            {error && (
+              <div
+                style={{
+                  padding: 10,
+                  background: "rgba(232,82,110,0.1)",
+                  border: "1px solid rgba(232,82,110,0.3)",
+                  borderRadius: 8,
+                  color: "#e8526e",
+                  fontSize: 12,
+                  marginBottom: 12,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={send}
+              disabled={busy}
+              style={{
+                width: "100%",
+                padding: "12px 0",
+                borderRadius: 10,
+                border: "none",
+                background: "#00d4b8",
+                color: "#07101f",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.6 : 1,
+              }}
+            >
+              {busy ? "Sending..." : "Send Invite"}
+            </button>
+          </>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            reset();
+          }}
+          style={{
+            marginTop: 10,
+            width: "100%",
+            padding: "9px 0",
+            borderRadius: 8,
+            border: "1px solid #1e3a5f",
+            background: "transparent",
+            color: "#a3b5cc",
+            fontSize: 12,
+            cursor: "pointer",
+          }}
+        >
+          {result ? "Done" : "Cancel"}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       <button
@@ -111,211 +340,7 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
       >
         + Invite Family Member
       </button>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Care Circle invite"
-          onClick={() => {
-            setOpen(false);
-            reset();
-          }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            background: "rgba(7,16,31,0.85)",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-            padding: 0,
-            fontFamily: "'Outfit', system-ui, sans-serif",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              background: "#0d1a30",
-              borderTop: "1px solid #1e3a5f",
-              borderRadius: "16px 16px 0 0",
-              padding: "16px 18px calc(20px + env(safe-area-inset-bottom,0px))",
-              color: "#eef2f8",
-              boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
-            }}
-          >
-            <div
-              aria-hidden
-              style={{
-                width: 36,
-                height: 4,
-                borderRadius: 2,
-                background: "rgba(255,255,255,0.18)",
-                margin: "0 auto 14px",
-              }}
-            />
-            <h2 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 600 }}>
-              Send Care Circle invite
-            </h2>
-
-            {result ? (
-              <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                <p style={{ margin: "0 0 14px", color: "#00d4b8" }}>
-                  {result.email_sent ? "Invite sent." : "Invite created."}
-                </p>
-                {!result.email_sent && (
-                  <p style={{ margin: "0 0 14px", color: "#d4a843" }}>
-                    Email could not be sent ({result.email_error || "unknown reason"}).
-                    Share this link manually:
-                  </p>
-                )}
-
-                <a
-                  id="ciq-invite-open-link"
-                  href={result.signup_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    padding: "12px 0",
-                    borderRadius: 10,
-                    background: "#00d4b8",
-                    color: "#07101f",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    textAlign: "center",
-                    textDecoration: "none",
-                    boxShadow: "0 0 18px rgba(0,212,184,0.3)",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  Open Link
-                </a>
-
-                <div style={{ textAlign: "center", marginTop: 10 }}>
-                  <button
-                    type="button"
-                    onClick={copyLink}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: 0,
-                      color: copied ? "#00d4b8" : "#7a9bbf",
-                      fontSize: 11,
-                      fontFamily: "'Outfit', system-ui, sans-serif",
-                      textDecoration: "underline",
-                      textUnderlineOffset: 3,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {copied ? "Copied!" : "Copy Invite Link"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <label
-                  htmlFor="ciq-recipient-email"
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: "#a3b5cc",
-                    marginBottom: 6,
-                  }}
-                >
-                  Family member&apos;s email
-                </label>
-                <input
-                  id="ciq-recipient-email"
-                  name="recipient_email"
-                  type="email"
-                  required
-                  autoComplete="off"
-                  placeholder="daughter@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !busy) {
-                      e.preventDefault();
-                      send();
-                    }
-                  }}
-                  style={{
-                    width: "100%",
-                    background: "#11243d",
-                    border: "1px solid #1e3a5f",
-                    borderRadius: 8,
-                    padding: "10px 12px",
-                    color: "#eef2f8",
-                    fontSize: 13,
-                    outline: "none",
-                    marginBottom: 12,
-                  }}
-                />
-
-                {error && (
-                  <div
-                    style={{
-                      padding: 10,
-                      background: "rgba(232,82,110,0.1)",
-                      border: "1px solid rgba(232,82,110,0.3)",
-                      borderRadius: 8,
-                      color: "#e8526e",
-                      fontSize: 12,
-                      marginBottom: 12,
-                    }}
-                  >
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={send}
-                  disabled={busy}
-                  style={{
-                    width: "100%",
-                    padding: "12px 0",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "#00d4b8",
-                    color: "#07101f",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: busy ? "not-allowed" : "pointer",
-                    opacity: busy ? 0.6 : 1,
-                  }}
-                >
-                  {busy ? "Sending..." : "Send Invite"}
-                </button>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                reset();
-              }}
-              style={{
-                marginTop: 10,
-                width: "100%",
-                padding: "9px 0",
-                borderRadius: 8,
-                border: "1px solid #1e3a5f",
-                background: "transparent",
-                color: "#a3b5cc",
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              {result ? "Done" : "Cancel"}
-            </button>
-          </div>
-        </div>
-      )}
+      {mounted && sheet ? createPortal(sheet, document.body) : null}
     </>
   );
 }
