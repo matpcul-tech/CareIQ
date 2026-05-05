@@ -24,9 +24,16 @@ const AUTH_COOKIE = "sov_auth";
 type Bucket = { count: number; resetAt: number };
 const rateBuckets = new Map<string, Bucket>();
 
+// Public API paths skip the CSRF check, the cookie identity requirement,
+// and the protected-API redirect. Each route in this set MUST do its own
+// auth verification (Supabase JWT, signed payload, etc.).
 const PUBLIC_API_PATHS = new Set<string>([
   "/api/auth/magic-link",
   "/api/csrf",
+  // Sovereign Prompt Shield decryption layer. Authenticates via either
+  // a family Supabase Bearer JWT or the CareIQ cookie session, and writes
+  // its own audit row on every call.
+  "/api/shield/decrypt",
 ]);
 
 function getClientIp(req: NextRequest): string {
@@ -193,7 +200,8 @@ export async function middleware(req: NextRequest) {
 
   const isApi = pathname.startsWith("/api/");
   const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
-  if (isApi && isMutating) {
+  const isPublicApi = isApi && PUBLIC_API_PATHS.has(pathname);
+  if (isApi && isMutating && !isPublicApi) {
     const headerToken = req.headers.get("x-csrf-token") || "";
     const cookieToken = existingCsrf;
     if (!headerToken || !cookieToken) {

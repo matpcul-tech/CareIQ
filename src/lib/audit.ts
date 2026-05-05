@@ -22,6 +22,7 @@ export type AuditAction =
   | "shield.invoked"
   | "shield.failed"
   | "shield.unavailable"
+  | "shield.decrypt"
   | "rate_limit.exceeded"
   | "csrf.failed"
   | "validation.failed"
@@ -52,6 +53,11 @@ export interface AuditEntry {
  *
  * The session_id stored is the SHA-256 of the rotating cookie session id
  * so that even with read access to audit_log, sessions cannot be replayed.
+ *
+ * For HIPAA-tier reads (e.g. shield.decrypt) we also accept SHA-256 hashes
+ * of the requester user-id and patient-id as metadata. These let an
+ * investigator confirm a known requester or patient by hashing the
+ * suspected identifier; the audit row itself never holds plaintext IDs.
  */
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
@@ -91,6 +97,12 @@ const ALLOWED_META_KEYS = new Set<string>([
   "shield_version",
   "invite_id",
   "expires_in_days",
+  // Sovereign Prompt Shield decrypt audit metadata. SHA-256 hex hashes
+  // of identifiers (never plaintext); short comma-joined list of fields.
+  "requester_hash",
+  "patient_hash",
+  "fields_accessed",
+  "requester_role",
 ]);
 
 function sanitizeMetadata(
