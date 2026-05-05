@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
  *
  * GET or POST /api/shield/decrypt
  *
- * Returns the patient's latest non-PHI vital summary, decrypted server-side.
- * The decryption key never leaves the server.
+ * Returns the patient's latest non-PHI vital + full blood panel + wearable
+ * summary, decrypted server-side. The decryption key never leaves the server.
  *
  * Auth (one of, in this order):
  *   1. Family JWT path: Authorization: Bearer <Supabase access_token>.
@@ -28,8 +28,14 @@ export const dynamic = "force-dynamic";
  *   Every successful decrypt writes one row to audit_log with action
  *   "shield.decrypt" and metadata { requester_hash, patient_hash,
  *   fields_accessed, requester_role, shield_version }. Hashes are SHA-256
- *   so plaintext identifiers never sit in the audit row, but an
- *   investigator can confirm a known requester by hashing it.
+ *   so plaintext identifiers never sit in the audit row.
+ *
+ * Forward-compat fields:
+ *   total_cholesterol, crp, hrv, active_calories ship in the response shape
+ *   with null values today. They become populated automatically once the
+ *   CareIQ encryption schema gains the matching ManualLabs / DailyMetric
+ *   keys (totalCholesterol / crp / hrv / activeCalories). Clients should
+ *   tolerate null and not render UI for absent values.
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -52,11 +58,13 @@ interface ManualLabs {
   a1c?: number;
   ldl?: number;
   hdl?: number;
+  totalCholesterol?: number;
   fastingGlucose?: number;
   bpSystolic?: number;
   bpDiastolic?: number;
   triglycerides?: number;
   egfr?: number;
+  crp?: number;
 }
 
 interface HistoryPlaintext {
@@ -66,12 +74,52 @@ interface HistoryPlaintext {
 interface DailyMetric {
   date: string;
   heartRate?: number;
+  steps?: number;
+  sleepHours?: number;
   spo2?: number;
+  calories?: number;
+  hrv?: number;
+  activeCalories?: number;
 }
 
 interface WearablePlaintext {
   device: string;
   metrics: DailyMetric[];
+}
+
+type RangeStatus = "ok" | "warn" | "alert" | "none";
+
+interface BandSpec {
+  ok: (v: number) => boolean;
+  warn: (v: number) => boolean;
+}
+
+const LAB_BANDS: Record<string, BandSpec> = {
+  a1c: { ok: (v) => v < 5.7, warn: (v) => v < 6.5 },
+  ldl: { ok: (v) => v < 130, warn: (v) => v < 190 },
+  hdl: { ok: (v) => v >= 40, warn: (v) => v >= 30 },
+  total_cholesterol: { ok: (v) => v < 200, warn: (v) => v < 240 },
+  fasting_glucose: { ok: (v) => v >= 70 && v < 100, warn: (v) => v < 126 },
+  triglycerides: { ok: (v) => v < 150, warn: (v) => v < 200 },
+  egfr: { ok: (v) => v >= 90, warn: (v) => v >= 60 },
+  crp: { ok: (v) => v < 1, warn: (v) => v < 3 },
+  bp: { ok: (v) => false, warn: (v) => false },
+};
+
+function bpStatus(sys: number | null, dia: number | null): RangeStatus {
+  if (sys === null && dia === null) return "none";
+  if ((sys ?? 0) >= 140 || (dia ?? 0) >= 90) return "alert";
+  if ((sys ?? 0) >= 130 || (dia ?? 0) >= 80) return "warn";
+  return "ok";
+}
+
+function bandStatus(key: string, value: number | null): RangeStatus {
+  if (value === null) return "none";
+  const b = LAB_BANDS[key];
+  if (!b) return "none";
+  if (b.ok(value)) return "ok";
+  if (b.warn(value)) return "warn";
+  return "alert";
 }
 
 function calculateRiskScore(labs: ManualLabs, latest: DailyMetric | null): number {
@@ -87,9 +135,18 @@ function calculateRiskScore(labs: ManualLabs, latest: DailyMetric | null): numbe
   if (labs.bpSystolic != null) {
     if (labs.bpSystolic >= 140 || (labs.bpDiastolic != null && labs.bpDiastolic >= 90)) score -= 6;
   }
+  if (labs.fastingGlucose != null && labs.fastingGlucose >= 126) score -= 5;
+  if (labs.triglycerides != null && labs.triglycerides >= 200) score -= 4;
+  if (labs.egfr != null && labs.egfr < 60) score -= 4;
   if (latest?.spo2 != null && latest.spo2 < 95) score -= 6;
   if (latest?.heartRate != null && (latest.heartRate < 50 || latest.heartRate > 100)) score -= 4;
   return Math.max(40, Math.min(95, score));
+}
+
+function riskLabel(score: number): string {
+  if (score >= 75) return "Low risk";
+  if (score >= 55) return "Moderate risk";
+  return "High risk";
 }
 
 type AuthResult =
@@ -98,9 +155,6 @@ type AuthResult =
   | { kind: "deny"; status: number; message: string; debug?: unknown };
 
 async function resolveAuth(req: NextRequest): Promise<AuthResult> {
-  // 1. Family JWT path. The presence of an Authorization header means the
-  //    caller is a Supabase-authenticated family member. We verify with
-  //    Supabase and look up care_circle to pick the linked patient_id.
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
   if (authHeader) {
     const m = /^Bearer\s+(.+)$/i.exec(authHeader);
@@ -137,10 +191,6 @@ async function resolveAuth(req: NextRequest): Promise<AuthResult> {
     };
   }
 
-  // 2. Cookie session path. Patient self-access (or clinician on the
-  //    patient's account in the CareIQ clinical view). The middleware has
-  //    already gated /api/shield/decrypt as a public path; the route owns
-  //    the cookie check itself.
   const session = readSession();
   if (session.patientId) {
     return { kind: "patient", requesterId: session.patientId, patientId: session.patientId };
@@ -149,18 +199,37 @@ async function resolveAuth(req: NextRequest): Promise<AuthResult> {
   return { kind: "deny", status: 401, message: "authentication required" };
 }
 
-interface DecryptedVitals {
+interface DecryptedPayload {
+  // Vitals (from manualLabs)
   bp_systolic: number | null;
   bp_diastolic: number | null;
+  // Blood panel
   a1c: number | null;
   ldl: number | null;
+  hdl: number | null;
+  total_cholesterol: number | null;
+  fasting_glucose: number | null;
+  triglycerides: number | null;
+  egfr: number | null;
+  crp: number | null;
+  // Wearable (latest day)
   hr: number | null;
+  steps: number | null;
   spo2: number | null;
+  sleep_hours: number | null;
+  hrv: number | null;
+  active_calories: number | null;
+  calories: number | null;
+  // Summary
   risk_score: number;
+  risk_label: string;
+  panel_grade: string;
+  panel_flagged: number;
+  panel_in_range: number;
   updated_at: string | null;
 }
 
-async function decryptVitals(patientId: string): Promise<DecryptedVitals> {
+async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
   const sb = getServiceClient();
 
   const { data: hh } = await sb
@@ -209,26 +278,92 @@ async function decryptVitals(patientId: string): Promise<DecryptedVitals> {
         : wearableUpdatedAt
       : historyUpdatedAt || wearableUpdatedAt || null;
 
+  // Compute panel grade based on the blood panel + BP. Wearable is graded
+  // separately and excluded from the panel grade.
+  const panel: Array<{ key: string; value: number | null }> = [
+    { key: "bp", value: labs.bpSystolic ?? null },
+    { key: "a1c", value: labs.a1c ?? null },
+    { key: "ldl", value: labs.ldl ?? null },
+    { key: "hdl", value: labs.hdl ?? null },
+    { key: "total_cholesterol", value: labs.totalCholesterol ?? null },
+    { key: "fasting_glucose", value: labs.fastingGlucose ?? null },
+    { key: "triglycerides", value: labs.triglycerides ?? null },
+    { key: "egfr", value: labs.egfr ?? null },
+    { key: "crp", value: labs.crp ?? null },
+  ];
+
+  let inRange = 0;
+  let flagged = 0;
+  for (const item of panel) {
+    if (item.value === null) continue;
+    let s: RangeStatus;
+    if (item.key === "bp") {
+      s = bpStatus(labs.bpSystolic ?? null, labs.bpDiastolic ?? null);
+    } else {
+      s = bandStatus(item.key, item.value);
+    }
+    if (s === "ok") inRange += 1;
+    else if (s === "warn" || s === "alert") flagged += 1;
+  }
+
+  const totalGraded = inRange + flagged;
+  let grade = "-";
+  if (totalGraded > 0) {
+    const pct = inRange / totalGraded;
+    if (pct >= 1) grade = "A";
+    else if (pct >= 0.8) grade = "B";
+    else if (pct >= 0.6) grade = "C";
+    else if (pct >= 0.4) grade = "D";
+    else grade = "F";
+  }
+
+  const riskScore = calculateRiskScore(labs, latestMetric);
+
   return {
     bp_systolic: labs.bpSystolic ?? null,
     bp_diastolic: labs.bpDiastolic ?? null,
     a1c: labs.a1c ?? null,
     ldl: labs.ldl ?? null,
+    hdl: labs.hdl ?? null,
+    total_cholesterol: labs.totalCholesterol ?? null,
+    fasting_glucose: labs.fastingGlucose ?? null,
+    triglycerides: labs.triglycerides ?? null,
+    egfr: labs.egfr ?? null,
+    crp: labs.crp ?? null,
     hr: latestMetric?.heartRate ?? null,
+    steps: latestMetric?.steps ?? null,
     spo2: latestMetric?.spo2 ?? null,
-    risk_score: calculateRiskScore(labs, latestMetric),
+    sleep_hours: latestMetric?.sleepHours ?? null,
+    hrv: latestMetric?.hrv ?? null,
+    active_calories: latestMetric?.activeCalories ?? null,
+    calories: latestMetric?.calories ?? null,
+    risk_score: riskScore,
+    risk_label: riskLabel(riskScore),
+    panel_grade: grade,
+    panel_flagged: flagged,
+    panel_in_range: inRange,
     updated_at: updatedAt,
   };
 }
 
-function fieldsAccessed(v: DecryptedVitals): string {
+function fieldsAccessed(v: DecryptedPayload): string {
   const fields: string[] = [];
   if (v.bp_systolic !== null || v.bp_diastolic !== null) fields.push("bp");
   if (v.a1c !== null) fields.push("a1c");
   if (v.ldl !== null) fields.push("ldl");
+  if (v.hdl !== null) fields.push("hdl");
+  if (v.total_cholesterol !== null) fields.push("chol");
+  if (v.fasting_glucose !== null) fields.push("glucose");
+  if (v.triglycerides !== null) fields.push("trig");
+  if (v.egfr !== null) fields.push("egfr");
+  if (v.crp !== null) fields.push("crp");
   if (v.hr !== null) fields.push("hr");
+  if (v.steps !== null) fields.push("steps");
   if (v.spo2 !== null) fields.push("spo2");
-  fields.push("risk_score");
+  if (v.sleep_hours !== null) fields.push("sleep");
+  if (v.hrv !== null) fields.push("hrv");
+  fields.push("risk");
+  fields.push("grade");
   return fields.join(",");
 }
 
@@ -247,7 +382,7 @@ async function handle(req: NextRequest) {
     return bad(auth.message, auth.status, auth.debug);
   }
 
-  const vitals = await decryptVitals(auth.patientId);
+  const payload = await decryptPayload(auth.patientId);
   const decryptedAt = new Date().toISOString();
 
   await logAudit({
@@ -258,7 +393,7 @@ async function handle(req: NextRequest) {
     metadata: {
       requester_hash: sha256Hex(auth.requesterId),
       patient_hash: sha256Hex(auth.patientId),
-      fields_accessed: fieldsAccessed(vitals),
+      fields_accessed: fieldsAccessed(payload),
       requester_role: auth.kind,
       shield_version: SHIELD_VERSION,
     },
@@ -267,14 +402,7 @@ async function handle(req: NextRequest) {
   return NextResponse.json(
     {
       patient_id: auth.patientId,
-      bp_systolic: vitals.bp_systolic,
-      bp_diastolic: vitals.bp_diastolic,
-      a1c: vitals.a1c,
-      ldl: vitals.ldl,
-      hr: vitals.hr,
-      spo2: vitals.spo2,
-      risk_score: vitals.risk_score,
-      updated_at: vitals.updated_at,
+      ...payload,
       decrypted_at: decryptedAt,
       shield_version: SHIELD_VERSION,
     },
