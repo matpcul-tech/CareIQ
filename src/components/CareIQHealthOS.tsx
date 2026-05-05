@@ -447,6 +447,7 @@ const RISK_DOMAIN_NAMES = ["Metabolic","Cardiovascular","Cognitive","Oncology","
 
 function Overview(){
   const { payload: shield, error: shieldErr } = useContext(ShieldContext);
+  const demoNarrative = process.env.NEXT_PUBLIC_SHIELD_DEMO_PLANS === "true";
   return(
     <div className="pad">
       <div className="sec">Today, In Plain Language</div>
@@ -456,7 +457,9 @@ function Overview(){
           <span className="badge b-violet">AI</span>
         </div>
         <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
-          {NOT_GENERATED}. The narrative will appear here once you log a few days of vitals.
+          {demoNarrative
+            ? "Your latest panel shows strong cardiovascular foundations with blood pressure well controlled and oxygen saturation optimal at 97%. Two areas need attention: LDL cholesterol at 112 mg/dL is above the longevity target of 70, and homocysteine at 10.4 umol/L suggests methylation support may help. Your A1C at 5.6% is excellent. Recommended focus: omega-3 supplementation, Mediterranean diet pattern, and a follow-up lipid panel in 90 days."
+            : `${NOT_GENERATED}. The narrative will appear here once you log a few days of vitals.`}
         </div>
       </div>
       <LongevityPanel payload={shield as unknown as LongevityShieldPayload | null} error={shieldErr} />
