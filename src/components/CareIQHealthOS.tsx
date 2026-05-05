@@ -168,7 +168,7 @@ const CSS = `
 .chat-msgs{flex:1;overflow-y:auto;padding:11px;display:flex;flex-direction:column;gap:7px;min-height:0}
 .chat-msg{padding:10px 12px;border-radius:13px;font-size:12px;line-height:1.55;max-width:88%;word-wrap:break-word}
 .chat-user{align-self:flex-end;background:linear-gradient(135deg,#00d4b8,#00b89e);color:#07101f}
-.chat-ai{align-self:flex-start;background:rgba(255,255,255,.06);color:#eef2f8}
+.chat-ai{align-self:flex-start;background:#111827;color:#e2e8f0}
 .chat-meta{font-family:'DM Mono',monospace;font-size:8px;color:#7a9bbf;margin-top:3px}
 .chat-input-row{display:flex;gap:7px;padding:9px 11px;border-top:1px solid rgba(0,212,184,.1)}
 .chat-input{flex:1;padding:9px 11px;background:rgba(255,255,255,.06);border:1px solid rgba(0,212,184,.15);border-radius:9px;color:#eef2f8;font-size:13px;font-family:'Outfit',sans-serif;outline:none;min-height:40px}
