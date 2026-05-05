@@ -89,7 +89,8 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard blocked (insecure context, permission denied, etc.).
-      // Fall back to selecting the visible link so the user can copy manually.
+      // Fall back to selecting the visible primary link button so the
+      // user can copy manually.
       const el = document.getElementById("ciq-invite-open-link");
       if (el && typeof window !== "undefined" && window.getSelection) {
         const range = document.createRange();
@@ -180,43 +181,47 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
                   </p>
                 )}
 
-                <button
-                  type="button"
-                  onClick={copyLink}
+                <a
+                  id="ciq-invite-open-link"
+                  href={result.signup_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
+                    display: "block",
                     width: "100%",
                     padding: "12px 0",
                     borderRadius: 10,
-                    border: "none",
-                    background: copied ? "#0d1a30" : "#00d4b8",
-                    color: copied ? "#00d4b8" : "#07101f",
+                    background: "#00d4b8",
+                    color: "#07101f",
                     fontSize: 14,
                     fontWeight: 700,
-                    cursor: "pointer",
-                    boxShadow: copied
-                      ? "inset 0 0 0 1px #00d4b8"
-                      : "0 0 18px rgba(0,212,184,0.3)",
-                    transition: "background 0.15s, color 0.15s",
+                    textAlign: "center",
+                    textDecoration: "none",
+                    boxShadow: "0 0 18px rgba(0,212,184,0.3)",
+                    boxSizing: "border-box",
                   }}
                 >
-                  {copied ? "Copied!" : "Copy Invite Link"}
-                </button>
+                  Open Link
+                </a>
 
                 <div style={{ textAlign: "center", marginTop: 10 }}>
-                  <a
-                    id="ciq-invite-open-link"
-                    href={result.signup_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={copyLink}
                     style={{
-                      color: "#7a9bbf",
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      color: copied ? "#00d4b8" : "#7a9bbf",
                       fontSize: 11,
+                      fontFamily: "'Outfit', system-ui, sans-serif",
                       textDecoration: "underline",
                       textUnderlineOffset: 3,
+                      cursor: "pointer",
                     }}
                   >
-                    Open Link
-                  </a>
+                    {copied ? "Copied!" : "Copy Invite Link"}
+                  </button>
                 </div>
               </div>
             ) : (
