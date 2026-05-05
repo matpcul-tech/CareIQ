@@ -650,6 +650,7 @@ function Step4Upload({
   onDone: () => void;
 }) {
   const [labStatus, setLabStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [autoFillStatus, setAutoFillStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [wearableStatus, setWearableStatus] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
@@ -698,6 +699,84 @@ function Step4Upload({
         const data = await res.json().catch(() => ({}));
         if (zone === "lab") {
           setLabStatus({ ok: true, message: "Lab file uploaded and encrypted." });
+          // Opportunistic auto-fill from parsed Quest/LabCorp PDF biomarkers.
+          // The upload route may return parsed_biomarkers as a map of canonical
+          // biomarker key to numeric value. We merge into bioValues without
+          // overwriting anything the patient already typed.
+          const parsed = (data && typeof data === "object")
+            ? (data as { parsed_biomarkers?: unknown }).parsed_biomarkers
+            : undefined;
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            const parsedMap = parsed as Record<string, unknown>;
+            const validKeys = new Set(BIOMARKER_FORM_SPECS.map((s) => s.key));
+            const catByKey = new Map<string, Cat>(
+              BIOMARKER_FORM_SPECS.map((s) => [s.key, s.cat] as const),
+            );
+            setBioValues((prev) => {
+              const next: Record<string, string> = { ...prev };
+              let added = 0;
+              const perCat: Record<Cat, number> = {
+                metabolic: 0,
+                cardiovascular: 0,
+                organ: 0,
+                blood: 0,
+                hormonal: 0,
+                longevity: 0,
+                cognitive: 0,
+              };
+              for (const [k, v] of Object.entries(parsedMap)) {
+                if (!validKeys.has(k)) continue;
+                const existing = (prev[k] ?? "").trim();
+                if (existing !== "") continue; // do not overwrite patient-typed values
+                const num = typeof v === "number" ? v : Number(v);
+                if (!Number.isFinite(num)) continue;
+                next[k] = String(num);
+                added += 1;
+                const c = catByKey.get(k);
+                if (c) perCat[c] += 1;
+              }
+              if (added > 0) {
+                // Pick the category with the most filled values among those
+                // affected by this auto-fill. Tally fills (parsed + already
+                // typed) across all categories so the chosen tab reflects
+                // the patient's overall best-filled section. Fallback to
+                // "metabolic" on ties.
+                const totalsByCat: Record<Cat, number> = {
+                  metabolic: 0,
+                  cardiovascular: 0,
+                  organ: 0,
+                  blood: 0,
+                  hormonal: 0,
+                  longevity: 0,
+                  cognitive: 0,
+                };
+                for (const spec of BIOMARKER_FORM_SPECS) {
+                  const raw = (next[spec.key] ?? "").trim();
+                  if (raw === "") continue;
+                  if (!Number.isFinite(Number(raw))) continue;
+                  totalsByCat[spec.cat] += 1;
+                }
+                let bestCat: Cat = "metabolic";
+                let bestCount = totalsByCat.metabolic;
+                for (const cat of CAT_ORDER) {
+                  if (totalsByCat[cat] > bestCount) {
+                    bestCat = cat;
+                    bestCount = totalsByCat[cat];
+                  }
+                }
+                setOpenCat(bestCat);
+                setAutoFillStatus({
+                  ok: true,
+                  message: `Auto-filled ${added} biomarker ${added === 1 ? "value" : "values"} from your lab PDF. Review and adjust before saving.`,
+                });
+              } else {
+                setAutoFillStatus(null);
+              }
+              return next;
+            });
+          } else {
+            setAutoFillStatus(null);
+          }
         } else {
           const detail =
             typeof data?.metrics === "number" ? ` ${data.metrics} day(s) parsed.` : "";
@@ -816,6 +895,11 @@ function Step4Upload({
         {labStatus && (
           <div className={`mt-2 ${labStatus.ok ? "alert-success" : "alert-error"}`}>
             {labStatus.message}
+          </div>
+        )}
+        {autoFillStatus && (
+          <div className={`mt-2 ${autoFillStatus.ok ? "alert-success" : "alert-error"}`}>
+            {autoFillStatus.message}
           </div>
         )}
       </div>
