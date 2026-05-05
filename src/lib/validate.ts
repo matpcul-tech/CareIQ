@@ -38,6 +38,11 @@ export const profileSchema = z.object({
     .regex(COMMUNITY_REGEX, "invalid characters")
     .optional()
     .or(z.literal("")),
+  // Optional self-reported sex. Used by the Shield decrypt endpoint to
+  // resolve sex-dependent biomarker thresholds (testosterone, ferritin,
+  // hemoglobin, etc.). When unset, sex-dependent biomarkers fall back to
+  // the union of male + female normal ranges with optimal cleared.
+  sex: z.enum(["male", "female"]).optional(),
 });
 export type ProfileInput = z.infer<typeof profileSchema>;
 
@@ -71,13 +76,38 @@ export const healthHistorySchema = z.object({
 });
 export type HealthHistoryInput = z.infer<typeof healthHistorySchema>;
 
+// ---------------------------------------------------------------------------
+// Biomarker entry shape used by the new structured `biomarkers` blob.
+// ---------------------------------------------------------------------------
+const biomarkerSourceSchema = z.enum(["lab", "wearable", "self_reported"]);
+
+export const biomarkerEntrySchema = z.object({
+  value: z.number().finite().optional(),
+  date_collected: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")
+    .optional(),
+  source: biomarkerSourceSchema.optional(),
+});
+export type BiomarkerEntryInput = z.infer<typeof biomarkerEntrySchema>;
+
+// We accept any string key here; the route handler filters down to known
+// biomarker keys before persisting (see manual-labs route). This avoids a
+// circular import between validate.ts and biomarker-ranges.ts.
+export const biomarkersBlobSchema = z
+  .record(z.string().min(1).max(64), biomarkerEntrySchema)
+  .optional();
+export type BiomarkersBlobInput = z.infer<typeof biomarkersBlobSchema>;
+
 /**
- * Manual lab values typed in by the patient on the data-upload step. Every
- * field is optional. Bounds are clinically generous so unusual but real
- * readings still pass; obviously-bogus values (negative, absurdly high)
- * are rejected.
+ * Manual lab values. Accepts BOTH the legacy flat shape (camelCase keys
+ * directly on the body) AND the new structured `biomarkers` shape. The
+ * onboard manual-labs route merges both into the encrypted blob: legacy
+ * keys land under `manualLabs`, structured entries land under `biomarkers`.
  */
 export const manualLabsSchema = z.object({
+  // Legacy flat fields. Kept until the OnboardClient lab form fully migrates
+  // to the structured shape. Existing pilot writes still flow through these.
   a1c:            z.number().min(0).max(25).optional(),
   ldl:            z.number().min(0).max(1000).optional(),
   hdl:            z.number().min(0).max(300).optional(),
@@ -86,6 +116,8 @@ export const manualLabsSchema = z.object({
   bpDiastolic:    z.number().int().min(20).max(200).optional(),
   triglycerides:  z.number().min(0).max(3000).optional(),
   egfr:           z.number().min(0).max(250).optional(),
+  // New structured biomarker entries, keyed by canonical biomarker key.
+  biomarkers: biomarkersBlobSchema,
 });
 export type ManualLabsInput = z.infer<typeof manualLabsSchema>;
 

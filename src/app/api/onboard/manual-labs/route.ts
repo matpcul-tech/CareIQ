@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { manualLabsSchema, type ManualLabsInput } from "@/lib/validate";
+import { manualLabsSchema, type ManualLabsInput, type BiomarkerEntryInput } from "@/lib/validate";
 import { encryptJson, decryptJson } from "@/lib/crypto";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
+import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,18 +13,25 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/onboard/manual-labs
  *
- * Accepts the patient-typed lab values from Step 4 of onboarding.
- * Every field is optional. Values are merged into the existing
- * health_history.data_encrypted JSON under the `manualLabs` key, so
- * chronic conditions / medications / allergies / family history
- * already on file are preserved.
+ * Accepts patient-typed lab values from Step 4 of onboarding. Two shapes
+ * are honored, and either or both may appear in the same request:
  *
- * After encrypting + persisting, this also upserts the same numeric
- * values + a few shareable health-history fields into the
- * public.patient_vitals_shared table so the patient's family circle
- * (linked via care_circle) can read them via Supabase REST + RLS.
- * The shared row is the source of truth for the CareCircle dashboard
- * tabs that need real BP/A1C/LDL/HR/etc. numbers.
+ *   1. Legacy flat shape  (camelCase keys directly on the body):
+ *        { a1c, ldl, hdl, fastingGlucose, bpSystolic, bpDiastolic,
+ *          triglycerides, egfr }
+ *      Persisted under `manualLabs` in the encrypted health_history blob.
+ *
+ *   2. New structured shape (full longevity panel):
+ *        { biomarkers: { fasting_glucose: { value, date_collected, source },
+ *                        a1c: { ... }, ... } }
+ *      Persisted under `biomarkers` in the encrypted blob, keyed by spec.
+ *
+ * The Shield decrypt endpoint reads both shapes (biomarkers preferred,
+ * manualLabs as fallback) so existing records keep working.
+ *
+ * After persisting, the route mirrors the canonical 8 fields into
+ * public.patient_vitals_shared so family-side reads (RLS-scoped) keep
+ * working without requiring decryption.
  */
 export async function POST(req: NextRequest) {
   const sessionId = headers().get("x-session-id") || "";
@@ -51,15 +59,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid lab values" }, { status: 400 });
   }
 
-  // Drop undefined fields so we don't store noise.
-  const cleaned: ManualLabsInput = {};
-  for (const [k, v] of Object.entries(parsed.data)) {
+  // Split parsed body into legacy flat fields vs structured biomarkers.
+  const { biomarkers: rawBiomarkers, ...legacy } = parsed.data;
+
+  // Legacy: drop empty / non-finite values.
+  const cleanedLegacy: Record<string, number> = {};
+  for (const [k, v] of Object.entries(legacy)) {
     if (v !== undefined && v !== null && Number.isFinite(v as number)) {
-      (cleaned as Record<string, number>)[k] = v as number;
+      cleanedLegacy[k] = v as number;
     }
   }
-  const enteredCount = Object.keys(cleaned).length;
 
+  // Biomarkers: accept only keys we know about, drop entries with no value.
+  const knownKeys = new Set<string>(BIOMARKER_KEYS);
+  const cleanedBiomarkers: Record<string, BiomarkerEntryInput> = {};
+  if (rawBiomarkers) {
+    for (const [k, entry] of Object.entries(rawBiomarkers)) {
+      if (!knownKeys.has(k)) continue;
+      if (!entry || typeof entry.value !== "number" || !Number.isFinite(entry.value)) continue;
+      const norm: BiomarkerEntryInput = { value: entry.value };
+      if (entry.date_collected) norm.date_collected = entry.date_collected;
+      if (entry.source) norm.source = entry.source;
+      cleanedBiomarkers[k] = norm;
+    }
+  }
+
+  const enteredCount = Object.keys(cleanedLegacy).length + Object.keys(cleanedBiomarkers).length;
   if (enteredCount === 0) {
     await logAudit({
       sessionId,
@@ -74,7 +99,6 @@ export async function POST(req: NextRequest) {
   const sb = getServiceClient();
   const aad = `history:${session.patientId}`;
 
-  // Read + decrypt existing health_history row, if any.
   const { data: existing, error: selErr } = await sb
     .from("health_history")
     .select("id, data_encrypted")
@@ -92,21 +116,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "could not read history" }, { status: 500 });
   }
 
-  let merged: Record<string, unknown> = { manualLabs: cleaned };
+  // Build the merged blob. We preserve every key on the existing decrypted
+  // record (chronicConditions, medications, etc.) and merge new lab values
+  // on top of `manualLabs` and `biomarkers`.
+  let merged: Record<string, unknown> = {};
   if (existing?.data_encrypted) {
     try {
-      const prior = decryptJson<Record<string, unknown>>(existing.data_encrypted, aad);
-      const priorLabs =
-        prior && typeof prior.manualLabs === "object" && prior.manualLabs !== null
-          ? (prior.manualLabs as Record<string, number>)
-          : {};
-      merged = {
-        ...prior,
-        manualLabs: { ...priorLabs, ...cleaned },
-      };
+      merged = decryptJson<Record<string, unknown>>(existing.data_encrypted, aad);
     } catch {
-      merged = { manualLabs: cleaned };
+      merged = {};
     }
+  }
+  const priorLegacy =
+    typeof merged.manualLabs === "object" && merged.manualLabs !== null
+      ? (merged.manualLabs as Record<string, number>)
+      : {};
+  const priorBiomarkers =
+    typeof merged.biomarkers === "object" && merged.biomarkers !== null
+      ? (merged.biomarkers as Record<string, BiomarkerEntryInput>)
+      : {};
+
+  if (Object.keys(cleanedLegacy).length > 0) {
+    merged.manualLabs = { ...priorLegacy, ...cleanedLegacy };
+  } else if (Object.keys(priorLegacy).length > 0) {
+    merged.manualLabs = priorLegacy;
+  }
+  if (Object.keys(cleanedBiomarkers).length > 0) {
+    merged.biomarkers = { ...priorBiomarkers, ...cleanedBiomarkers };
+  } else if (Object.keys(priorBiomarkers).length > 0) {
+    merged.biomarkers = priorBiomarkers;
   }
 
   const encrypted = encryptJson(merged, aad);
@@ -140,31 +178,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "could not save manual labs" }, { status: 500 });
   }
 
-  // Mirror the merged labs + shareable history fields into the
-  // family-readable patient_vitals_shared table. Best-effort: if the
-  // mirror upsert fails, the patient's encrypted record is still
-  // saved and the request is reported as successful. Family will see
-  // stale or missing vitals until the next save retries.
-  type SharedRow = {
-    patient_id: string;
-    a1c: number | null;
-    ldl: number | null;
-    hdl: number | null;
-    fasting_glucose: number | null;
-    bp_systolic: number | null;
-    bp_diastolic: number | null;
-    triglycerides: number | null;
-    egfr: number | null;
-    chronic_conditions: string[] | null;
-    medications: string | null;
-    allergies: string | null;
-    updated_at: string;
-  };
+  // Mirror to patient_vitals_shared. Prefer the new structured biomarker
+  // value over the legacy flat value when both exist, so the family mirror
+  // tracks whichever the patient updated most recently.
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
 
   const mergedLabs =
     typeof merged.manualLabs === "object" && merged.manualLabs !== null
       ? (merged.manualLabs as Record<string, number>)
       : {};
+  const mergedBio =
+    typeof merged.biomarkers === "object" && merged.biomarkers !== null
+      ? (merged.biomarkers as Record<string, BiomarkerEntryInput>)
+      : {};
+
+  const fromBio = (key: string): number | null => {
+    const e = mergedBio[key];
+    if (!e || typeof e.value !== "number" || !Number.isFinite(e.value)) return null;
+    return e.value;
+  };
 
   const conditions =
     Array.isArray((merged as Record<string, unknown>).chronicConditions)
@@ -179,19 +212,16 @@ export async function POST(req: NextRequest) {
       ? ((merged as Record<string, unknown>).allergies as string)
       : null;
 
-  const numOrNull = (v: unknown): number | null =>
-    typeof v === "number" && Number.isFinite(v) ? v : null;
-
-  const sharedRow: SharedRow = {
+  const sharedRow = {
     patient_id: session.patientId,
-    a1c: numOrNull(mergedLabs.a1c),
-    ldl: numOrNull(mergedLabs.ldl),
-    hdl: numOrNull(mergedLabs.hdl),
-    fasting_glucose: numOrNull(mergedLabs.fastingGlucose),
+    a1c: fromBio("a1c") ?? numOrNull(mergedLabs.a1c),
+    ldl: fromBio("ldl") ?? numOrNull(mergedLabs.ldl),
+    hdl: fromBio("hdl") ?? numOrNull(mergedLabs.hdl),
+    fasting_glucose: fromBio("fasting_glucose") ?? numOrNull(mergedLabs.fastingGlucose),
     bp_systolic: numOrNull(mergedLabs.bpSystolic),
     bp_diastolic: numOrNull(mergedLabs.bpDiastolic),
-    triglycerides: numOrNull(mergedLabs.triglycerides),
-    egfr: numOrNull(mergedLabs.egfr),
+    triglycerides: fromBio("triglycerides") ?? numOrNull(mergedLabs.triglycerides),
+    egfr: fromBio("egfr") ?? numOrNull(mergedLabs.egfr),
     chronic_conditions: conditions,
     medications: meds,
     allergies,
@@ -210,7 +240,7 @@ export async function POST(req: NextRequest) {
       success: true,
       metadata: { reason_code: "mirror_failed", metric_count: enteredCount },
     });
-    // Eslint-disable-next-line no-console
+    // eslint-disable-next-line no-console
     console.error("[manual-labs] mirror upsert failed:", mirrorErr.code || mirrorErr.message);
   } else {
     await logAudit({
@@ -221,6 +251,11 @@ export async function POST(req: NextRequest) {
       metadata: { metric_count: enteredCount },
     });
   }
+
+  // Tell the consumer ManualLabsInput stays referenced even if a future
+  // refactor narrows the schema; suppresses unused-import linter noise.
+  type _ManualLabsRef = ManualLabsInput;
+  void (null as unknown as _ManualLabsRef);
 
   return NextResponse.json({
     ok: true,
