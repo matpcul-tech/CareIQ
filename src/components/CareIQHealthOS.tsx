@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
 import InviteFamilyModal from "@/components/InviteFamilyModal";
+import LongevityPanel from "@/components/LongevityPanel";
 
 const ZK_SALT = "CARE-IQ-SOVEREIGN-SHIELD-2026";
 const ZK_TERMS = ["fqhc","careiq","sovereign","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
@@ -421,6 +422,7 @@ function EmptyState({text}:{text:string}){
 const RISK_DOMAIN_NAMES = ["Metabolic","Cardiovascular","Cognitive","Oncology","Renal","Mental Health"];
 
 function Overview(){
+  const { payload: shield, error: shieldErr } = useContext(ShieldContext);
   return(
     <div className="pad">
       <div className="sec">Today, In Plain Language</div>
@@ -433,16 +435,7 @@ function Overview(){
           {NOT_GENERATED}. The narrative will appear here once you log a few days of vitals.
         </div>
       </div>
-      <div className="sec">Risk Domains</div>
-      <div className="dom-grid">
-        {RISK_DOMAIN_NAMES.map((name,i)=>(
-          <div className="dom-item" key={i}>
-            <div className="dom-name">{name}</div>
-            <div className="dom-bg"><div className="dom-fill" style={{width:"0%",background:"rgba(122,155,191,.3)"}}/></div>
-            <div className="dom-score" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_COMPUTED}</div>
-          </div>
-        ))}
-      </div>
+      <LongevityPanel payload={shield} error={shieldErr} />
     </div>
   );
 }
