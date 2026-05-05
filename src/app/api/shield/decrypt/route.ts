@@ -4,6 +4,15 @@ import { decryptJson, sha256Hex } from "@/lib/crypto";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
+import {
+  BIOMARKER_SPECS,
+  computeStatus,
+  getThresholds,
+  type BiomarkerCategory,
+  type BiomarkerSpec,
+  type BiomarkerStatus,
+  type Sex,
+} from "@/lib/biomarker-ranges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,29 +22,18 @@ export const dynamic = "force-dynamic";
  *
  * GET or POST /api/shield/decrypt
  *
- * Returns the patient's latest non-PHI vital + full blood panel + wearable
- * summary, decrypted server-side. The decryption key never leaves the server.
+ * Returns the patient's latest decrypted vital + full longevity biomarker
+ * panel, server-side. The decryption key never leaves the server.
  *
- * Auth (one of, in this order):
- *   1. Family JWT path: Authorization: Bearer <Supabase access_token>.
- *      We verify the JWT with Supabase, then look up care_circle to find
- *      which patient this family member is linked to.
- *   2. Cookie session path (sov_auth): the patient viewing their own data,
- *      or a clinician operating on the patient's account in the CareIQ
- *      clinical view. Self-access; patient_id = session.patientId.
+ * Auth (one of):
+ *   1. Family Bearer JWT (Supabase access_token).
+ *   2. Cookie session (sov_auth) for patient self-access / clinician view.
  *
- * Audit:
- *   Every successful decrypt writes one row to audit_log with action
- *   "shield.decrypt" and metadata { requester_hash, patient_hash,
- *   fields_accessed, requester_role, shield_version }. Hashes are SHA-256
- *   so plaintext identifiers never sit in the audit row.
- *
- * Forward-compat fields:
- *   total_cholesterol, crp, hrv, active_calories ship in the response shape
- *   with null values today. They become populated automatically once the
- *   CareIQ encryption schema gains the matching ManualLabs / DailyMetric
- *   keys (totalCholesterol / crp / hrv / activeCalories). Clients should
- *   tolerate null and not render UI for absent values.
+ * Response keeps the legacy flat fields (bp_systolic, a1c, ldl, etc.) for
+ * back-compat with care-os clients that have not yet adopted the new
+ * `biomarkers` shape. The new `biomarkers` object groups every spec from
+ * BIOMARKER_SPECS by category and embeds resolved thresholds + computed
+ * status.
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -54,7 +52,16 @@ function bad(message: string, status = 400, debug?: unknown) {
   return NextResponse.json(body, { status, headers: CORS_HEADERS });
 }
 
+type Source = "lab" | "wearable" | "self_reported";
+
+interface BiomarkerEntryStored {
+  value?: number | null;
+  date_collected?: string;
+  source?: Source;
+}
+
 interface ManualLabs {
+  // Legacy flat shape, still written by the existing onboard form.
   a1c?: number;
   ldl?: number;
   hdl?: number;
@@ -65,10 +72,26 @@ interface ManualLabs {
   triglycerides?: number;
   egfr?: number;
   crp?: number;
+  hsCrp?: number;
+  hs_crp?: number;
+}
+
+interface BiomarkerBlob {
+  // New per-biomarker structured shape, keyed by spec.key.
+  [key: string]: BiomarkerEntryStored | undefined;
 }
 
 interface HistoryPlaintext {
   manualLabs?: ManualLabs;
+  biomarkers?: BiomarkerBlob;
+}
+
+interface ProfilePlaintext {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  communityAffiliation?: string;
+  sex?: Sex;
 }
 
 interface DailyMetric {
@@ -89,37 +112,11 @@ interface WearablePlaintext {
 
 type RangeStatus = "ok" | "warn" | "alert" | "none";
 
-interface BandSpec {
-  ok: (v: number) => boolean;
-  warn: (v: number) => boolean;
-}
-
-const LAB_BANDS: Record<string, BandSpec> = {
-  a1c: { ok: (v) => v < 5.7, warn: (v) => v < 6.5 },
-  ldl: { ok: (v) => v < 130, warn: (v) => v < 190 },
-  hdl: { ok: (v) => v >= 40, warn: (v) => v >= 30 },
-  total_cholesterol: { ok: (v) => v < 200, warn: (v) => v < 240 },
-  fasting_glucose: { ok: (v) => v >= 70 && v < 100, warn: (v) => v < 126 },
-  triglycerides: { ok: (v) => v < 150, warn: (v) => v < 200 },
-  egfr: { ok: (v) => v >= 90, warn: (v) => v >= 60 },
-  crp: { ok: (v) => v < 1, warn: (v) => v < 3 },
-  bp: { ok: (v) => false, warn: (v) => false },
-};
-
 function bpStatus(sys: number | null, dia: number | null): RangeStatus {
   if (sys === null && dia === null) return "none";
   if ((sys ?? 0) >= 140 || (dia ?? 0) >= 90) return "alert";
   if ((sys ?? 0) >= 130 || (dia ?? 0) >= 80) return "warn";
   return "ok";
-}
-
-function bandStatus(key: string, value: number | null): RangeStatus {
-  if (value === null) return "none";
-  const b = LAB_BANDS[key];
-  if (!b) return "none";
-  if (b.ok(value)) return "ok";
-  if (b.warn(value)) return "warn";
-  return "alert";
 }
 
 function calculateRiskScore(labs: ManualLabs, latest: DailyMetric | null): number {
@@ -199,11 +196,148 @@ async function resolveAuth(req: NextRequest): Promise<AuthResult> {
   return { kind: "deny", status: 401, message: "authentication required" };
 }
 
+// ---------------------------------------------------------------------------
+// Biomarker resolution.
+// ---------------------------------------------------------------------------
+
+interface BiomarkerResponse {
+  value: number | null;
+  unit: string;
+  precision: number;
+  date_collected: string | null;
+  source: Source | null;
+  normal_low: number | null;
+  normal_high: number | null;
+  optimal_low: number | null;
+  optimal_high: number | null;
+  bar_min: number;
+  bar_max: number;
+  status: BiomarkerStatus;
+  trend: "improving" | "stable" | "declining" | null;
+}
+
+type CategoryGroup = Record<string, BiomarkerResponse>;
+type BiomarkerPanel = Record<BiomarkerCategory, CategoryGroup>;
+
+function emptyPanel(): BiomarkerPanel {
+  return {
+    metabolic: {},
+    cardiovascular: {},
+    organ: {},
+    blood: {},
+    hormonal: {},
+    longevity: {},
+    cognitive: {},
+  };
+}
+
+function resolveSourceValue(
+  spec: BiomarkerSpec,
+  blob: HistoryPlaintext,
+  latestWearable: DailyMetric | null,
+): { value: number | null; date_collected: string | null; source: Source | null } {
+  // 1. Wearable-sourced biomarkers come from the latest wearable_data row.
+  if (spec.wearable_field && latestWearable) {
+    const v = latestWearable[spec.wearable_field];
+    if (typeof v === "number") {
+      return {
+        value: v,
+        date_collected: latestWearable.date ?? null,
+        source: "wearable",
+      };
+    }
+  }
+
+  // 2. New structured biomarkers blob keyed by spec.key.
+  const entry = blob.biomarkers?.[spec.key];
+  if (entry && typeof entry.value === "number") {
+    return {
+      value: entry.value,
+      date_collected: entry.date_collected ?? null,
+      source: entry.source ?? null,
+    };
+  }
+
+  // 3. Legacy flat ManualLabs (camelCase) fallback.
+  if (spec.legacy_keys && blob.manualLabs) {
+    const labs = blob.manualLabs as Record<string, unknown>;
+    for (const lk of spec.legacy_keys) {
+      const v = labs[lk];
+      if (typeof v === "number") {
+        return { value: v, date_collected: null, source: "self_reported" };
+      }
+    }
+  }
+
+  return { value: null, date_collected: null, source: null };
+}
+
+function buildBiomarkerPanel(
+  blob: HistoryPlaintext,
+  latestWearable: DailyMetric | null,
+  sex: Sex,
+): BiomarkerPanel {
+  const panel = emptyPanel();
+  for (const spec of BIOMARKER_SPECS) {
+    const src = resolveSourceValue(spec, blob, latestWearable);
+    const th = getThresholds(spec, sex);
+    const status = computeStatus(src.value, th);
+    const entry: BiomarkerResponse = {
+      value: src.value,
+      unit: spec.unit,
+      precision: spec.precision,
+      date_collected: src.date_collected,
+      source: src.source,
+      normal_low: th.normal_low,
+      normal_high: th.normal_high,
+      optimal_low: th.optimal_low,
+      optimal_high: th.optimal_high,
+      bar_min: spec.bar_min,
+      bar_max: spec.bar_max,
+      status,
+      // Trend requires a time series (planned phase 2). Always null today.
+      trend: null,
+    };
+    panel[spec.category][spec.key] = entry;
+  }
+  return panel;
+}
+
+function summarizePanel(panel: BiomarkerPanel): {
+  panel_grade: string;
+  panel_flagged: number;
+  panel_in_range: number;
+} {
+  let inRange = 0;
+  let flagged = 0;
+  for (const cat of Object.keys(panel) as BiomarkerCategory[]) {
+    const group = panel[cat];
+    for (const k of Object.keys(group)) {
+      const entry = group[k];
+      if (entry.status === "ok") inRange += 1;
+      else if (entry.status === "suboptimal" || entry.status === "outside_normal") flagged += 1;
+    }
+  }
+  const total = inRange + flagged;
+  let grade = "-";
+  if (total > 0) {
+    const pct = inRange / total;
+    if (pct >= 1) grade = "A";
+    else if (pct >= 0.8) grade = "B";
+    else if (pct >= 0.6) grade = "C";
+    else if (pct >= 0.4) grade = "D";
+    else grade = "F";
+  }
+  return { panel_grade: grade, panel_flagged: flagged, panel_in_range: inRange };
+}
+
+// ---------------------------------------------------------------------------
+// Decrypt orchestration.
+// ---------------------------------------------------------------------------
+
 interface DecryptedPayload {
-  // Vitals (from manualLabs)
   bp_systolic: number | null;
   bp_diastolic: number | null;
-  // Blood panel
   a1c: number | null;
   ldl: number | null;
   hdl: number | null;
@@ -212,7 +346,6 @@ interface DecryptedPayload {
   triglycerides: number | null;
   egfr: number | null;
   crp: number | null;
-  // Wearable (latest day)
   hr: number | null;
   steps: number | null;
   spo2: number | null;
@@ -220,36 +353,56 @@ interface DecryptedPayload {
   hrv: number | null;
   active_calories: number | null;
   calories: number | null;
-  // Summary
   risk_score: number;
   risk_label: string;
   panel_grade: string;
   panel_flagged: number;
   panel_in_range: number;
   updated_at: string | null;
+  biomarkers: BiomarkerPanel;
+  sex: Sex;
 }
 
 async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
   const sb = getServiceClient();
 
+  // Profile (for sex).
+  const { data: pat } = await sb
+    .from("patients")
+    .select("profile_encrypted")
+    .eq("id", patientId)
+    .maybeSingle();
+  let sex: Sex = "unknown";
+  if (pat?.profile_encrypted) {
+    try {
+      const profile = decryptJson<ProfilePlaintext>(pat.profile_encrypted, `profile:${patientId}`);
+      if (profile.sex === "male" || profile.sex === "female") sex = profile.sex;
+    } catch {
+      // unreadable, treat as unknown
+    }
+  }
+
+  // Health history (manual labs + structured biomarkers).
   const { data: hh } = await sb
     .from("health_history")
     .select("data_encrypted, updated_at")
     .eq("patient_id", patientId)
     .maybeSingle();
 
-  let labs: ManualLabs = {};
+  let blob: HistoryPlaintext = {};
   let historyUpdatedAt: string | null = null;
   if (hh?.data_encrypted) {
     historyUpdatedAt = (hh as { updated_at?: string }).updated_at ?? null;
     try {
-      const parsed = decryptJson<HistoryPlaintext>(hh.data_encrypted, `history:${patientId}`);
-      labs = parsed.manualLabs ?? {};
+      blob = decryptJson<HistoryPlaintext>(hh.data_encrypted, `history:${patientId}`);
     } catch {
-      // Decryption failed (key rotation, corruption). Treat as no labs.
+      // Decryption failed (key rotation, corruption). Treat as empty.
+      blob = {};
     }
   }
+  const labs: ManualLabs = blob.manualLabs ?? {};
 
+  // Wearable (latest).
   const { data: wd } = await sb
     .from("wearable_data")
     .select("data_encrypted, uploaded_at")
@@ -267,7 +420,7 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
       const metrics = parsed.metrics || [];
       latestMetric = metrics[metrics.length - 1] || null;
     } catch {
-      // Decryption failed. Treat as no wearable.
+      // ignore
     }
   }
 
@@ -278,58 +431,39 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
         : wearableUpdatedAt
       : historyUpdatedAt || wearableUpdatedAt || null;
 
-  // Compute panel grade based on the blood panel + BP. Wearable is graded
-  // separately and excluded from the panel grade.
-  const panel: Array<{ key: string; value: number | null }> = [
-    { key: "bp", value: labs.bpSystolic ?? null },
-    { key: "a1c", value: labs.a1c ?? null },
-    { key: "ldl", value: labs.ldl ?? null },
-    { key: "hdl", value: labs.hdl ?? null },
-    { key: "total_cholesterol", value: labs.totalCholesterol ?? null },
-    { key: "fasting_glucose", value: labs.fastingGlucose ?? null },
-    { key: "triglycerides", value: labs.triglycerides ?? null },
-    { key: "egfr", value: labs.egfr ?? null },
-    { key: "crp", value: labs.crp ?? null },
-  ];
+  // Build biomarker panel and summary.
+  const biomarkers = buildBiomarkerPanel(blob, latestMetric, sex);
+  const { panel_grade, panel_flagged, panel_in_range } = summarizePanel(biomarkers);
 
-  let inRange = 0;
-  let flagged = 0;
-  for (const item of panel) {
-    if (item.value === null) continue;
-    let s: RangeStatus;
-    if (item.key === "bp") {
-      s = bpStatus(labs.bpSystolic ?? null, labs.bpDiastolic ?? null);
-    } else {
-      s = bandStatus(item.key, item.value);
-    }
-    if (s === "ok") inRange += 1;
-    else if (s === "warn" || s === "alert") flagged += 1;
-  }
-
-  const totalGraded = inRange + flagged;
-  let grade = "-";
-  if (totalGraded > 0) {
-    const pct = inRange / totalGraded;
-    if (pct >= 1) grade = "A";
-    else if (pct >= 0.8) grade = "B";
-    else if (pct >= 0.6) grade = "C";
-    else if (pct >= 0.4) grade = "D";
-    else grade = "F";
-  }
-
+  // Risk score still derived from the original simple model. Phase 2 can
+  // expand it across the full panel.
   const riskScore = calculateRiskScore(labs, latestMetric);
+
+  // Resolve legacy flat fields. We prefer the structured biomarker if it
+  // has a value (so the legacy fields stay consistent with the panel).
+  const flat = (k: string): number | null => {
+    for (const cat of Object.keys(biomarkers) as BiomarkerCategory[]) {
+      const entry = biomarkers[cat][k];
+      if (entry && typeof entry.value === "number") return entry.value;
+    }
+    return null;
+  };
+
+  // BP is not in BIOMARKER_SPECS (vitals, not a biomarker); keep direct.
+  const bpStatusValue = bpStatus(labs.bpSystolic ?? null, labs.bpDiastolic ?? null);
+  void bpStatusValue;
 
   return {
     bp_systolic: labs.bpSystolic ?? null,
     bp_diastolic: labs.bpDiastolic ?? null,
-    a1c: labs.a1c ?? null,
-    ldl: labs.ldl ?? null,
-    hdl: labs.hdl ?? null,
-    total_cholesterol: labs.totalCholesterol ?? null,
-    fasting_glucose: labs.fastingGlucose ?? null,
-    triglycerides: labs.triglycerides ?? null,
-    egfr: labs.egfr ?? null,
-    crp: labs.crp ?? null,
+    a1c: flat("a1c"),
+    ldl: flat("ldl"),
+    hdl: flat("hdl"),
+    total_cholesterol: flat("total_cholesterol"),
+    fasting_glucose: flat("fasting_glucose"),
+    triglycerides: flat("triglycerides"),
+    egfr: flat("egfr"),
+    crp: flat("hs_crp"),
     hr: latestMetric?.heartRate ?? null,
     steps: latestMetric?.steps ?? null,
     spo2: latestMetric?.spo2 ?? null,
@@ -339,32 +473,28 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     calories: latestMetric?.calories ?? null,
     risk_score: riskScore,
     risk_label: riskLabel(riskScore),
-    panel_grade: grade,
-    panel_flagged: flagged,
-    panel_in_range: inRange,
+    panel_grade,
+    panel_flagged,
+    panel_in_range,
     updated_at: updatedAt,
+    biomarkers,
+    sex,
   };
 }
 
-function fieldsAccessed(v: DecryptedPayload): string {
+function fieldsAccessed(panel: BiomarkerPanel): string {
   const fields: string[] = [];
-  if (v.bp_systolic !== null || v.bp_diastolic !== null) fields.push("bp");
-  if (v.a1c !== null) fields.push("a1c");
-  if (v.ldl !== null) fields.push("ldl");
-  if (v.hdl !== null) fields.push("hdl");
-  if (v.total_cholesterol !== null) fields.push("chol");
-  if (v.fasting_glucose !== null) fields.push("glucose");
-  if (v.triglycerides !== null) fields.push("trig");
-  if (v.egfr !== null) fields.push("egfr");
-  if (v.crp !== null) fields.push("crp");
-  if (v.hr !== null) fields.push("hr");
-  if (v.steps !== null) fields.push("steps");
-  if (v.spo2 !== null) fields.push("spo2");
-  if (v.sleep_hours !== null) fields.push("sleep");
-  if (v.hrv !== null) fields.push("hrv");
+  for (const cat of Object.keys(panel) as BiomarkerCategory[]) {
+    const group = panel[cat];
+    for (const k of Object.keys(group)) {
+      if (group[k].value !== null) fields.push(k);
+    }
+  }
   fields.push("risk");
   fields.push("grade");
-  return fields.join(",");
+  // Truncate to 256 chars (audit metadata cap is 256).
+  const joined = fields.join(",");
+  return joined.length > 256 ? joined.slice(0, 256) : joined;
 }
 
 async function handle(req: NextRequest) {
@@ -393,7 +523,7 @@ async function handle(req: NextRequest) {
     metadata: {
       requester_hash: sha256Hex(auth.requesterId),
       patient_hash: sha256Hex(auth.patientId),
-      fields_accessed: fieldsAccessed(payload),
+      fields_accessed: fieldsAccessed(payload.biomarkers),
       requester_role: auth.kind,
       shield_version: SHIELD_VERSION,
     },
