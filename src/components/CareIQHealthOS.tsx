@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
 import InviteFamilyModal from "@/components/InviteFamilyModal";
-import LongevityPanel from "@/components/LongevityPanel";
+import LongevityPanel, { type ShieldPayload as LongevityShieldPayload } from "@/components/LongevityPanel";
 
 const ZK_SALT = "CARE-IQ-SOVEREIGN-SHIELD-2026";
 const ZK_TERMS = ["fqhc","careiq","sovereign","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
@@ -435,7 +435,7 @@ function Overview(){
           {NOT_GENERATED}. The narrative will appear here once you log a few days of vitals.
         </div>
       </div>
-      <LongevityPanel payload={shield} error={shieldErr} />
+      <LongevityPanel payload={shield as unknown as LongevityShieldPayload | null} error={shieldErr} />
     </div>
   );
 }
