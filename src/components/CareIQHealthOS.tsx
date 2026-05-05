@@ -100,7 +100,7 @@ const CSS = `
 .vital-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:500;letter-spacing:-.02em}
 .vital-unit{font-size:8px;color:#7a9bbf;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.12em;margin-top:1px}
 .vital-name{font-size:9px;color:#7a9bbf;margin-top:5px}
-.ok{color:#00d4b8}.warn{color:#d4a843}.alert{color:#e8526e}
+.ok{color:#00d4b8}.warn{color:#d4a843}.alert{color:#e8526e}.muted{color:#7a9bbf}
 .scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:1}
 .pad{padding:18px 18px calc(110px + env(safe-area-inset-bottom,0px))}
 .sec{font-size:9px;font-weight:700;color:#00d4b8;text-transform:uppercase;letter-spacing:.18em;margin:18px 0 10px;font-family:'DM Mono',monospace}
@@ -122,6 +122,7 @@ const CSS = `
 .b-green{background:rgba(74,222,128,.15);color:#4ade80;border:1px solid rgba(74,222,128,.3)}
 .b-gold{background:rgba(212,168,67,.15);color:#d4a843;border:1px solid rgba(212,168,67,.25)}
 .b-rose{background:rgba(232,82,110,.15);color:#e8526e;border:1px solid rgba(232,82,110,.25)}
+.b-slate{background:rgba(122,155,191,.12);color:#7a9bbf;border:1px solid rgba(122,155,191,.25)}
 .prog-bg{height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;margin-top:7px}
 .prog-fill{height:100%;border-radius:3px;transition:width 1s ease}
 .insight{padding:13px;border-radius:11px;border:1px solid rgba(0,212,184,.1);margin-bottom:9px;background:rgba(255,255,255,.04)}
@@ -174,6 +175,7 @@ const CSS = `
 .chat-send{padding:9px 14px;background:linear-gradient(135deg,#00d4b8,#00b89e);color:#07101f;border:none;border-radius:9px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;flex-shrink:0;min-height:40px}
 .chat-send:disabled{opacity:.5;cursor:not-allowed}
 .err-card{padding:14px;background:rgba(232,82,110,.06);border:1px solid rgba(232,82,110,.25);border-radius:11px;margin:18px;color:#e8526e;font-size:11px;line-height:1.5}
+.empty-card{padding:14px;background:rgba(255,255,255,.03);border:1px dashed rgba(122,155,191,.3);border-radius:11px;font-size:11px;color:#7a9bbf;line-height:1.55;margin-bottom:9px}
 .hos.elder{font-size:18px}
 .hos.elder .vital-val{font-size:20px}
 .hos.elder .vital-name{font-size:11px}
@@ -210,6 +212,7 @@ const CSS = `
 .hos.elder .logo-name{font-size:18px}
 .hos.elder .logo-sub{font-size:9px}
 .hos.elder .pad{padding:22px 18px calc(120px + env(safe-area-inset-bottom,0px))}
+.hos.elder .empty-card{font-size:13px}
 @media (max-width:380px){
   .vital{min-width:70px}
   .stat-val{font-size:15px}
@@ -226,45 +229,10 @@ const CSS = `
 }
 `;
 
-/* ----- Demo data (Matthew Culwell), used as fallback when no real patient
-        data is available, exposed via ClinicalDataContext below. -------- */
-
-const DEMO_PATIENT = { name:"Matthew Culwell", id:"CIQ-2026-MATT", age:43, score:74 };
-const DEMO_VITALS = [
-  {icon:"BP",val:"118/76",unit:"mmHg",name:"Blood Pressure",s:"ok"},
-  {icon:"A1C",val:"6.4",unit:"A1C %",name:"Glycemic",s:"warn"},
-  {icon:"LDL",val:"212",unit:"mg/dL",name:"LDL Chol.",s:"alert"},
-  {icon:"HR",val:"68",unit:"bpm",name:"Heart Rate",s:"ok"},
-  {icon:"O2",val:"96",unit:"SpO2 %",name:"Oxygen Sat",s:"ok"},
-  {icon:"WT",val:"174",unit:"lbs",name:"Body Weight",s:"warn"},
-];
-const DEMO_DOMAINS = [
-  {name:"Metabolic",score:58},{name:"Cardiovascular",score:62},
-  {name:"Cognitive",score:81},{name:"Oncology",score:88},
-  {name:"Renal",score:79},{name:"Mental Health",score:72},
-];
-const DEMO_INSIGHTS = [
-  {type:"crit",icon:"!",title:"Elevated LDL, Action Required",body:"LDL of 212 mg/dL significantly elevates 10-year cardiovascular risk. Statin evaluation recommended within 14 days.",cta:"Schedule Consult",conf:"94%"},
-  {type:"watch",icon:"^",title:"Prediabetes Progression Risk",body:"A1C at 6.4%. Community health programs show 51% of patients return to normal blood sugar in 14 months with metabolic protocol.",cta:"Start Protocol",conf:"89%"},
-  {type:"pos",icon:"+",title:"Cognitive Biomarkers Stable",body:"Cerebrovascular flow and inflammatory markers within optimal range.",cta:"View Report",conf:"97%"},
-];
-const DEMO_TIMELINE = [
-  {dot:"#00d4b8",date:"Apr 10, 2026",title:"AI Full-Body Scan",text:"Whole-body MRI plus liquid biopsy. No oncological signals."},
-  {dot:"#d4a843",date:"Mar 3, 2026",title:"Metabolic Panel, Flag",text:"LDL 198 to 212. A1C 6.1% to 6.4%. Protocol upgraded."},
-  {dot:"#8060cc",date:"Jan 28, 2026",title:"Cognitive Assessment",text:"MOCA 27/30. Brain aging markers stable."},
-  {dot:"#00d4b8",date:"Dec 15, 2025",title:"Enrollment",text:"Health score: 68. CareIQ vault created on Trace Fiber."},
-];
-const DEMO_MEALS = [
-  {time:"Breakfast 7:00 AM",name:"Steel-Cut Oats with Berries",desc:"Steel-cut oatmeal topped with fresh blueberries, walnuts, and a drizzle of olive oil.",tags:["Heart-Healthy","High Fiber","Low Sodium"]},
-  {time:"Lunch 12:00 PM",name:"Lentil and Vegetable Bowl",desc:"Stewed lentils with brown rice, leafy greens, tomatoes, and lemon. Lean plant protein with complete fiber.",tags:["Plant Protein","Low GI","Affordable"]},
-  {time:"Dinner 6:30 PM",name:"Baked Salmon with Sweet Potato",desc:"Baked salmon, roasted sweet potato, and steamed collards. Omega-3s, potassium, and folate in one plate.",tags:["Cardioprotective","Low Sodium","High Potassium"]},
-];
-const DEMO_WEAR_HR_7DAY=[67,70,68,72,69,71,68];
-const DEMO_WEAR_STEPS_7DAY=[6800,7200,8100,5400,7842,8500,6900];
-const DEMO_WEAR_DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-
-/* ----- ClinicalData shape exposed via context. Server populates this from
-        decrypted Supabase rows; falls back to demo when no data exists. -- */
+/* ----- ClinicalData shape exposed via context. The parent route is expected
+        to inject real, decrypted patient data via the clinicalData prop. The
+        default value is an empty/loading shape so the UI never renders demo
+        numbers. -------------------------------------------------------- */
 
 export interface ClinicalPatient { name: string; id: string; age: number; score: number; }
 export interface ClinicalVital { icon: string; val: string; unit: string; name: string; s: string; }
@@ -285,126 +253,127 @@ export interface ClinicalData {
   primaryDeviceLabel?: string;
 }
 
-const DEMO_DATA: ClinicalData = {
-  patient: DEMO_PATIENT,
-  vitals: DEMO_VITALS,
-  domains: DEMO_DOMAINS,
-  insights: DEMO_INSIGHTS,
-  timeline: DEMO_TIMELINE,
-  meals: DEMO_MEALS,
-  wearHr7Day: DEMO_WEAR_HR_7DAY,
-  wearSteps7Day: DEMO_WEAR_STEPS_7DAY,
-  wearDays: DEMO_WEAR_DAYS,
+const EMPTY_CLINICAL_DATA: ClinicalData = {
+  patient: { name: "", id: "", age: 0, score: 0 },
+  vitals: [],
+  domains: [],
+  insights: [],
+  timeline: [],
+  meals: [],
+  wearHr7Day: [],
+  wearSteps7Day: [],
+  wearDays: [],
 };
 
-const ClinicalDataContext = createContext<ClinicalData>(DEMO_DATA);
+const ClinicalDataContext = createContext<ClinicalData>(EMPTY_CLINICAL_DATA);
 
-interface ShieldGenState { loading: boolean; text: string; error: string; blocked: boolean; }
+/* ----- Sovereign Shield decrypted-payload shape returned by
+        /api/shield/decrypt. Authenticated via the existing sov_auth cookie,
+        no CSRF or Authorization header required (route is in
+        PUBLIC_API_PATHS in middleware.ts). ------------------------------ */
 
-function inferConditions(domains: ClinicalDomain[], vitals: ClinicalVital[]): string[] {
-  const out: string[] = [];
-  const cardio = domains.find((d) => /cardio/i.test(d.name));
-  if (cardio && cardio.score <= 65) out.push("hypertension");
-  const metab = domains.find((d) => /metabolic/i.test(d.name));
-  if (metab && metab.score <= 65) out.push("prediabetes");
-  const ldl = vitals.find((v) => /LDL/i.test(v.name));
-  if (ldl && ldl.s === "alert") out.push("dyslipidemia");
-  return out;
+export interface ShieldPayload {
+  patient_id: string;
+  bp_systolic: number | null;
+  bp_diastolic: number | null;
+  a1c: number | null;
+  ldl: number | null;
+  hdl: number | null;
+  total_cholesterol: number | null;
+  fasting_glucose: number | null;
+  triglycerides: number | null;
+  egfr: number | null;
+  crp: number | null;
+  hr: number | null;
+  steps: number | null;
+  spo2: number | null;
+  sleep_hours: number | null;
+  hrv: number | null;
+  active_calories: number | null;
+  calories: number | null;
+  risk_score: number;
+  risk_label: string;
+  panel_grade: string;
+  panel_flagged: number;
+  panel_in_range: number;
+  updated_at: string | null;
+  decrypted_at: string;
+  shield_version: string;
 }
 
-function useShieldGenerate(mode: "workout" | "meal_plan" | "narrative"): ShieldGenState & { regen: () => void } {
-  const { patient, vitals, domains } = useContext(ClinicalDataContext);
-  const [state, setState] = useState<ShieldGenState>({ loading: true, text: "", error: "", blocked: false });
-  const [tick, setTick] = useState(0);
-  const conditions = inferConditions(domains, vitals);
-  const key = `${mode}:${patient.id}:${new Date().toISOString().slice(0, 10)}:${tick}`;
-  useEffect(() => {
-    let cancelled = false;
-    setState({ loading: true, text: "", error: "", blocked: false });
-    (async () => {
-      try {
-        const res = await fetch("/api/shield", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mode,
-            context: {
-              patientAge: patient.age,
-              communityAffiliation: "COMMUNITY_LOCATION",
-              vitals: vitals.map((v) => ({ name: v.name, val: v.val, unit: v.unit, status: v.s })),
-              domains: domains.map((d) => ({ name: d.name, score: d.score })),
-              conditions,
-            },
-          }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        const blocked = Boolean(body?.meta?.blocked) || body?.riskLevel === "CRITICAL";
-        if (blocked) {
-          setState({ loading: false, text: "", error: "", blocked: true });
-        } else if (typeof body?.insight === "string" && body.insight.length > 0) {
-          setState({ loading: false, text: body.insight, error: "", blocked: false });
-        } else {
-          setState({ loading: false, text: "", error: "Sovereign Shield returned no content.", blocked: false });
-        }
-      } catch {
-        if (!cancelled) setState({ loading: false, text: "", error: "Shield offline. Try again.", blocked: false });
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return { ...state, regen: () => setTick((t) => t + 1) };
+interface ShieldState { payload: ShieldPayload | null; error: string | null; loading: boolean; }
+const ShieldContext = createContext<ShieldState>({ payload: null, error: null, loading: true });
+
+const NOT_ENTERED = "Not yet entered";
+const NOT_LOGGED = "Not yet logged";
+const NOT_GENERATED = "Not yet generated";
+const NOT_AVAILABLE = "Not yet available";
+const NOT_COMPUTED = "Not yet computed";
+const MUTED = "#7a9bbf";
+
+function fmtBP(sys: number | null, dia: number | null): string {
+  if (sys == null || dia == null) return NOT_ENTERED;
+  return `${Math.round(sys)}/${Math.round(dia)}`;
+}
+function fmtNum(n: number | null, digits = 0): string {
+  if (n == null) return NOT_ENTERED;
+  return digits > 0 ? n.toFixed(digits) : String(Math.round(n));
+}
+function fmtSleep(h: number | null): string {
+  if (h == null) return NOT_LOGGED;
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${hh}h ${mm}m`;
 }
 
-function GeneratedCard({
-  title, badge, mode,
-}: { title: string; badge: string; mode: "workout" | "meal_plan" | "narrative" }) {
-  const { loading, text, error, blocked, regen } = useShieldGenerate(mode);
-  return (
-    <div className="card">
-      <div className="card-hdr">
-        <span className="card-title">{title}</span>
-        <span className="badge b-violet">{badge}</span>
-      </div>
-      {loading ? (
-        <div style={{ fontSize: 11, color: "#7a9bbf", fontStyle: "italic" }}>
-          Sovereign AI is generating, this takes a few seconds...
-        </div>
-      ) : blocked ? (
-        <div style={{ fontSize: 11, color: "#e8526e", lineHeight: 1.5 }}>
-          Blocked: PII detected in patient context. Care team notified via audit log.
-        </div>
-      ) : error ? (
-        <div style={{ fontSize: 11, color: "#e8526e", lineHeight: 1.5 }}>{error}</div>
-      ) : (
-        <div style={{ fontSize: 12, color: "#a3b5cc", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
-      )}
-      <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: "#7a9bbf", letterSpacing: ".12em" }}>
-          via /api/shield, anonymized
-        </span>
-        <button
-          type="button"
-          className="insight-cta"
-          onClick={regen}
-          disabled={loading}
-          style={{ opacity: loading ? 0.5 : 1 }}
-        >
-          {loading ? "..." : "Regenerate"}
-        </button>
-      </div>
-    </div>
-  );
+/* Vital threshold helpers, mirrored from src/components/dashboard/CareIQPage.tsx
+   on care-os. null inputs return "muted" so missing data is never shown as ok. */
+function bpStatus(sys: number | null, dia: number | null): string {
+  if (sys == null || dia == null) return "muted";
+  if (sys >= 140 || dia >= 90) return "alert";
+  if (sys >= 130 || dia >= 80) return "warn";
+  return "ok";
+}
+function a1cStatus(a1c: number | null): string {
+  if (a1c == null) return "muted";
+  if (a1c >= 6.5) return "alert";
+  if (a1c >= 5.7) return "warn";
+  return "ok";
+}
+function ldlStatus(ldl: number | null): string {
+  if (ldl == null) return "muted";
+  if (ldl >= 190) return "alert";
+  if (ldl >= 130) return "warn";
+  return "ok";
+}
+function hrStatus(hr: number | null): string {
+  if (hr == null) return "muted";
+  if (hr < 50 || hr > 100) return "alert";
+  if (hr < 55 || hr > 95) return "warn";
+  return "ok";
+}
+function spo2Status(spo2: number | null): string {
+  if (spo2 == null) return "muted";
+  if (spo2 < 90) return "alert";
+  if (spo2 < 95) return "warn";
+  return "ok";
 }
 
-function HealthNarrative() { return <GeneratedCard title="Today's Health Narrative" badge="AI" mode="narrative" />; }
-function WorkoutPlan()    { return <GeneratedCard title="Today's Workout Plan"     badge="AI" mode="workout" />; }
-function MealPlan()       { return <GeneratedCard title="Today's Meal Plan"        badge="AI" mode="meal_plan" />; }
-
+function vitalsFromShield(p: ShieldPayload | null): ClinicalVital[] {
+  if (!p) return [];
+  return [
+    { icon: "BP",  val: fmtBP(p.bp_systolic, p.bp_diastolic), unit: "mmHg",  name: "Blood Pressure", s: bpStatus(p.bp_systolic, p.bp_diastolic) },
+    { icon: "A1C", val: fmtNum(p.a1c, 1),                     unit: "A1C %", name: "Glycemic",       s: a1cStatus(p.a1c) },
+    { icon: "LDL", val: fmtNum(p.ldl, 0),                     unit: "mg/dL", name: "LDL Chol.",      s: ldlStatus(p.ldl) },
+    { icon: "HR",  val: fmtNum(p.hr, 0),                      unit: "bpm",   name: "Heart Rate",     s: hrStatus(p.hr) },
+    { icon: "O2",  val: fmtNum(p.spo2, 0),                    unit: "SpO2 %",name: "Oxygen Sat",     s: spo2Status(p.spo2) },
+  ];
+}
 
 function dc(s:number){return s>=80?"#00d4b8":s>=60?"#d4a843":"#e8526e"}
 function rc(level:string){return level==="CRITICAL"?"#e8526e":level==="HIGH"?"#f97316":level==="MEDIUM"?"#d4a843":level==="UNKNOWN"?"#7a9bbf":"#00d4b8"}
+// dc kept exported via void for future use when Risk Domains gets real scores.
+void dc;
 
 function ABar({label,pct,color,delay=0,right}:{label:string;pct:number;color:string;delay?:number;right?:string}){
   const [w,setW]=useState(0);
@@ -445,133 +414,145 @@ class TabErrorBoundary extends Component<{children:ReactNode},{hasError:boolean}
   }
 }
 
+function EmptyState({text}:{text:string}){
+  return <div className="empty-card">{text}</div>;
+}
+
+const RISK_DOMAIN_NAMES = ["Metabolic","Cardiovascular","Cognitive","Oncology","Renal","Mental Health"];
+
 function Overview(){
-  const { domains } = useContext(ClinicalDataContext);
   return(
     <div className="pad">
       <div className="sec">Today, In Plain Language</div>
-      <HealthNarrative/>
+      <div className="card">
+        <div className="card-hdr">
+          <span className="card-title">Health Narrative</span>
+          <span className="badge b-violet">AI</span>
+        </div>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          {NOT_GENERATED}. The narrative will appear here once you log a few days of vitals.
+        </div>
+      </div>
       <div className="sec">Risk Domains</div>
       <div className="dom-grid">
-        {domains.map((d,i)=>(
+        {RISK_DOMAIN_NAMES.map((name,i)=>(
           <div className="dom-item" key={i}>
-            <div className="dom-name">{d.name}</div>
-            <div className="dom-bg"><div className="dom-fill" style={{width:`${d.score}%`,background:`linear-gradient(90deg,${dc(d.score)},${dc(d.score)}77)`}}/></div>
-            <div className="dom-score" style={{color:dc(d.score)}}>{d.score}<span style={{fontSize:10,color:"#7a9bbf"}}>/100</span></div>
+            <div className="dom-name">{name}</div>
+            <div className="dom-bg"><div className="dom-fill" style={{width:"0%",background:"rgba(122,155,191,.3)"}}/></div>
+            <div className="dom-score" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_COMPUTED}</div>
           </div>
         ))}
       </div>
-      <div className="sec">Platform Intelligence</div>
-      <div className="stat-grid">
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>15B+</div><div className="stat-lbl">Clinical Data Points</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#d4a843"}}>96%</div><div className="stat-lbl">Pre-Symptom Detection</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#8060cc"}}>13:1</div><div className="stat-lbl">Prevention ROI</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#4ade80"}}>$20M+</div><div className="stat-lbl">Annual/1K Members</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>51%</div><div className="stat-lbl">Prediabetes Reversed</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#e8526e"}}>4x</div><div className="stat-lbl">Cancer Detection</div></div>
-      </div>
-      <div className="sec">Active Protocols</div>
-      {[
-        {label:"Metabolic Reversal",pct:34,color:"#d4a843",detail:"Week 5 of 18 . A1C target: 5.7%"},
-        {label:"Cardiovascular Defense",pct:20,color:"#e8526e",detail:"LDL target: under 170 mg/dL"},
-        {label:"Longevity Optimization",pct:61,color:"#00d4b8",detail:"Supplement plus sleep plus exercise"},
-        {label:"Cognitive Protection",pct:78,color:"#8060cc",detail:"Brain health markers stable"},
-      ].map((p,i)=>(
-        <div className="card" key={i}>
-          <div className="card-hdr"><span className="card-title">{p.label}</span><span className="badge b-violet">{p.pct}%</span></div>
-          <div className="prog-bg"><div className="prog-fill" style={{width:`${p.pct}%`,background:`linear-gradient(90deg,${p.color},${p.color}88)`}}/></div>
-          <div style={{fontSize:10,color:"#7a9bbf",marginTop:6}}>{p.detail}</div>
-        </div>
-      ))}
     </div>
   );
 }
 
 function Insights(){
-  const { insights, timeline } = useContext(ClinicalDataContext);
   return(
     <div className="pad">
       <div className="sec">Today's Workout</div>
-      <WorkoutPlan/>
+      <div className="card">
+        <div className="card-hdr">
+          <span className="card-title">Workout Plan</span>
+          <span className="badge b-violet">AI</span>
+        </div>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          {NOT_GENERATED}. Your personalized workout plan will appear here once you log a few days of vitals.
+        </div>
+      </div>
       <div className="sec">AI Clinical Insights</div>
-      {insights.map((ins,i)=>(
-        <div key={i} className={`insight ${ins.type}`}>
-          <div className="insight-hdr"><span style={{fontSize:14}}>{ins.icon}</span><span className="insight-title">{ins.title}</span></div>
-          <div className="insight-body">{ins.body}</div>
-          <div className="insight-foot"><button className="insight-cta">{ins.cta}</button><span className="insight-conf">AI Confidence: {ins.conf}</span></div>
-        </div>
-      ))}
+      <EmptyState text={`${NOT_GENERATED}. Clinical insights will appear here once your care team reviews your latest vitals.`}/>
       <div className="sec">Health Timeline</div>
-      {timeline.map((t,i)=>(
-        <div className="tl-item" key={i}>
-          <div className="tl-col">
-            <div className="tl-dot" style={{background:t.dot}}/>
-            {i<timeline.length-1&&<div className="tl-line"/>}
-          </div>
-          <div className="tl-body">
-            <div className="tl-date">{t.date}</div>
-            <div className="tl-title">{t.title}</div>
-            <div className="tl-text">{t.text}</div>
-          </div>
-        </div>
-      ))}
+      <EmptyState text={`${NOT_LOGGED}. Health events will appear here as they are recorded by your care team.`}/>
     </div>
   );
 }
 
 function Nutrition(){
-  const { meals } = useContext(ClinicalDataContext);
   return(
     <div className="pad">
       <div className="sec">Today's Meal Plan, AI Generated</div>
-      <MealPlan/>
+      <div className="card">
+        <div className="card-hdr">
+          <span className="card-title">Meal Plan</span>
+          <span className="badge b-violet">AI</span>
+        </div>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          {NOT_GENERATED}. Your personalized meal plan will appear here once you log a few days of vitals.
+        </div>
+      </div>
       <div className="sec">Personalized Nutrition Plan</div>
       <div className="stat-grid" style={{marginBottom:10}}>
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>1,820</div><div className="stat-lbl">Calories</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#d4a843"}}>118g</div><div className="stat-lbl">Protein</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#8060cc"}}>28g</div><div className="stat-lbl">Fiber</div></div>
+        <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Calories</div></div>
+        <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Protein</div></div>
+        <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Fiber</div></div>
       </div>
-      {meals.map((m,i)=>(
-        <div className="meal-card" key={i}>
-          <div className="meal-time">{m.time}</div>
-          <div className="meal-name">{m.name}</div>
-          <div className="meal-desc">{m.desc}</div>
-          <div className="meal-tags">{m.tags.map((t,j)=><span key={j} className="meal-tag">{t}</span>)}</div>
-        </div>
-      ))}
+      <EmptyState text={`${NOT_LOGGED}. Logged meals will appear here.`}/>
     </div>
   );
 }
 
 function BloodPanel(){
-  const p=[
-    {name:"LDL Cholesterol",val:"212",unit:"mg/dL",pct:92,c:"#e8526e"},
-    {name:"Total Cholesterol",val:"238",unit:"mg/dL",pct:79,c:"#d4a843"},
-    {name:"HDL Cholesterol",val:"52",unit:"mg/dL",pct:60,c:"#00d4b8"},
-    {name:"A1C (Glycemic)",val:"6.4",unit:"%",pct:80,c:"#d4a843"},
-    {name:"Fasting Glucose",val:"114",unit:"mg/dL",pct:75,c:"#d4a843"},
-    {name:"eGFR (Kidney)",val:"74",unit:"mL/min",pct:55,c:"#00d4b8"},
-    {name:"CRP (Inflammation)",val:"2.1",unit:"mg/L",pct:70,c:"#d4a843"},
-    {name:"Triglycerides",val:"148",unit:"mg/dL",pct:65,c:"#00d4b8"},
+  const { payload, error, loading } = useContext(ShieldContext);
+
+  const rows: Array<{name:string; raw:number|null; unit:string; digits:number; statusFor?:(v:number)=>string}> = [
+    { name:"LDL Cholesterol",   raw: payload?.ldl ?? null,                unit:"mg/dL", digits:0, statusFor:(v)=>v>=190?"alert":v>=130?"warn":"ok" },
+    { name:"Total Cholesterol", raw: payload?.total_cholesterol ?? null,  unit:"mg/dL", digits:0, statusFor:(v)=>v>=240?"alert":v>=200?"warn":"ok" },
+    { name:"HDL Cholesterol",   raw: payload?.hdl ?? null,                unit:"mg/dL", digits:0, statusFor:(v)=>v<40?"alert":v<60?"warn":"ok" },
+    { name:"A1C (Glycemic)",    raw: payload?.a1c ?? null,                unit:"%",     digits:1, statusFor:(v)=>v>=6.5?"alert":v>=5.7?"warn":"ok" },
+    { name:"Fasting Glucose",   raw: payload?.fasting_glucose ?? null,    unit:"mg/dL", digits:0, statusFor:(v)=>v>=126?"alert":v>=100?"warn":"ok" },
+    { name:"eGFR (Kidney)",     raw: payload?.egfr ?? null,               unit:"mL/min",digits:0, statusFor:(v)=>v<30?"alert":v<60?"warn":"ok" },
+    { name:"CRP (Inflammation)",raw: payload?.crp ?? null,                unit:"mg/L",  digits:1, statusFor:(v)=>v>=10?"alert":v>=3?"warn":"ok" },
+    { name:"Triglycerides",     raw: payload?.triglycerides ?? null,      unit:"mg/dL", digits:0, statusFor:(v)=>v>=200?"alert":v>=150?"warn":"ok" },
   ];
+
+  const colorFor = (s:string) => s==="alert" ? "#e8526e" : s==="warn" ? "#d4a843" : s==="ok" ? "#00d4b8" : MUTED;
+
   return(
     <div className="pad">
       <div className="sec">Comprehensive Blood Analysis</div>
+      {error && (
+        <div className="err-card" style={{margin:"0 0 9px"}}>
+          Vitals not available: {error}
+        </div>
+      )}
       <div className="card">
-        {p.map((b,i)=>(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:i<p.length-1?"1px solid rgba(255,255,255,.06)":"none"}}>
-            <div style={{fontSize:10,color:"#7a9bbf",width:110,flexShrink:0}}>{b.name}</div>
-            <div style={{flex:1,height:4,background:"rgba(255,255,255,.06)",borderRadius:2,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${b.pct}%`,background:`linear-gradient(90deg,${b.c},${b.c}88)`,borderRadius:2}}/>
+        {rows.map((b,i)=>{
+          const status = b.raw == null ? "muted" : (b.statusFor ? b.statusFor(b.raw) : "ok");
+          const c = colorFor(status);
+          const display = b.raw == null ? NOT_ENTERED : (b.digits > 0 ? b.raw.toFixed(b.digits) : String(Math.round(b.raw)));
+          return (
+            <div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:i<rows.length-1?"1px solid rgba(255,255,255,.06)":"none"}}>
+              <div style={{fontSize:10,color:"#7a9bbf",width:110,flexShrink:0}}>{b.name}</div>
+              <div style={{flex:1,height:4,background:"rgba(255,255,255,.06)",borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:b.raw==null?"0%":"100%",background:b.raw==null?"rgba(122,155,191,.3)":`linear-gradient(90deg,${c},${c}88)`,borderRadius:2}}/>
+              </div>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:b.raw==null?9:12,color:c,width:90,textAlign:"right",flexShrink:0}}>
+                {display}{b.raw!=null && <span style={{fontSize:8,color:"#7a9bbf"}}> {b.unit}</span>}
+              </div>
             </div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:b.c,width:55,textAlign:"right",flexShrink:0}}>{b.val}<span style={{fontSize:8,color:"#7a9bbf"}}> {b.unit}</span></div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="stat-grid">
-        <div className="stat-item"><div className="stat-val" style={{color:"#d4a843"}}>B-</div><div className="stat-lbl">Panel Grade</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#e8526e"}}>2</div><div className="stat-lbl">Flagged</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>6</div><div className="stat-lbl">In Range</div></div>
+        <div className="stat-item">
+          <div className="stat-val" style={{color: payload?.panel_grade ? "#d4a843" : MUTED, fontSize: payload?.panel_grade ? 17 : 11, fontWeight: payload?.panel_grade ? 600 : 400}}>
+            {loading ? "..." : (payload?.panel_grade || NOT_AVAILABLE)}
+          </div>
+          <div className="stat-lbl">Panel Grade</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-val" style={{color: payload && payload.panel_flagged > 0 ? "#e8526e" : MUTED, fontSize: payload ? 17 : 11, fontWeight: payload ? 600 : 400}}>
+            {loading ? "..." : (payload ? String(payload.panel_flagged) : NOT_AVAILABLE)}
+          </div>
+          <div className="stat-lbl">Flagged</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-val" style={{color: payload ? "#00d4b8" : MUTED, fontSize: payload ? 17 : 11, fontWeight: payload ? 600 : 400}}>
+            {loading ? "..." : (payload ? String(payload.panel_in_range) : NOT_AVAILABLE)}
+          </div>
+          <div className="stat-lbl">In Range</div>
+        </div>
       </div>
     </div>
   );
@@ -581,33 +562,9 @@ function Telehealth(){
   return(
     <div className="pad">
       <div className="sec">Upcoming Appointments</div>
-      <div className="card">
-        {[
-          {icon:"MD",title:"Dr. J. Rivera, MD",body:"Metabolic review . Apr 28 . 10:30 AM"},
-          {icon:"CV",title:"Cardiology, Dr. K. Nguyen",body:"LDL management . May 12 . 2:00 PM"},
-          {icon:"LB",title:"Lab Draw, Fasting Panel",body:"A1C, lipids . Apr 22 . 7:00 AM"},
-        ].map((r,i)=>(
-          <div key={i} style={{display:"flex",gap:12,padding:"10px 0",borderBottom:i<2?"1px solid rgba(255,255,255,.06)":"none"}}>
-            <span style={{fontSize:14,flexShrink:0,fontFamily:"'DM Mono',monospace",color:"#00d4b8"}}>{r.icon}</span>
-            <div><div style={{fontSize:12,fontWeight:600,marginBottom:3}}>{r.title}</div><div style={{fontSize:11,color:"#7a9bbf"}}>{r.body}</div></div>
-          </div>
-        ))}
-      </div>
+      <EmptyState text={`${NOT_LOGGED}. Scheduled appointments will appear here once your care team books them.`}/>
       <div className="sec">Cost Savings</div>
-      <div className="card">
-        <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-          <span style={{fontSize:11,color:"#7a9bbf"}}>ER Visit (avoided)</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:"#4ade80"}}>$3,200 saved</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-          <span style={{fontSize:11,color:"#7a9bbf"}}>Annual Per-Capita</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:"#4ade80"}}>$12,500 to $1,800</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0 0"}}>
-          <span style={{fontSize:11,color:"#7a9bbf"}}>Annual ER diversion savings</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:"#4ade80",fontWeight:600}}>$9.4M</span>
-        </div>
-      </div>
+      <EmptyState text={`${NOT_AVAILABLE}. Cost-savings analytics will appear here once enough care episodes have been recorded.`}/>
     </div>
   );
 }
@@ -620,13 +577,11 @@ function Sovereignty(){
         <div className="stat-grid">
           <div className="stat-item"><div className="stat-val" style={{color:"#4ade80"}}>100%</div><div className="stat-lbl">Sovereign Vault</div></div>
           <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>AES-256</div><div className="stat-lbl">Encryption</div></div>
-          <div className="stat-item"><div className="stat-val" style={{color:"#8060cc"}}>50yr</div><div className="stat-lbl">Retention</div></div>
+          <div className="stat-item"><div className="stat-val" style={{color:"#8060cc",fontSize:12,fontWeight:400}}>{NOT_AVAILABLE}</div><div className="stat-lbl">Retention</div></div>
         </div>
       </div>
       <div className="sec">Vault Activity, Last 24h</div>
-      <ABar label="Data Operations" pct={87} color="#00d4b8" right="2,847"/>
-      <ABar label="Sovereign Shield Queries" pct={62} color="#4ade80" right="1,203" delay={120}/>
-      <ABar label="Cross-Domain Sync" pct={94} color="#8060cc" right="98.7%" delay={240}/>
+      <EmptyState text={`${NOT_AVAILABLE}. Vault activity metrics will appear here once telemetry is wired into the dashboard.`}/>
       <div className="sec">Trace Fiber Network</div>
       <div className="card">
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
@@ -635,8 +590,8 @@ function Sovereignty(){
             <div style={{width:6,height:6,borderRadius:"50%",background:"#4ade80",animation:"pulse 2s infinite"}}/>OPERATIONAL
           </span>
         </div>
-        <div style={{display:"flex",gap:15,fontSize:10,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>
-          <span>Latency: 12ms</span><span>Uptime: 99.997%</span>
+        <div style={{fontSize:10,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>
+          Live latency and uptime metrics: {NOT_AVAILABLE}.
         </div>
       </div>
     </div>
@@ -647,27 +602,9 @@ function Impact(){
   return(
     <div className="pad">
       <div className="sec">Cost Per Member Per Year</div>
-      <div className="card">
-        <div style={{textAlign:"center",padding:"6px 0"}}>
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:32,fontWeight:700,color:"#4ade80"}}>$1,800</div>
-          <div style={{fontSize:10,color:"#7a9bbf",marginTop:3}}>versus $12,500 traditional model</div>
-          <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:9,padding:"4px 10px",background:"rgba(74,222,128,.1)",borderRadius:20,fontSize:11,color:"#4ade80"}}>86% reduction</div>
-        </div>
-      </div>
+      <EmptyState text={`${NOT_AVAILABLE}. Per-member cost analytics will appear here once enough care episodes have been recorded.`}/>
       <div className="sec">Per 1K Members Per Year</div>
-      <ABar label="ER Visits Avoided" pct={78} color="#4ade80" right="$3.2M"/>
-      <ABar label="Hospitalizations Prevented" pct={62} color="#00d4b8" right="$5.8M" delay={120}/>
-      <ABar label="Chronic Disease Reversal" pct={51} color="#d4a843" right="$2.4M" delay={240}/>
-      <ABar label="Early Cancer Detection" pct={87} color="#8060cc" right="$8.6M" delay={360}/>
-      <div className="card" style={{marginTop:12}}>
-        <div className="card-hdr">
-          <span className="card-title">Total Annual Savings</span>
-          <span className="badge b-green">$20M+</span>
-        </div>
-        <div style={{fontSize:11,color:"#a3b5cc",lineHeight:1.5}}>
-          Per 1,000 enrolled members. Compared to traditional reactive care models.
-        </div>
-      </div>
+      <EmptyState text={`${NOT_AVAILABLE}. Population-level outcome and savings analytics will appear here once enough cohort data has been collected.`}/>
     </div>
   );
 }
@@ -747,7 +684,7 @@ function ShieldDash({logs}:{logs:SLog[]}){
 
 function AIChat({onLog}:{onLog:(log:SLog)=>void}){
   const { patient } = useContext(ClinicalDataContext);
-  const firstName = patient.name.split(" ")[0] || "friend";
+  const firstName = (patient.name && patient.name.split(" ")[0]) || "friend";
   const [msgs,setMsgs]=useState([{role:"ai",text:`Hello, ${firstName}. Every message is protected by the ZK Sovereign Shield.`,zkCount:0,flagCount:0}]);
   const [input,setInput]=useState("");
   const [sending,setSending]=useState(false);
@@ -833,13 +770,17 @@ function AIChat({onLog}:{onLog:(log:SLog)=>void}){
 
 function Profile(){
   const { patient } = useContext(ClinicalDataContext);
+  const displayName = patient.name || NOT_ENTERED;
+  const displayId = patient.id || NOT_ENTERED;
+  const ageStr = patient.age > 0 ? `Age ${patient.age}` : NOT_ENTERED;
+  const initial = (patient.name && patient.name.charAt(0).toUpperCase()) || "P";
   return(
     <div className="pad">
       <div style={{textAlign:"center",padding:"16px 0 20px"}}>
-        <div style={{width:68,height:68,borderRadius:"50%",background:"linear-gradient(135deg,#00d4b8,#8060cc)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 10px",color:"#07101f",fontWeight:700}}>P</div>
-        <div style={{fontSize:20,fontWeight:700}}>{patient.name}</div>
-        <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#7a9bbf",marginTop:3}}>{patient.id}</div>
-        <div style={{fontSize:11,color:"#d4a843",marginTop:5}}>Enrolled Patient . Age {patient.age}</div>
+        <div style={{width:68,height:68,borderRadius:"50%",background:"linear-gradient(135deg,#00d4b8,#8060cc)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 10px",color:"#07101f",fontWeight:700}}>{initial}</div>
+        <div style={{fontSize:20,fontWeight:700}}>{displayName}</div>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#7a9bbf",marginTop:3}}>{displayId}</div>
+        <div style={{fontSize:11,color:"#d4a843",marginTop:5}}>Enrolled Patient . {ageStr}</div>
         <div style={{display:"inline-flex",alignItems:"center",gap:5,fontFamily:"'DM Mono',monospace",fontSize:8,color:"#4ade80",background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.2)",padding:"3px 10px",borderRadius:20,marginTop:10}}>
           <div style={{width:5,height:5,borderRadius:"50%",background:"#4ade80",animation:"pulse 2s infinite"}}/>
           ZK Shield Active . Trace Fiber Sovereign
@@ -847,10 +788,14 @@ function Profile(){
       </div>
       <div className="sec">Profile</div>
       {([
-        ["Enrollment","December 15, 2025"],["Program","CareIQ, Full"],
-        ["Physician","Dr. J. Rivera, MD"],["Next Scan","July 2, 2026"],
-        ["Data Vault","Trace Fiber . AES-256"],["Shield","v5.0 Sovereign + HIPAA"],
-        ["AI Model","CIQ v1.2 . AILT Governed"],["Protocols","4 of 4 Active"],
+        ["Enrollment", NOT_ENTERED],
+        ["Program",    NOT_ENTERED],
+        ["Physician",  NOT_ENTERED],
+        ["Next Scan",  NOT_ENTERED],
+        ["Data Vault", "Trace Fiber . AES-256"],
+        ["Shield",     "v5.0 Sovereign + HIPAA"],
+        ["AI Model",   "CIQ v1.2 . AILT Governed"],
+        ["Protocols",  NOT_ENTERED],
       ] as const).map(([k,v],i)=>(
         <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,.06)",gap:12}}>
           <span style={{fontSize:11,color:"#7a9bbf"}}>{k}</span>
@@ -862,10 +807,10 @@ function Profile(){
 }
 
 function Wearable(){
-  const { wearHr7Day, wearSteps7Day, wearDays, primaryDeviceLabel } = useContext(ClinicalDataContext);
+  const { primaryDeviceLabel } = useContext(ClinicalDataContext);
+  const { payload } = useContext(ShieldContext);
   const [now,setNow]=useState(()=>Date.now());
-  const [appleStart]=useState(()=>Date.now()-14000);
-  const [fitbitStart]=useState(()=>Date.now()-52000);
+  const [appleStart]=useState(()=>Date.now());
   useEffect(()=>{
     const t=setInterval(()=>setNow(Date.now()),1000);
     return()=>clearInterval(t);
@@ -879,107 +824,55 @@ function Wearable(){
     const h=Math.floor(m/60);
     return `${h}h ${m%60}m ago`;
   };
-  const apple=[
-    {icon:"HR",val:String(wearHr7Day[wearHr7Day.length-1] ?? 68),unit:"bpm",name:"Resting HR"},
-    {icon:"ST",val:(wearSteps7Day[wearSteps7Day.length-1] ?? 7842).toLocaleString(),unit:"today",name:"Steps"},
-    {icon:"AC",val:"340",unit:"kcal",name:"Active Cal"},
-    {icon:"SL",val:"6h 20m",unit:"last night",name:"Sleep"},
-    {icon:"O2",val:"97",unit:"%",name:"SpO2"},
-    {icon:"HV",val:"42",unit:"ms",name:"HRV"},
+
+  const metrics: Array<{icon:string; raw: string | null; unit:string; name:string}> = [
+    { icon:"HR", raw: payload?.hr != null ? String(Math.round(payload.hr)) : null, unit:"bpm", name:"Resting HR" },
+    { icon:"ST", raw: payload?.steps != null ? Math.round(payload.steps).toLocaleString() : null, unit:"today", name:"Steps" },
+    { icon:"AC", raw: payload?.active_calories != null ? String(Math.round(payload.active_calories)) : null, unit:"kcal", name:"Active Cal" },
+    { icon:"SL", raw: payload?.sleep_hours != null ? fmtSleep(payload.sleep_hours) : null, unit:"last night", name:"Sleep" },
+    { icon:"O2", raw: payload?.spo2 != null ? String(Math.round(payload.spo2)) : null, unit:"%", name:"SpO2" },
+    { icon:"HV", raw: payload?.hrv != null ? String(Math.round(payload.hrv)) : null, unit:"ms", name:"HRV" },
   ];
-  const fitbit=[
-    {icon:"HR",val:"71",unit:"bpm",name:"Resting HR"},
-    {icon:"ST",val:"6,210",unit:"today",name:"Steps"},
-    {icon:"AC",val:"285",unit:"kcal",name:"Active Cal"},
-    {icon:"SL",val:"6h 50m",unit:"last night",name:"Sleep"},
-    {icon:"O2",val:"96",unit:"%",name:"SpO2"},
-    {icon:"HV",val:"38",unit:"ms",name:"HRV"},
-  ];
-  const hrMax=Math.max(...wearHr7Day);
-  const hrMin=Math.min(...wearHr7Day);
-  const stepsMax=Math.max(...wearSteps7Day);
-  const renderCard=(title:string,start:number,metrics:typeof apple)=>(
-    <div className="card">
-      <div className="card-hdr">
-        <span className="card-title">{title}</span>
-        <span className="badge b-green">SYNCED</span>
-      </div>
-      <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#7a9bbf",marginBottom:10}}>
-        Last sync: {fmtAgo(start)}
-      </div>
-      <div className="stat-grid" style={{gridTemplateColumns:"repeat(3,1fr)",gap:7}}>
-        {metrics.map((m,i)=>(
-          <div className="stat-item" key={i}>
-            <div style={{fontSize:10,marginBottom:3,fontFamily:"'DM Mono',monospace",color:"#7a9bbf"}}>{m.icon}</div>
-            <div className="stat-val" style={{color:"#00d4b8",fontSize:14}}>{m.val}</div>
-            <div className="stat-lbl">{m.name}</div>
-            <div style={{fontSize:8,color:"#7a9bbf",fontFamily:"'DM Mono',monospace",marginTop:2}}>{m.unit}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{marginTop:11,display:"flex",justifyContent:"flex-end"}}>
-        <button className="insight-cta">Resync Now</button>
-      </div>
-    </div>
-  );
-  const primaryLabel = primaryDeviceLabel ?? "Apple Watch Series 9";
+
+  const primaryLabel = primaryDeviceLabel ?? "Connected Device";
+
   return(
     <div className="pad">
       <div className="sec">Connected Devices</div>
-      {renderCard(primaryLabel,appleStart,apple)}
-      {renderCard("Fitbit Charge 6",fitbitStart,fitbit)}
+      <div className="card">
+        <div className="card-hdr">
+          <span className="card-title">{primaryLabel}</span>
+          <span className={`badge ${payload ? "b-green" : "b-slate"}`}>{payload ? "SYNCED" : "PENDING"}</span>
+        </div>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#7a9bbf",marginBottom:10}}>
+          Last sync: {payload ? fmtAgo(appleStart) : NOT_AVAILABLE}
+        </div>
+        <div className="stat-grid" style={{gridTemplateColumns:"repeat(3,1fr)",gap:7}}>
+          {metrics.map((m,i)=>(
+            <div className="stat-item" key={i}>
+              <div style={{fontSize:10,marginBottom:3,fontFamily:"'DM Mono',monospace",color:"#7a9bbf"}}>{m.icon}</div>
+              <div className="stat-val" style={{color: m.raw != null ? "#00d4b8" : MUTED, fontSize: m.raw != null ? 14 : 10, fontWeight: m.raw != null ? 600 : 400}}>
+                {m.raw != null ? m.raw : NOT_ENTERED}
+              </div>
+              <div className="stat-lbl">{m.name}</div>
+              <div style={{fontSize:8,color:"#7a9bbf",fontFamily:"'DM Mono',monospace",marginTop:2}}>{m.unit}</div>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="sec">Sync Status</div>
       <div className="card">
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
           <div style={{display:"inline-flex",alignItems:"center",gap:8}}>
-            <div style={{width:8,height:8,borderRadius:"50%",background:"#4ade80",animation:"pulse 2s infinite"}}/>
-            <span style={{fontSize:13,fontWeight:600,color:"#4ade80"}}>All Synced</span>
+            <div style={{width:8,height:8,borderRadius:"50%",background: payload ? "#4ade80" : MUTED, animation: payload ? "pulse 2s infinite" : "none"}}/>
+            <span style={{fontSize:13,fontWeight:600,color: payload ? "#4ade80" : MUTED}}>
+              {payload ? "Synced" : "Awaiting first sync"}
+            </span>
           </div>
-          <button className="insight-cta">Sync All</button>
         </div>
       </div>
       <div className="sec">7 Day Trends</div>
-      <div className="card">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-          <span style={{fontSize:11,fontWeight:600}}>Heart Rate (bpm)</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf"}}>{hrMin} to {hrMax}</span>
-        </div>
-        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:74,marginBottom:6}}>
-          {wearHr7Day.map((v,i)=>{
-            const range=Math.max(1,hrMax-hrMin+4);
-            const pct=Math.max(22,((v-hrMin+2)/range)*100);
-            return(
-              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"#00d4b8"}}>{v}</div>
-                <div style={{width:"100%",height:`${pct}%`,background:"linear-gradient(180deg,#00d4b8,#00b89e)",borderRadius:4,minHeight:8}}/>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          {wearDays.map((d,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>{d}</div>))}
-        </div>
-      </div>
-      <div className="card">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-          <span style={{fontSize:11,fontWeight:600}}>Steps</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf"}}>peak {stepsMax.toLocaleString()}</span>
-        </div>
-        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:74,marginBottom:6}}>
-          {wearSteps7Day.map((v,i)=>{
-            const pct=(v/stepsMax)*100;
-            return(
-              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"#d4a843"}}>{(v/1000).toFixed(1)}k</div>
-                <div style={{width:"100%",height:`${pct}%`,background:"linear-gradient(180deg,#d4a843,#b8902f)",borderRadius:4,minHeight:8}}/>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          {wearDays.map((d,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>{d}</div>))}
-        </div>
-      </div>
+      <EmptyState text={`${NOT_LOGGED}. Trend charts will appear here once at least seven days of wearable data have been recorded.`}/>
     </div>
   );
 }
@@ -996,7 +889,54 @@ interface CareIQHealthOSProps {
 }
 
 export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareIQHealthOSProps = {}) {
-  const data = clinicalData ?? DEMO_DATA;
+  const baseData = clinicalData ?? EMPTY_CLINICAL_DATA;
+
+  const [shield, setShield] = useState<ShieldPayload | null>(null);
+  const [shieldErr, setShieldErr] = useState<string | null>(null);
+  const [shieldLoading, setShieldLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/shield/decrypt", {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          if (!cancelled) {
+            setShieldErr(data?.error || `shield ${r.status}`);
+            setShieldLoading(false);
+          }
+          return;
+        }
+        if (!cancelled) {
+          setShield(data as ShieldPayload);
+          setShieldLoading(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setShieldErr((e as Error).message);
+          setShieldLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Merge real Shield-derived vitals and risk score into the context payload
+  // so child components see real data without changing their consumption API.
+  const data: ClinicalData = {
+    ...baseData,
+    patient: {
+      ...baseData.patient,
+      score: shield ? Math.round(shield.risk_score) : 0,
+    },
+    vitals: shield ? vitalsFromShield(shield) : [],
+  };
+
   const { patient, vitals } = data;
 
   const [mode,setMode]=useState("patient");
@@ -1018,9 +958,10 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
   },[elder]);
 
   useEffect(()=>{
-    const t=setTimeout(()=>setRingPct(patient.score),120);
+    const target = shield ? Math.round(shield.risk_score) : 0;
+    const t=setTimeout(()=>setRingPct(target),120);
     return()=>clearTimeout(t);
-  },[patient.score]);
+  },[shield]);
 
   useEffect(()=>{
     const nav=mode==="patient"?PNAV:CNAV;
@@ -1052,90 +993,122 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
     }
   };
 
-  const offset=RING_C*(1-ringPct/100);
+  const offset = shield ? RING_C*(1-ringPct/100) : RING_C;
+
+  // Risk label / sub-label rendering, derived only from real Shield data.
+  let riskTitle: string;
+  let riskTitleColor = "#eef2f8";
+  if (shieldErr) {
+    riskTitle = `Vitals not available: ${shieldErr}`;
+    riskTitleColor = "#e8526e";
+  } else if (shieldLoading || !shield) {
+    riskTitle = "Loading vitals...";
+    riskTitleColor = MUTED;
+  } else {
+    riskTitle = shield.risk_label || NOT_AVAILABLE;
+  }
+
+  // Ring center number: blank while loading, else the real risk score.
+  const ringCenterNum = shieldLoading ? "" : (shield ? String(Math.round(shield.risk_score)) : "");
+
+  // Header patient label, only show name when we actually have one.
+  const headerName = patient.name || (shieldLoading ? "Loading..." : NOT_ENTERED);
+  const headerId = patient.id || (shield?.patient_id || "");
 
   return(
     <ClinicalDataContext.Provider value={data}>
-      <style>{CSS}</style>
-      <div className={`hos${elder?" elder":""}`}>
-        <div className="hdr">
-          <div className="hdr-top">
-            <div className="logo">
-              <div className="logo-mark">+</div>
-              <div><div className="logo-name">CareIQ</div><div className="logo-sub">Clinical Intelligence for the Safety Net</div></div>
-            </div>
-            <div className="hdr-right">
-              <div className="hdr-patient">{patient.name}</div>
-              <div className="hdr-id">{patient.id}</div>
-              <div className="shield-on"><div className="pulse"/>ZK SHIELD ON</div>
-            </div>
-          </div>
-          <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
-            <InviteFamilyModal patientName={patient.name} />
-          </div>
-        </div>
-        {demoMode && (
-          <div className="demo-banner">
-            Demo data - <a href="/onboard?step=2&edit=1">complete your profile</a> to see your health intelligence.
-          </div>
-        )}
-        {showRing&&(
-          <>
-            <div className="ring-wrap">
-              <div className="ring-pos">
-                <svg width="100%" height="100%" viewBox="0 0 88 88" className="ring-svg" preserveAspectRatio="xMidYMid meet">
-                  <circle cx="44" cy="44" r={RING_R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7"/>
-                  <circle className="ring-progress" cx="44" cy="44" r={RING_R} fill="none" stroke="url(#rg)" strokeWidth="7"
-                    strokeLinecap="round" strokeDasharray={`${RING_C}`} strokeDashoffset={`${offset}`}/>
-                  <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#00d4b8"/><stop offset="100%" stopColor="#8060cc"/>
-                  </linearGradient></defs>
-                </svg>
-                <div className="ring-inner">
-                  <div className="ring-num">{patient.score}</div>
-                  <div className="ring-lbl">Score</div>
-                </div>
+      <ShieldContext.Provider value={{ payload: shield, error: shieldErr, loading: shieldLoading }}>
+        <style>{CSS}</style>
+        <div className={`hos${elder?" elder":""}`}>
+          <div className="hdr">
+            <div className="hdr-top">
+              <div className="logo">
+                <div className="logo-mark">+</div>
+                <div><div className="logo-name">CareIQ</div><div className="logo-sub">Clinical Intelligence for the Safety Net</div></div>
               </div>
-              <div className="score-info">
-                <div className="score-title">Moderate Risk</div>
-                <div className="score-sub">2 active alerts . Next scan 83 days</div>
-                <div className="trend">+8.8% since last scan</div>
+              <div className="hdr-right">
+                <div className="hdr-patient">{headerName}</div>
+                <div className="hdr-id">{headerId}</div>
+                <div className="shield-on"><div className="pulse"/>ZK SHIELD ON</div>
               </div>
             </div>
-            <div className="vitals-row">
-              {vitals.map((v,i)=>(
-                <div className="vital" key={i}>
-                  <div className="vital-icon">{v.icon}</div>
-                  <div className={`vital-val ${v.s}`}>{v.val}</div>
-                  <div className="vital-unit">{v.unit}</div>
-                  <div className="vital-name">{v.name}</div>
-                </div>
-              ))}
+            <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+              <InviteFamilyModal patientName={patient.name || ""} />
             </div>
-          </>
-        )}
-        <div className="mode-bar">
-          <button className={`mbtn ${mode==="patient"?"on":""}`} onClick={()=>setMode("patient")} aria-pressed={mode==="patient"}>Patient</button>
-          <button className={`mbtn ${mode==="clinical"?"on":""}`} onClick={()=>setMode("clinical")} aria-pressed={mode==="clinical"}>Clinical</button>
-          <button className={`mbtn son ${page==="shield"?"on":""}`} onClick={()=>{setMode("clinical");setPage("shield")}}>
-            Shield{logs.length>0?` (${logs.length})`:""}
-          </button>
-          <button className={`mbtn ${elder?"elder-on":""}`} onClick={()=>setElder(e=>!e)} aria-pressed={elder} aria-label="Toggle Elder Mode">
-            AA Elder{elder?" ON":""}
-          </button>
-        </div>
-        <div className="scroll">
-          <TabErrorBoundary>{renderPage()}</TabErrorBoundary>
-        </div>
-        <div className="bnav">
-          {nav.map(n=>(
-            <button key={n.id} className={`bnav-btn ${n.id==="shield"?"sn":""} ${page===n.id?"on":""}`} onClick={()=>setPage(n.id)} aria-current={page===n.id?"page":undefined}>
-              <span className="bnav-icon">{n.icon}</span>
-              <span className="bnav-lbl">{n.id==="shield"&&logs.length>0?`Shield(${logs.length})`:n.label}</span>
+          </div>
+          {demoMode && (
+            <div className="demo-banner">
+              Demo data - <a href="/onboard?step=2&edit=1">complete your profile</a> to see your health intelligence.
+            </div>
+          )}
+          {showRing&&(
+            <>
+              <div className="ring-wrap">
+                <div className="ring-pos">
+                  <svg width="100%" height="100%" viewBox="0 0 88 88" className="ring-svg" preserveAspectRatio="xMidYMid meet">
+                    <circle cx="44" cy="44" r={RING_R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7"/>
+                    <circle className="ring-progress" cx="44" cy="44" r={RING_R} fill="none" stroke="url(#rg)" strokeWidth="7"
+                      strokeLinecap="round" strokeDasharray={`${RING_C}`} strokeDashoffset={`${offset}`}/>
+                    <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#00d4b8"/><stop offset="100%" stopColor="#8060cc"/>
+                    </linearGradient></defs>
+                  </svg>
+                  <div className="ring-inner">
+                    <div className="ring-num">{ringCenterNum || (shieldLoading ? "..." : "")}</div>
+                    <div className="ring-lbl">Score</div>
+                  </div>
+                </div>
+                <div className="score-info">
+                  <div className="score-title" style={{color: riskTitleColor}}>{riskTitle}</div>
+                </div>
+              </div>
+              <div className="vitals-row">
+                {vitals.length === 0 ? (
+                  <div className="vital" style={{minWidth: 220}}>
+                    <div className="vital-name" style={{marginTop:0}}>
+                      {shieldErr ? `Vitals not available: ${shieldErr}` : (shieldLoading ? "Loading vitals..." : NOT_ENTERED)}
+                    </div>
+                  </div>
+                ) : vitals.map((v,i)=>{
+                  const isEmpty = v.s === "muted";
+                  return (
+                    <div className="vital" key={i} style={isEmpty ? {minWidth: 110} : undefined}>
+                      <div className="vital-icon">{v.icon}</div>
+                      <div className={`vital-val ${v.s}`} style={isEmpty ? {fontSize: 10, lineHeight: 1.3} : undefined}>{v.val}</div>
+                      {!isEmpty && <div className="vital-unit">{v.unit}</div>}
+                      <div className="vital-name">{v.name}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <div className="mode-bar">
+            <button className={`mbtn ${mode==="patient"?"on":""}`} onClick={()=>setMode("patient")} aria-pressed={mode==="patient"}>Patient</button>
+            <button className={`mbtn ${mode==="clinical"?"on":""}`} onClick={()=>setMode("clinical")} aria-pressed={mode==="clinical"}>Clinical</button>
+            <button className={`mbtn son ${page==="shield"?"on":""}`} onClick={()=>{setMode("clinical");setPage("shield")}}>
+              Shield{logs.length>0?` (${logs.length})`:""}
             </button>
-          ))}
+            <button className={`mbtn ${elder?"elder-on":""}`} onClick={()=>setElder(e=>!e)} aria-pressed={elder} aria-label="Toggle Elder Mode">
+              AA Elder{elder?" ON":""}
+            </button>
+          </div>
+          <div className="scroll">
+            <TabErrorBoundary>{renderPage()}</TabErrorBoundary>
+          </div>
+          <div className="bnav">
+            {nav.map(n=>(
+              <button key={n.id} className={`bnav-btn ${n.id==="shield"?"sn":""} ${page===n.id?"on":""}`} onClick={()=>setPage(n.id)} aria-current={page===n.id?"page":undefined}>
+                <span className="bnav-icon">{n.icon}</span>
+                <span className="bnav-lbl">{n.id==="shield"&&logs.length>0?`Shield(${logs.length})`:n.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </ShieldContext.Provider>
     </ClinicalDataContext.Provider>
   );
 }
+
+// Re-export the trend bar helper so external usages do not break if any.
+export { ABar };
