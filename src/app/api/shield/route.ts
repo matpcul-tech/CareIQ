@@ -468,6 +468,17 @@ export async function POST(req: NextRequest) {
   const combinedContext = [anon.summary, clientContextBlock].filter(Boolean).join("\n\n");
   const promptHash = sha256Hex(systemFor(mode) + "\n" + combinedContext);
 
+  // Display name for de-anonymizing the LLM output. The prompt sent to
+  // Anthropic always uses COMMUNITY_PATIENT as the name token (see
+  // anonymize() above), so the model can echo it back. After generation
+  // we replace COMMUNITY_PATIENT with the patient's actual first name
+  // (and last name when present) from the decrypted profile so the
+  // user-facing insight reads naturally. Falls back to "you" so the
+  // placeholder token never leaks into the UI.
+  const displayName =
+    (((profile?.firstName || "").trim() + " " + (profile?.lastName || "").trim()).trim()) ||
+    "you";
+
   const apiKey = (process.env.ANTHROPIC_API_KEY || "").trim();
   const keyPrefix10 = apiKey.slice(0, 10);
 
@@ -561,6 +572,10 @@ export async function POST(req: NextRequest) {
     }
 
     generated = sanitizeOutput(generated);
+    // De-anonymize for the user-facing surface only. The Anthropic prompt
+    // already saw the COMMUNITY_PATIENT token; the patient's real name is
+    // never sent to the model.
+    generated = generated.replace(/COMMUNITY_PATIENT/g, displayName);
 
     // eslint-disable-next-line no-console
     console.log(
