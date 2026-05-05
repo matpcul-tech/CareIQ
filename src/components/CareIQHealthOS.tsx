@@ -747,12 +747,29 @@ function BloodPanel(){
 }
 
 function Telehealth(){
+  const demo = process.env.NEXT_PUBLIC_SHIELD_DEMO_PLANS === "true";
   return(
     <div className="pad">
       <div className="sec">Upcoming Appointments</div>
-      <EmptyState text={`${NOT_LOGGED}. Scheduled appointments will appear here once your care team books them.`}/>
+      {demo ? (
+        <div className="card">
+          <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+            Annual wellness visit -- May 15, 2026 at 10:00 AM with Dr. Sarah Mitchell, Primary Care
+          </div>
+        </div>
+      ) : (
+        <EmptyState text={`${NOT_LOGGED}. Scheduled appointments will appear here once your care team books them.`}/>
+      )}
       <div className="sec">Cost Savings</div>
-      <EmptyState text={`${NOT_AVAILABLE}. Cost-savings analytics will appear here once enough care episodes have been recorded.`}/>
+      {demo ? (
+        <div className="card">
+          <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+            Estimated $2,400 saved this year through early detection and preventive care protocols vs reactive treatment costs
+          </div>
+        </div>
+      ) : (
+        <EmptyState text={`${NOT_AVAILABLE}. Cost-savings analytics will appear here once enough care episodes have been recorded.`}/>
+      )}
     </div>
   );
 }
