@@ -141,9 +141,9 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
               background: "#0d1a30",
               border: "1px solid #1e3a5f",
               borderRadius: 12,
-              padding: 22,
+              padding: 14,
               color: "#eef2f8",
-              maxHeight: "80vh",
+              maxHeight: "70vh",
               overflowY: "auto",
             }}
           >
