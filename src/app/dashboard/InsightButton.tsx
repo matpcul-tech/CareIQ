@@ -47,7 +47,10 @@ export default function InsightButton() {
         {busy ? "Generating..." : "Generate AI Health Insight"}
       </button>
       {insight && (
-        <div className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-100 p-4 text-sm leading-relaxed text-ink">
+        <div
+          className="mt-3 whitespace-pre-wrap rounded-xl p-4 text-sm leading-relaxed"
+          style={{ background: "#111827", color: "#e2e8f0" }}
+        >
           {insight}
         </div>
       )}
