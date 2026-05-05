@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode, type CSSProperties } from "react";
 import InviteFamilyModal from "@/components/InviteFamilyModal";
 import LongevityPanel, { type ShieldPayload as LongevityShieldPayload } from "@/components/LongevityPanel";
 
@@ -273,6 +273,28 @@ const ClinicalDataContext = createContext<ClinicalData>(EMPTY_CLINICAL_DATA);
         no CSRF or Authorization header required (route is in
         PUBLIC_API_PATHS in middleware.ts). ------------------------------ */
 
+interface WorkoutPlan {
+  title: string;
+  weekly_target: string;
+  cardio: string;
+  strength: string;
+  flexibility: string;
+  emphasis: string[];
+  rationale: string;
+  is_demo: boolean;
+}
+interface NutritionPlan {
+  title: string;
+  pattern: string;
+  daily_calories: number;
+  macros: { protein_g: number; carb_g: number; fat_g: number };
+  emphasize: string[];
+  limit: string[];
+  sample_day: { meal: string; foods: string }[];
+  rationale: string;
+  is_demo: boolean;
+}
+
 export interface ShieldPayload {
   patient_id: string;
   bp_systolic: number | null;
@@ -300,6 +322,8 @@ export interface ShieldPayload {
   updated_at: string | null;
   decrypted_at: string;
   shield_version: string;
+  workout_plan?: WorkoutPlan | null;
+  nutrition_plan?: NutritionPlan | null;
 }
 
 interface ShieldState { payload: ShieldPayload | null; error: string | null; loading: boolean; }
@@ -441,18 +465,96 @@ function Overview(){
 }
 
 function Insights(){
+  const { payload: shield } = useContext(ShieldContext);
+  const plan = shield?.workout_plan ?? null;
+  const samplePlanBadge = (
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      fontFamily: "'DM Mono',monospace",
+      fontSize: 8,
+      padding: "2px 7px",
+      borderRadius: 6,
+      background: "rgba(0,212,184,.12)",
+      color: "#00d4b8",
+      border: "1px solid rgba(0,212,184,.28)",
+      textTransform: "uppercase",
+      letterSpacing: ".1em",
+      marginLeft: 8,
+    }}>Sample plan</span>
+  );
+  const monoLabel: CSSProperties = {
+    fontFamily: "'DM Mono',monospace",
+    fontSize: 9,
+    color: "#7a9bbf",
+    textTransform: "uppercase",
+    letterSpacing: ".14em",
+    minWidth: 78,
+    flexShrink: 0,
+  };
+  const sentenceText: CSSProperties = {
+    fontSize: 12,
+    color: "#a3b5cc",
+    lineHeight: 1.55,
+  };
   return(
     <div className="pad">
       <div className="sec">Today's Workout</div>
-      <div className="card">
-        <div className="card-hdr">
-          <span className="card-title">Workout Plan</span>
-          <span className="badge b-violet">AI</span>
+      {plan ? (
+        <div className="card">
+          <div className="card-hdr">
+            <span className="card-title" style={{display:"inline-flex",alignItems:"center"}}>
+              <h3 style={{fontSize:13,fontWeight:600,margin:0}}>{plan.title}</h3>
+              {samplePlanBadge}
+            </span>
+            <span className="badge b-violet">AI</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:9,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+            <div style={monoLabel}>Weekly target</div>
+            <div style={sentenceText}>{plan.weekly_target}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-start",gap:9,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+            <div style={monoLabel}>Cardio</div>
+            <div style={sentenceText}>{plan.cardio}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-start",gap:9,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+            <div style={monoLabel}>Strength</div>
+            <div style={sentenceText}>{plan.strength}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-start",gap:9,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+            <div style={monoLabel}>Flexibility</div>
+            <div style={sentenceText}>{plan.flexibility}</div>
+          </div>
+          {plan.emphasis.length > 0 && (
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
+              {plan.emphasis.map((chip, i) => (
+                <span key={i} style={{
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: 9,
+                  padding: "3px 8px",
+                  borderRadius: 12,
+                  background: "rgba(0,212,184,.08)",
+                  color: "#a3b5cc",
+                  border: "1px solid rgba(0,212,184,.18)",
+                }}>{chip}</span>
+              ))}
+            </div>
+          )}
+          <div style={{marginTop:10,fontSize:11,fontStyle:"italic",color:MUTED,lineHeight:1.5}}>
+            Why: {plan.rationale}
+          </div>
         </div>
-        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
-          {NOT_GENERATED}. Your personalized workout plan will appear here once you log a few days of vitals.
+      ) : (
+        <div className="card">
+          <div className="card-hdr">
+            <span className="card-title">Workout Plan</span>
+            <span className="badge b-violet">AI</span>
+          </div>
+          <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+            {NOT_GENERATED}. Will appear here once a workout plan is generated for you.
+          </div>
         </div>
-      </div>
+      )}
       <div className="sec">AI Clinical Insights</div>
       <EmptyState text={`${NOT_GENERATED}. Clinical insights will appear here once your care team reviews your latest vitals.`}/>
       <div className="sec">Health Timeline</div>
@@ -462,24 +564,114 @@ function Insights(){
 }
 
 function Nutrition(){
+  const { payload: shield } = useContext(ShieldContext);
+  const plan = shield?.nutrition_plan ?? null;
+  const samplePlanBadge = (
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      fontFamily: "'DM Mono',monospace",
+      fontSize: 8,
+      padding: "2px 7px",
+      borderRadius: 6,
+      background: "rgba(0,212,184,.12)",
+      color: "#00d4b8",
+      border: "1px solid rgba(0,212,184,.28)",
+      textTransform: "uppercase",
+      letterSpacing: ".1em",
+      marginLeft: 8,
+    }}>Sample plan</span>
+  );
+  const mealLabel: CSSProperties = {
+    fontFamily: "'DM Mono',monospace",
+    fontSize: 9,
+    color: "#7a9bbf",
+    textTransform: "uppercase",
+    letterSpacing: ".14em",
+    minWidth: 78,
+    flexShrink: 0,
+  };
+  const mealText: CSSProperties = {
+    fontSize: 12,
+    color: "#a3b5cc",
+    lineHeight: 1.55,
+  };
   return(
     <div className="pad">
       <div className="sec">Today's Meal Plan, AI Generated</div>
-      <div className="card">
-        <div className="card-hdr">
-          <span className="card-title">Meal Plan</span>
-          <span className="badge b-violet">AI</span>
-        </div>
-        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
-          {NOT_GENERATED}. Your personalized meal plan will appear here once you log a few days of vitals.
-        </div>
-      </div>
-      <div className="sec">Personalized Nutrition Plan</div>
-      <div className="stat-grid" style={{marginBottom:10}}>
-        <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Calories</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Protein</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Fiber</div></div>
-      </div>
+      {plan ? (
+        <>
+          <div className="card">
+            <div className="card-hdr">
+              <span className="card-title" style={{display:"inline-flex",alignItems:"center"}}>
+                <h3 style={{fontSize:13,fontWeight:600,margin:0}}>{plan.title}</h3>
+                {samplePlanBadge}
+              </span>
+              <span className="badge b-violet">AI</span>
+            </div>
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:20,background:"rgba(0,212,184,.1)",border:"1px solid rgba(0,212,184,.2)",fontFamily:"'DM Mono',monospace",fontSize:10,color:"#00d4b8",marginBottom:10}}>
+              {plan.daily_calories} kcal/day
+            </div>
+            <div className="stat-grid" style={{marginBottom:10}}>
+              <div className="stat-item"><div className="stat-val">{plan.macros.protein_g} g</div><div className="stat-lbl">Protein</div></div>
+              <div className="stat-item"><div className="stat-val">{plan.macros.carb_g} g</div><div className="stat-lbl">Carbs</div></div>
+              <div className="stat-item"><div className="stat-val">{plan.macros.fat_g} g</div><div className="stat-lbl">Fat</div></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:6}}>
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#00d4b8",textTransform:"uppercase",letterSpacing:".14em",marginBottom:6}}>Emphasize</div>
+                <ul style={{listStyle:"none",margin:0,padding:0}}>
+                  {plan.emphasize.map((item, i) => (
+                    <li key={i} style={{fontSize:11,color:"#a3b5cc",lineHeight:1.5,paddingLeft:10,position:"relative",marginBottom:3}}>
+                      <span style={{position:"absolute",left:0,color:"#00d4b8"}}>+</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#e8526e",textTransform:"uppercase",letterSpacing:".14em",marginBottom:6}}>Limit</div>
+                <ul style={{listStyle:"none",margin:0,padding:0}}>
+                  {plan.limit.map((item, i) => (
+                    <li key={i} style={{fontSize:11,color:"#a3b5cc",lineHeight:1.5,paddingLeft:10,position:"relative",marginBottom:3}}>
+                      <span style={{position:"absolute",left:0,color:"#e8526e"}}>-</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)"}}>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf",textTransform:"uppercase",letterSpacing:".14em",marginBottom:6}}>Sample day</div>
+              {plan.sample_day.slice(0,4).map((row, i) => (
+                <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"5px 0",borderBottom:i<Math.min(plan.sample_day.length,4)-1?"1px solid rgba(255,255,255,.06)":"none"}}>
+                  <div style={mealLabel}>{row.meal}</div>
+                  <div style={mealText}>{row.foods}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{marginTop:10,fontSize:11,fontStyle:"italic",color:MUTED,lineHeight:1.5}}>
+              Why: {plan.rationale}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="card">
+            <div className="card-hdr">
+              <span className="card-title">Meal Plan</span>
+              <span className="badge b-violet">AI</span>
+            </div>
+            <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+              {NOT_GENERATED}. Your personalized meal plan will appear here once you log a few days of vitals.
+            </div>
+          </div>
+          <div className="sec">Personalized Nutrition Plan</div>
+          <div className="stat-grid" style={{marginBottom:10}}>
+            <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Calories</div></div>
+            <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Protein</div></div>
+            <div className="stat-item"><div className="stat-val" style={{color:MUTED,fontSize:11,fontWeight:400}}>{NOT_ENTERED}</div><div className="stat-lbl">Fiber</div></div>
+          </div>
+        </>
+      )}
       <EmptyState text={`${NOT_LOGGED}. Logged meals will appear here.`}/>
     </div>
   );
