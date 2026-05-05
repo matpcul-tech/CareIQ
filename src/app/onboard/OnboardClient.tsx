@@ -25,6 +25,74 @@ const DEVICES = [
 const MAGIC_COOLDOWN_SECONDS = 60;
 const MAGIC_COOLDOWN_STORAGE_KEY = "sov_magic_last_send_at";
 
+type Cat = "metabolic" | "cardiovascular" | "organ" | "blood" | "hormonal" | "longevity" | "cognitive";
+interface FormSpec { key: string; cat: Cat; label: string; unit: string; step: string; placeholder: string; }
+const BIOMARKER_FORM_SPECS: FormSpec[] = [
+  // metabolic
+  { key: "fasting_glucose", cat: "metabolic", label: "Fasting Glucose", unit: "mg/dL", step: "1", placeholder: "e.g. 85" },
+  { key: "fasting_insulin", cat: "metabolic", label: "Fasting Insulin", unit: "µIU/mL", step: "0.1", placeholder: "e.g. 5.2" },
+  { key: "homa_ir", cat: "metabolic", label: "HOMA-IR", unit: "", step: "0.01", placeholder: "e.g. 1.20" },
+  { key: "a1c", cat: "metabolic", label: "A1C", unit: "%", step: "0.1", placeholder: "e.g. 5.3" },
+  { key: "uric_acid", cat: "metabolic", label: "Uric Acid", unit: "mg/dL", step: "0.1", placeholder: "e.g. 5.0" },
+  // cardiovascular
+  { key: "ldl", cat: "cardiovascular", label: "LDL Cholesterol", unit: "mg/dL", step: "1", placeholder: "e.g. 110" },
+  { key: "hdl", cat: "cardiovascular", label: "HDL Cholesterol", unit: "mg/dL", step: "1", placeholder: "e.g. 55" },
+  { key: "total_cholesterol", cat: "cardiovascular", label: "Total Cholesterol", unit: "mg/dL", step: "1", placeholder: "e.g. 180" },
+  { key: "triglycerides", cat: "cardiovascular", label: "Triglycerides", unit: "mg/dL", step: "1", placeholder: "e.g. 130" },
+  { key: "apob", cat: "cardiovascular", label: "ApoB", unit: "mg/dL", step: "1", placeholder: "e.g. 90" },
+  { key: "lpa", cat: "cardiovascular", label: "Lp(a)", unit: "nmol/L", step: "1", placeholder: "e.g. 25" },
+  { key: "hs_crp", cat: "cardiovascular", label: "hs-CRP", unit: "mg/L", step: "0.01", placeholder: "e.g. 0.40" },
+  { key: "homocysteine", cat: "cardiovascular", label: "Homocysteine", unit: "µmol/L", step: "0.1", placeholder: "e.g. 8.0" },
+  { key: "vldl", cat: "cardiovascular", label: "VLDL", unit: "mg/dL", step: "1", placeholder: "e.g. 18" },
+  // organ
+  { key: "egfr", cat: "organ", label: "eGFR", unit: "mL/min", step: "1", placeholder: "e.g. 95" },
+  { key: "creatinine", cat: "organ", label: "Creatinine", unit: "mg/dL", step: "0.01", placeholder: "e.g. 0.95" },
+  { key: "bun", cat: "organ", label: "BUN", unit: "mg/dL", step: "1", placeholder: "e.g. 12" },
+  { key: "alt", cat: "organ", label: "ALT", unit: "U/L", step: "1", placeholder: "e.g. 18" },
+  { key: "ast", cat: "organ", label: "AST", unit: "U/L", step: "1", placeholder: "e.g. 18" },
+  { key: "albumin", cat: "organ", label: "Albumin", unit: "g/dL", step: "0.1", placeholder: "e.g. 4.6" },
+  { key: "bilirubin", cat: "organ", label: "Bilirubin", unit: "mg/dL", step: "0.01", placeholder: "e.g. 0.7" },
+  // blood
+  { key: "wbc", cat: "blood", label: "WBC", unit: "K/µL", step: "0.1", placeholder: "e.g. 6.0" },
+  { key: "rbc", cat: "blood", label: "RBC", unit: "M/µL", step: "0.01", placeholder: "e.g. 4.80" },
+  { key: "hemoglobin", cat: "blood", label: "Hemoglobin", unit: "g/dL", step: "0.1", placeholder: "e.g. 14.0" },
+  { key: "hematocrit", cat: "blood", label: "Hematocrit", unit: "%", step: "0.1", placeholder: "e.g. 42" },
+  { key: "platelets", cat: "blood", label: "Platelets", unit: "K/µL", step: "1", placeholder: "e.g. 250" },
+  { key: "ferritin", cat: "blood", label: "Ferritin", unit: "ng/mL", step: "1", placeholder: "e.g. 80" },
+  { key: "vitamin_b12", cat: "blood", label: "Vitamin B12", unit: "pg/mL", step: "1", placeholder: "e.g. 600" },
+  // hormonal
+  { key: "testosterone_total", cat: "hormonal", label: "Testosterone (Total)", unit: "ng/dL", step: "1", placeholder: "e.g. 700" },
+  { key: "testosterone_free", cat: "hormonal", label: "Testosterone (Free)", unit: "pg/mL", step: "0.1", placeholder: "e.g. 20.0" },
+  { key: "dhea_s", cat: "hormonal", label: "DHEA-S", unit: "µg/dL", step: "1", placeholder: "e.g. 280" },
+  { key: "cortisol_am", cat: "hormonal", label: "Cortisol (AM)", unit: "µg/dL", step: "0.1", placeholder: "e.g. 12.0" },
+  { key: "igf1", cat: "hormonal", label: "IGF-1", unit: "ng/mL", step: "1", placeholder: "e.g. 150" },
+  { key: "tsh", cat: "hormonal", label: "TSH", unit: "mIU/L", step: "0.01", placeholder: "e.g. 1.50" },
+  { key: "vitamin_d", cat: "hormonal", label: "Vitamin D", unit: "ng/mL", step: "1", placeholder: "e.g. 60" },
+  { key: "omega3_index", cat: "hormonal", label: "Omega-3 Index", unit: "%", step: "0.1", placeholder: "e.g. 8.0" },
+  // longevity
+  { key: "biological_age_estimate", cat: "longevity", label: "Biological Age", unit: "yrs", step: "0.1", placeholder: "e.g. 38.5" },
+  { key: "grip_strength", cat: "longevity", label: "Grip Strength", unit: "kg", step: "1", placeholder: "e.g. 45" },
+  { key: "vo2_max", cat: "longevity", label: "VO2 Max", unit: "mL/kg/min", step: "0.1", placeholder: "e.g. 50.0" },
+  { key: "resting_hr", cat: "longevity", label: "Resting HR", unit: "bpm", step: "1", placeholder: "e.g. 58" },
+  { key: "hrv", cat: "longevity", label: "HRV", unit: "ms", step: "1", placeholder: "e.g. 65" },
+  { key: "sleep_score", cat: "longevity", label: "Sleep Score", unit: "/100", step: "1", placeholder: "e.g. 85" },
+  { key: "stress_score", cat: "longevity", label: "Stress Score", unit: "/100", step: "1", placeholder: "e.g. 25" },
+  // cognitive
+  { key: "memory_score", cat: "cognitive", label: "Memory", unit: "/100", step: "1", placeholder: "e.g. 85" },
+  { key: "processing_speed", cat: "cognitive", label: "Processing Speed", unit: "/100", step: "1", placeholder: "e.g. 80" },
+  { key: "executive_function", cat: "cognitive", label: "Executive Function", unit: "/100", step: "1", placeholder: "e.g. 80" },
+];
+const CAT_TITLES: Record<Cat, string> = {
+  metabolic: "Metabolic",
+  cardiovascular: "Cardiovascular",
+  organ: "Organ Function",
+  blood: "Blood",
+  hormonal: "Hormonal",
+  longevity: "Longevity",
+  cognitive: "Cognitive",
+};
+const CAT_ORDER: Cat[] = ["metabolic", "cardiovascular", "organ", "blood", "hormonal", "longevity", "cognitive"];
+
 function getCsrfToken(): string {
   if (typeof document === "undefined") return "";
   const m = document.cookie.match(/(?:^|;\s*)sov_csrf=([^;]+)/);
@@ -352,6 +420,7 @@ function Step2Profile({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [dob, setDob] = useState("");
+  const [sex, setSex] = useState<"male" | "female" | "">("");
   const [community, setCommunity] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -374,6 +443,7 @@ function Step2Profile({
         firstName,
         lastName,
         dateOfBirth: dob,
+        sex: sex || undefined,
         communityAffiliation: community || undefined,
       });
       if (!res.ok) {
@@ -424,6 +494,22 @@ function Step2Profile({
         required
         className="field-input"
       />
+      <div>
+        <label className="field-label" htmlFor="profile-sex">Sex</label>
+        <select
+          id="profile-sex"
+          value={sex}
+          onChange={(e) => setSex(e.target.value as "male" | "female" | "")}
+          className="field-input"
+        >
+          <option value="">Prefer not to say</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+        <p className="mt-1 text-xs text-ink-soft">
+          Used by the longevity panel to resolve sex-dependent reference ranges. Optional.
+        </p>
+      </div>
       <label className="field-label">Community affiliation (optional)</label>
       <input
         value={community}
@@ -552,37 +638,8 @@ function Step3History({
   );
 }
 
-interface ManualLabsForm {
-  a1c: string;
-  ldl: string;
-  hdl: string;
-  fastingGlucose: string;
-  bpSystolic: string;
-  bpDiastolic: string;
-  triglycerides: string;
-  egfr: string;
-}
-
-const EMPTY_LABS: ManualLabsForm = {
-  a1c: "",
-  ldl: "",
-  hdl: "",
-  fastingGlucose: "",
-  bpSystolic: "",
-  bpDiastolic: "",
-  triglycerides: "",
-  egfr: "",
-};
-
-function buildLabsPayload(form: ManualLabsForm): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(form)) {
-    const trimmed = (v as string).trim();
-    if (trimmed === "") continue;
-    const n = Number(trimmed);
-    if (Number.isFinite(n)) out[k] = n;
-  }
-  return out;
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function Step4Upload({
@@ -597,7 +654,17 @@ function Step4Upload({
     null,
   );
   const [busy, setBusy] = useState<"lab" | "wearable" | null>(null);
-  const [labs, setLabs] = useState<ManualLabsForm>(EMPTY_LABS);
+
+  // Biomarker accordion state
+  const [bioValues, setBioValues] = useState<Record<string, string>>({});
+  const [openCat, setOpenCat] = useState<Cat | null>("metabolic");
+  const [dateCollected, setDateCollected] = useState<string>("");
+  const [bioSource, setBioSource] = useState<"lab" | "wearable" | "self_reported">("self_reported");
+
+  // Blood pressure (vitals, kept legacy flat shape)
+  const [bpSystolic, setBpSystolic] = useState<string>("");
+  const [bpDiastolic, setBpDiastolic] = useState<string>("");
+
   const [labsStatus, setLabsStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [savingLabs, setSavingLabs] = useState(false);
 
@@ -646,13 +713,66 @@ function Step4Upload({
     }
   }
 
+  function setBio(key: string, value: string) {
+    setBioValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function toggleCat(cat: Cat) {
+    setOpenCat((prev) => (prev === cat ? null : cat));
+  }
+
+  function filledCount(cat: Cat): number {
+    return BIOMARKER_FORM_SPECS.filter((s) => s.cat === cat)
+      .filter((s) => {
+        const v = (bioValues[s.key] ?? "").trim();
+        if (v === "") return false;
+        return Number.isFinite(Number(v));
+      }).length;
+  }
+
+  function totalCount(cat: Cat): number {
+    return BIOMARKER_FORM_SPECS.filter((s) => s.cat === cat).length;
+  }
+
   async function continueToDashboard() {
-    const payload = buildLabsPayload(labs);
-    const enteredCount = Object.keys(payload).length;
+    // Build biomarkers payload
+    const effectiveDate = dateCollected || todayIso();
+    const biomarkers: Record<string, { value: number; date_collected: string; source: string }> = {};
+    for (const spec of BIOMARKER_FORM_SPECS) {
+      const raw = (bioValues[spec.key] ?? "").trim();
+      if (raw === "") continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n)) continue;
+      biomarkers[spec.key] = {
+        value: n,
+        date_collected: effectiveDate,
+        source: bioSource,
+      };
+    }
+
+    // BP legacy flat shape
+    const payload: Record<string, unknown> = { biomarkers };
+    const sysTrim = bpSystolic.trim();
+    const diaTrim = bpDiastolic.trim();
+    if (sysTrim !== "") {
+      const n = Number(sysTrim);
+      if (Number.isFinite(n)) payload.bpSystolic = n;
+    }
+    if (diaTrim !== "") {
+      const n = Number(diaTrim);
+      if (Number.isFinite(n)) payload.bpDiastolic = n;
+    }
+
+    const enteredCount =
+      Object.keys(biomarkers).length +
+      (payload.bpSystolic !== undefined ? 1 : 0) +
+      (payload.bpDiastolic !== undefined ? 1 : 0);
+
     if (enteredCount === 0) {
       onDone();
       return;
     }
+
     setSavingLabs(true);
     setLabsStatus(null);
     try {
@@ -670,10 +790,6 @@ function Step4Upload({
       setLabsStatus({ ok: false, message: "Network error saving lab values." });
       setSavingLabs(false);
     }
-  }
-
-  function setLab<K extends keyof ManualLabsForm>(key: K, value: string) {
-    setLabs((prev) => ({ ...prev, [key]: value }));
   }
 
   return (
@@ -727,143 +843,132 @@ function Step4Upload({
         )}
       </div>
 
+      {/* Blood Pressure card (vitals, not a biomarker spec) */}
       <div className="rounded-xl border border-slate-300 bg-slate-50 p-4">
-        <div className="font-bold">Enter labs manually (optional)</div>
+        <div className="font-bold">Blood Pressure</div>
         <div className="mb-3 text-sm text-ink-soft">
-          Type any values you already know. Every field is optional. Values are encrypted before storage.
+          Optional. Stored as a vital sign and applied to your latest reading.
         </div>
+        <label className="field-label">Blood Pressure (mmHg)</label>
+        <div className="flex items-center gap-2">
+          <input
+            aria-label="Systolic"
+            type="number"
+            inputMode="numeric"
+            step="1"
+            min="40"
+            max="300"
+            value={bpSystolic}
+            onChange={(e) => setBpSystolic(e.target.value)}
+            className="field-input"
+            placeholder="Systolic"
+          />
+          <span className="font-mono text-ink-soft">/</span>
+          <input
+            aria-label="Diastolic"
+            type="number"
+            inputMode="numeric"
+            step="1"
+            min="20"
+            max="200"
+            value={bpDiastolic}
+            onChange={(e) => setBpDiastolic(e.target.value)}
+            className="field-input"
+            placeholder="Diastolic"
+          />
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className="field-label" htmlFor="lab-a1c">A1C (%)</label>
-            <input
-              id="lab-a1c"
-              type="number"
-              inputMode="decimal"
-              step="0.1"
-              min="0"
-              max="25"
-              value={labs.a1c}
-              onChange={(e) => setLab("a1c", e.target.value)}
-              className="field-input"
-              placeholder="e.g. 5.7"
-            />
+      {/* Biomarker accordion */}
+      <div className="flex flex-col gap-3">
+        <div className="rounded-xl border border-slate-300 bg-slate-50 p-4">
+          <div className="font-bold">Enter biomarkers manually (optional)</div>
+          <div className="mb-3 text-sm text-ink-soft">
+            Type any values you already know. Every field is optional. Values are encrypted before storage.
           </div>
-
-          <div>
-            <label className="field-label" htmlFor="lab-ldl">LDL (mg/dL)</label>
-            <input
-              id="lab-ldl"
-              type="number"
-              inputMode="numeric"
-              step="1"
-              min="0"
-              max="1000"
-              value={labs.ldl}
-              onChange={(e) => setLab("ldl", e.target.value)}
-              className="field-input"
-              placeholder="e.g. 110"
-            />
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="lab-hdl">HDL (mg/dL)</label>
-            <input
-              id="lab-hdl"
-              type="number"
-              inputMode="numeric"
-              step="1"
-              min="0"
-              max="300"
-              value={labs.hdl}
-              onChange={(e) => setLab("hdl", e.target.value)}
-              className="field-input"
-              placeholder="e.g. 55"
-            />
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="lab-glucose">Fasting Glucose (mg/dL)</label>
-            <input
-              id="lab-glucose"
-              type="number"
-              inputMode="numeric"
-              step="1"
-              min="0"
-              max="1000"
-              value={labs.fastingGlucose}
-              onChange={(e) => setLab("fastingGlucose", e.target.value)}
-              className="field-input"
-              placeholder="e.g. 95"
-            />
-          </div>
-
-          <div className="sm:col-span-2">
-            <label className="field-label">Blood Pressure (mmHg)</label>
-            <div className="flex items-center gap-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="field-label" htmlFor="bio-date">Date collected</label>
               <input
-                aria-label="Systolic"
-                type="number"
-                inputMode="numeric"
-                step="1"
-                min="40"
-                max="300"
-                value={labs.bpSystolic}
-                onChange={(e) => setLab("bpSystolic", e.target.value)}
+                id="bio-date"
+                type="date"
+                value={dateCollected}
+                onChange={(e) => setDateCollected(e.target.value)}
                 className="field-input"
-                placeholder="Systolic"
               />
-              <span className="font-mono text-ink-soft">/</span>
-              <input
-                aria-label="Diastolic"
-                type="number"
-                inputMode="numeric"
-                step="1"
-                min="20"
-                max="200"
-                value={labs.bpDiastolic}
-                onChange={(e) => setLab("bpDiastolic", e.target.value)}
+              <p className="mt-1 text-xs text-ink-soft">Applied to all biomarkers entered today.</p>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="bio-source">Source</label>
+              <select
+                id="bio-source"
+                value={bioSource}
+                onChange={(e) => setBioSource(e.target.value as "lab" | "wearable" | "self_reported")}
                 className="field-input"
-                placeholder="Diastolic"
-              />
+              >
+                <option value="lab">Lab</option>
+                <option value="wearable">Wearable</option>
+                <option value="self_reported">Self-reported</option>
+              </select>
+              <p className="mt-1 text-xs text-ink-soft">Where these values came from.</p>
             </div>
           </div>
-
-          <div>
-            <label className="field-label" htmlFor="lab-trig">Triglycerides (mg/dL)</label>
-            <input
-              id="lab-trig"
-              type="number"
-              inputMode="numeric"
-              step="1"
-              min="0"
-              max="3000"
-              value={labs.triglycerides}
-              onChange={(e) => setLab("triglycerides", e.target.value)}
-              className="field-input"
-              placeholder="e.g. 130"
-            />
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="lab-egfr">eGFR (mL/min)</label>
-            <input
-              id="lab-egfr"
-              type="number"
-              inputMode="numeric"
-              step="1"
-              min="0"
-              max="250"
-              value={labs.egfr}
-              onChange={(e) => setLab("egfr", e.target.value)}
-              className="field-input"
-              placeholder="e.g. 90"
-            />
-          </div>
         </div>
 
+        {CAT_ORDER.map((cat) => {
+          const isOpen = openCat === cat;
+          const filled = filledCount(cat);
+          const total = totalCount(cat);
+          const specs = BIOMARKER_FORM_SPECS.filter((s) => s.cat === cat);
+          return (
+            <div key={cat} className="flex flex-col">
+              <button
+                type="button"
+                onClick={() => toggleCat(cat)}
+                className="flex w-full items-center justify-between rounded-xl border border-slate-300 bg-slate-50 p-3 text-left hover:bg-slate-100"
+                aria-expanded={isOpen}
+              >
+                <span className="font-semibold text-ink">{CAT_TITLES[cat]}</span>
+                <span className="flex items-center gap-3 text-xs text-ink-soft">
+                  <span className="font-mono">{filled} / {total} entered</span>
+                  <span aria-hidden className="text-ink-mute">{isOpen ? "▲" : "▼"}</span>
+                </span>
+              </button>
+              {isOpen && (
+                <div className="rounded-b-xl border border-t-0 border-slate-300 bg-white p-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {specs.map((spec) => {
+                      const inputId = `bio-${spec.key}`;
+                      return (
+                        <div key={spec.key}>
+                          <label className="field-label" htmlFor={inputId}>{spec.label}</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              id={inputId}
+                              type="number"
+                              inputMode="decimal"
+                              step={spec.step}
+                              value={bioValues[spec.key] ?? ""}
+                              onChange={(e) => setBio(spec.key, e.target.value)}
+                              className="field-input"
+                              placeholder={spec.placeholder}
+                            />
+                            {spec.unit && (
+                              <span className="text-xs text-ink-soft whitespace-nowrap">{spec.unit}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
         {labsStatus && (
-          <div className={`mt-3 ${labsStatus.ok ? "alert-success" : "alert-error"}`}>
+          <div className={`${labsStatus.ok ? "alert-success" : "alert-error"}`}>
             {labsStatus.message}
           </div>
         )}
