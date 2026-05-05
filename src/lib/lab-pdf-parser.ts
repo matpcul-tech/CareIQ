@@ -3,21 +3,6 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
 
-/**
- * Universal lab PDF parser.
- *
- * Two-stage extraction:
- *   1. unpdf text extraction + line-by-line synonym matching.
- *   2. Claude vision fallback (claude-sonnet-4) when stage 1 yields
- *      < 100 chars or matches zero biomarkers.
- *
- * unpdf transfers the underlying ArrayBuffer to a pdfjs-dist worker,
- * leaving the caller's Uint8Array detached / zero-length. To survive
- * that for the vision fallback we keep a fresh defensive copy of the
- * input bytes BEFORE running unpdf, and pass that copy to the vision
- * call. The vision side also defends with an explicit length guard.
- */
-
 export type Confidence = "high" | "medium" | "low";
 export type ExtractionMode = "text" | "vision" | "none";
 
@@ -41,7 +26,6 @@ interface Spec {
 }
 
 const SPECS: Spec[] = [
-  // Metabolic
   { key: "fasting_glucose",
     primary: ["fasting glucose", "glucose fasting", "glucose, fasting", "glucose plasma fasting"],
     aliases: ["glucose", "plasma glucose", "blood glucose", "blood sugar"],
@@ -62,7 +46,6 @@ const SPECS: Spec[] = [
     primary: ["uric acid"],
     aliases: ["urate", "serum uric acid"],
     units: ["mg/dl"], min: 0.5, max: 20 },
-  // Cardiovascular
   { key: "ldl",
     primary: ["ldl cholesterol", "ldl-c", "ldl chol", "ldl calc", "ldl cholesterol calc", "ldl-cholesterol"],
     aliases: ["ldl", "low density lipoprotein", "low-density lipoprotein"],
@@ -105,7 +88,6 @@ const SPECS: Spec[] = [
     primary: ["homocysteine"],
     aliases: ["hcy"],
     units: ["umol/l", "µmol/l", "mcmol/l"], min: 1, max: 100 },
-  // Organ function
   { key: "egfr",
     primary: ["egfr", "estimated gfr", "gfr estimated", "egfr non-african american", "egfr if non-african american"],
     aliases: ["glomerular filtration rate", "gfr"],
@@ -134,7 +116,6 @@ const SPECS: Spec[] = [
     primary: ["bilirubin total", "total bilirubin", "bilirubin, total"],
     aliases: ["bilirubin", "t bili", "tbili"],
     units: ["mg/dl"], min: 0, max: 30 },
-  // Blood
   { key: "wbc",
     primary: ["wbc", "white blood cell count", "white blood cells"],
     aliases: ["leukocytes", "leukocyte count"],
@@ -163,7 +144,6 @@ const SPECS: Spec[] = [
     primary: ["vitamin b12", "vitamin b-12", "b12 serum", "b12, serum", "b12"],
     aliases: ["cobalamin"],
     units: ["pg/ml"], min: 50, max: 5000 },
-  // Hormonal
   { key: "testosterone_total",
     primary: ["testosterone total", "total testosterone", "testosterone, total"],
     aliases: ["testosterone", "serum testosterone"],
@@ -323,10 +303,6 @@ function confidenceFor(spec: Spec, tier: "primary" | "alias", value: number, uni
 
 const CONF_RANK: Record<Confidence, number> = { high: 3, medium: 2, low: 1 };
 
-// ===========================================================================
-// Stage 1: text extraction via unpdf
-// ===========================================================================
-
 export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   try {
     const mod = await import("unpdf");
@@ -388,10 +364,6 @@ export function extractBiomarkersFromText(text: string): ExtractedBiomarker[] {
   return Array.from(best.values());
 }
 
-// ===========================================================================
-// Stage 2: Claude vision fallback
-// ===========================================================================
-
 const VISION_MODEL = "claude-sonnet-4-20250514";
 
 const VISION_PROMPT =
@@ -421,6 +393,37 @@ function extractFirstJsonObject(text: string): string | null {
   return null;
 }
 
+/**
+ * Coerce Claude's value to a finite number. Accepts:
+ *   - JS number (any finite value)
+ *   - String containing a leading number and optional unit suffix
+ *     ("5.4", "5.4 %", "110 mg/dL", "<5.0" -> rejected)
+ *   - Nested {value: number} or {value: "5.4"} object (some prompt
+ *     drift defenses)
+ * Rejects:
+ *   - Strings starting with < or > (BDL / above-detection markers)
+ *   - Strings that don't begin with a numeric character
+ *   - Plain non-numeric strings ("BDL", "Not Detected")
+ *   - null, undefined, booleans, arrays
+ */
+function coerceNumeric(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (!trimmed) return null;
+    if (/^[<>]/.test(trimmed)) return null;
+    if (!/^-?\d/.test(trimmed)) return null;
+    const n = parseFloat(trimmed);
+    if (Number.isFinite(n)) return n;
+    return null;
+  }
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    const inner = (v as Record<string, unknown>).value;
+    if (inner !== undefined) return coerceNumeric(inner);
+  }
+  return null;
+}
+
 async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiomarker[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -430,7 +433,7 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
   }
   if (!bytes || bytes.length === 0) {
     // eslint-disable-next-line no-console
-    console.warn("[lab-pdf-parser] vision fallback skipped: pdf bytes empty (likely detached by unpdf worker transfer)");
+    console.warn("[lab-pdf-parser] vision fallback skipped: pdf bytes empty");
     return [];
   }
   if (bytes.length > 30 * 1024 * 1024) {
@@ -475,7 +478,16 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
     return [];
   }
 
-  const objText = extractFirstJsonObject(raw);
+  // Surface Claude's actual response (truncated) so we can diagnose when 0
+  // biomarkers come back. Truncate to 800 chars to keep log lines readable.
+  const rawTrimmed = raw.trim();
+  // eslint-disable-next-line no-console
+  console.log(
+    `[lab-pdf-parser] vision raw response (${rawTrimmed.length} chars):`,
+    rawTrimmed.length > 800 ? rawTrimmed.slice(0, 800) + "...[truncated]" : rawTrimmed,
+  );
+
+  const objText = extractFirstJsonObject(rawTrimmed);
   if (!objText) {
     // eslint-disable-next-line no-console
     console.warn("[lab-pdf-parser] vision response did not contain a JSON object");
@@ -497,12 +509,20 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
   }
 
   const out: ExtractedBiomarker[] = [];
+  const dropped: string[] = [];
   for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-    const key = k.toLowerCase();
-    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    const key = k.toLowerCase().trim();
+    if (!key) continue;
+    const num = coerceNumeric(v);
+    if (num === null) {
+      // Capture the type so the log tells us why it was dropped.
+      const tag = typeof v === "string" ? `"${(v as string).slice(0, 24)}"` : typeof v;
+      dropped.push(`${key}=${tag}`);
+      continue;
+    }
     out.push({
       key,
-      value: v,
+      value: num,
       unit: "",
       raw_name: k,
       raw_line: "",
@@ -513,15 +533,12 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
 
   // eslint-disable-next-line no-console
   console.log(
-    `[lab-pdf-parser] vision: matched ${out.length} biomarkers`,
-    out.length > 0 ? out.map((o) => o.key).join(",") : "(none)",
+    `[lab-pdf-parser] vision: matched ${out.length} biomarkers; dropped ${dropped.length}`,
+    out.length > 0 ? `kept=${out.map((o) => o.key).join(",")}` : "",
+    dropped.length > 0 ? `dropped=${dropped.slice(0, 12).join(";")}` : "",
   );
   return out;
 }
-
-// ===========================================================================
-// Orchestration
-// ===========================================================================
 
 export interface ParsePdfResult {
   ok: boolean;
@@ -536,10 +553,9 @@ export interface ParsePdfResult {
 const MIN_TEXT_CHARS_FOR_REGEX = 100;
 
 export async function parsePdfBiomarkers(bytes: Uint8Array): Promise<ParsePdfResult> {
-  // Defensive copy. unpdf transfers the underlying ArrayBuffer to a
-  // pdfjs-dist worker, leaving the caller's Uint8Array detached. This
-  // copy survives that transfer so the vision fallback below still has
-  // the original PDF bytes to send to Claude.
+  // Defensive copy: unpdf transfers the underlying ArrayBuffer to a
+  // pdfjs-dist worker, leaving the caller's Uint8Array detached. Copy
+  // BEFORE running unpdf so the vision fallback still has the bytes.
   const visionBytes = new Uint8Array(bytes.byteLength);
   visionBytes.set(bytes);
 
