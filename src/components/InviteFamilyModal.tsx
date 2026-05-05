@@ -127,9 +127,9 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
             zIndex: 50,
             background: "rgba(7,16,31,0.85)",
             display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-            padding: 16,
+            flexDirection: "column",
+            justifyContent: "flex-end",
+            padding: 0,
             fontFamily: "'Outfit', system-ui, sans-serif",
           }}
         >
@@ -137,16 +137,24 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "100%",
-              maxWidth: 420,
               background: "#0d1a30",
-              border: "1px solid #1e3a5f",
-              borderRadius: 12,
-              padding: 14,
+              borderTop: "1px solid #1e3a5f",
+              borderRadius: "16px 16px 0 0",
+              padding: "16px 18px calc(20px + env(safe-area-inset-bottom,0px))",
               color: "#eef2f8",
-              maxHeight: "70vh",
-              overflowY: "auto",
+              boxShadow: "0 -8px 24px rgba(0,0,0,0.4)",
             }}
           >
+            <div
+              aria-hidden
+              style={{
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                background: "rgba(255,255,255,0.18)",
+                margin: "0 auto 14px",
+              }}
+            />
             <h2 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 600 }}>
               Send Care Circle invite
             </h2>
@@ -292,7 +300,7 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
                 reset();
               }}
               style={{
-                marginTop: 14,
+                marginTop: 10,
                 width: "100%",
                 padding: "9px 0",
                 borderRadius: 8,
