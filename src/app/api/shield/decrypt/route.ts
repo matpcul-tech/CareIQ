@@ -23,12 +23,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const SHIELD_VERSION = "v5";
 
-// Pilot demo: when no wearable_data row exists for the patient, surface
-// plausible fake metrics so the dashboard isn't empty mid-demo. Gated
-// behind SHIELD_DEMO_WEARABLE env var to keep production clean.
-// Set SHIELD_DEMO_WEARABLE=true on the CareIQ Vercel project to enable;
-// any other value (including unset) leaves wearable fields null when
-// no real data is on file.
+// Demo wearable fallback (set SHIELD_DEMO_WEARABLE=true on Vercel).
 const DEMO_WEARABLE_ENABLED = process.env.SHIELD_DEMO_WEARABLE === "true";
 const DEMO_WEARABLE: DailyMetric = {
   date: new Date().toISOString().slice(0, 10),
@@ -40,6 +35,11 @@ const DEMO_WEARABLE: DailyMetric = {
   hrv: 58,
   activeCalories: 540,
 };
+
+// Demo plan generation (set SHIELD_DEMO_PLANS=true on Vercel). Generates
+// a workout + nutrition plan tailored to the patient's current biomarker
+// values; plans are flagged is_demo:true so the UI labels them clearly.
+const DEMO_PLANS_ENABLED = process.env.SHIELD_DEMO_PLANS === "true";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -371,6 +371,238 @@ function summarizePanel(panel: BiomarkerPanel): {
   return { panel_grade: grade, panel_flagged: flagged, panel_in_range: inRange };
 }
 
+// ===========================================================================
+// Demo plan generation. Pulls signal from the biomarker panel + wearable
+// and emits a workout + nutrition plan with rationale tied to specific
+// out-of-optimal markers. Both plans carry is_demo: true so UI can label.
+// ===========================================================================
+
+export interface WorkoutPlan {
+  title: string;
+  weekly_target: string;
+  cardio: string;
+  strength: string;
+  flexibility: string;
+  emphasis: string[];
+  rationale: string;
+  is_demo: boolean;
+}
+
+export interface NutritionPlan {
+  title: string;
+  pattern: string;
+  daily_calories: number;
+  macros: { protein_g: number; carb_g: number; fat_g: number };
+  emphasize: string[];
+  limit: string[];
+  sample_day: { meal: string; foods: string }[];
+  rationale: string;
+  is_demo: boolean;
+}
+
+function valOf(panel: BiomarkerPanel, key: string): number | null {
+  for (const cat of Object.keys(panel) as BiomarkerCategory[]) {
+    const e = panel[cat][key];
+    if (e && typeof e.value === "number") return e.value;
+  }
+  return null;
+}
+
+function generateWorkoutPlan(panel: BiomarkerPanel, latestWearable: DailyMetric | null): WorkoutPlan {
+  const ldl = valOf(panel, "ldl");
+  const a1c = valOf(panel, "a1c");
+  const tg = valOf(panel, "triglycerides");
+  const hsCrp = valOf(panel, "hs_crp");
+  const vitD = valOf(panel, "vitamin_d");
+  const restingHr = latestWearable?.heartRate ?? valOf(panel, "resting_hr");
+  const steps = latestWearable?.steps ?? null;
+
+  const emphasis: string[] = [];
+  const reasons: string[] = [];
+
+  let weekly = "4 sessions per week";
+  let cardio = "30 minutes moderate cardio (brisk walk, cycling) 3x per week";
+  let strength = "Full-body resistance training 2x per week";
+  let flexibility = "10 minutes mobility / stretching daily";
+
+  if ((ldl !== null && ldl >= 130) || (tg !== null && tg >= 150)) {
+    emphasis.push("Aerobic endurance");
+    cardio = "35-45 minutes moderate-intensity cardio (brisk walk, cycling, swimming) 5x per week";
+    weekly = "5 sessions per week";
+    if (ldl !== null && ldl >= 130) reasons.push(`elevated LDL (${Math.round(ldl)} mg/dL)`);
+    if (tg !== null && tg >= 150) reasons.push(`elevated triglycerides (${Math.round(tg)} mg/dL)`);
+  }
+
+  if (a1c !== null && a1c >= 5.7) {
+    emphasis.push("Post-meal walks");
+    flexibility = "10 minute walk after each main meal, plus 10 minutes stretching";
+    if (a1c >= 6.5) {
+      cardio = "40 minutes brisk walking 5-6x per week, plus 1-2 short HIIT sessions";
+      reasons.push(`A1C ${a1c.toFixed(1)}% (diabetic range)`);
+    } else {
+      reasons.push(`A1C ${a1c.toFixed(1)}% (prediabetic range)`);
+    }
+  }
+
+  if (hsCrp !== null && hsCrp >= 3) {
+    emphasis.push("Moderate intensity (avoid high-impact)");
+    reasons.push(`elevated hs-CRP (${hsCrp.toFixed(2)} mg/L)`);
+  }
+
+  if (vitD !== null && vitD < 30) {
+    emphasis.push("Outdoor sessions");
+    reasons.push(`vitamin D ${Math.round(vitD)} ng/mL (low)`);
+  }
+
+  if (restingHr !== null && restingHr > 75) {
+    emphasis.push("Zone 2 cardio for resting HR improvement");
+    reasons.push(`resting HR ${restingHr} bpm`);
+  }
+
+  if (steps !== null && steps < 5000) {
+    emphasis.push("Daily step target 8,000+");
+    reasons.push(`current ${steps} daily steps`);
+  }
+
+  if (emphasis.length === 0) {
+    emphasis.push("Maintenance");
+    reasons.push("all monitored markers within optimal range");
+  }
+
+  const rationale =
+    reasons.length > 0
+      ? `Plan tailored to: ${reasons.join("; ")}. Strength training preserves lean mass and supports glucose disposal independent of cardio.`
+      : "Balanced plan suitable for ongoing maintenance.";
+
+  return {
+    title: "Weekly Movement Plan",
+    weekly_target: weekly,
+    cardio,
+    strength,
+    flexibility,
+    emphasis,
+    rationale,
+    is_demo: true,
+  };
+}
+
+function generateNutritionPlan(panel: BiomarkerPanel): NutritionPlan {
+  const ldl = valOf(panel, "ldl");
+  const a1c = valOf(panel, "a1c");
+  const fg = valOf(panel, "fasting_glucose");
+  const tg = valOf(panel, "triglycerides");
+  const hsCrp = valOf(panel, "hs_crp");
+  const vitD = valOf(panel, "vitamin_d");
+  const ferritin = valOf(panel, "ferritin");
+  const b12 = valOf(panel, "vitamin_b12");
+  const homocysteine = valOf(panel, "homocysteine");
+
+  const reasons: string[] = [];
+  const emphasize: string[] = [];
+  const limit: string[] = [];
+  let pattern = "Balanced whole foods";
+  let dailyCalories = 2000;
+  let macros = { protein_g: 100, carb_g: 220, fat_g: 70 };
+
+  if (ldl !== null && ldl >= 130) {
+    pattern = "Mediterranean";
+    emphasize.push("Extra-virgin olive oil (2-3 tbsp/day)", "Fatty fish (salmon, sardines) 2-3x per week", "Mixed nuts (1 oz/day)", "Soluble fiber: oats, legumes, apples");
+    limit.push("Saturated fat (red meat, butter, full-fat dairy)", "Trans fats and fried foods");
+    reasons.push(`LDL ${Math.round(ldl)} mg/dL`);
+  }
+
+  if ((a1c !== null && a1c >= 5.7) || (fg !== null && fg >= 100)) {
+    pattern = pattern === "Mediterranean" ? "Mediterranean (low glycemic)" : "Low glycemic";
+    emphasize.push("Non-starchy vegetables at every meal", "Protein at every meal (25-35g)", "Whole intact grains over flour-based grains");
+    limit.push("Refined carbohydrates and added sugars", "Sugar-sweetened beverages");
+    macros = { protein_g: 120, carb_g: 180, fat_g: 80 };
+    if (a1c !== null) reasons.push(`A1C ${a1c.toFixed(1)}%`);
+    if (fg !== null) reasons.push(`fasting glucose ${Math.round(fg)} mg/dL`);
+  }
+
+  if (tg !== null && tg >= 150) {
+    emphasize.push("Omega-3 sources: salmon, sardines, walnuts, flax");
+    limit.push("Alcohol", "Refined carbohydrates", "Added sugars");
+    reasons.push(`triglycerides ${Math.round(tg)} mg/dL`);
+  }
+
+  if (hsCrp !== null && hsCrp >= 3) {
+    emphasize.push("Berries, leafy greens, turmeric, fatty fish (anti-inflammatory)");
+    limit.push("Processed meats", "Ultra-processed snacks");
+    reasons.push(`hs-CRP ${hsCrp.toFixed(2)} mg/L`);
+  }
+
+  if (vitD !== null && vitD < 30) {
+    emphasize.push("Fortified dairy or non-dairy milk", "Egg yolks, mushrooms (UV-exposed)");
+    reasons.push(`vitamin D ${Math.round(vitD)} ng/mL`);
+  }
+
+  if (ferritin !== null && ferritin < 30) {
+    emphasize.push("Iron-rich foods: lean red meat, lentils, spinach (with vitamin C)");
+    reasons.push(`ferritin ${Math.round(ferritin)} ng/mL`);
+  }
+
+  if (b12 !== null && b12 < 400) {
+    emphasize.push("B12-rich foods: clams, sardines, beef, fortified nutritional yeast");
+    reasons.push(`B12 ${Math.round(b12)} pg/mL`);
+  }
+
+  if (homocysteine !== null && homocysteine >= 10) {
+    emphasize.push("Folate, B6, B12 cofactors: leafy greens, eggs, lentils");
+    reasons.push(`homocysteine ${homocysteine.toFixed(1)} µmol/L`);
+  }
+
+  if (emphasize.length === 0) {
+    pattern = "Mediterranean (maintenance)";
+    emphasize.push("Olive oil, fatty fish weekly, vegetables at every meal", "Whole intact grains, legumes, nuts");
+    limit.push("Ultra-processed foods", "Added sugars");
+    reasons.push("all monitored markers within optimal range");
+  }
+
+  const sampleDay = [
+    {
+      meal: "Breakfast",
+      foods:
+        pattern.includes("glycemic")
+          ? "Greek yogurt with berries and walnuts; 2 boiled eggs"
+          : "Steel-cut oats with berries, walnuts, and ground flax; black coffee",
+    },
+    {
+      meal: "Lunch",
+      foods:
+        "Mixed greens with grilled salmon, chickpeas, olives, cucumber, tomato; olive-oil + lemon dressing",
+    },
+    {
+      meal: "Snack",
+      foods: "Apple with almond butter or 1 oz mixed nuts",
+    },
+    {
+      meal: "Dinner",
+      foods:
+        pattern.includes("glycemic")
+          ? "Grilled chicken or tofu, roasted non-starchy vegetables, small portion of quinoa or lentils"
+          : "Roasted salmon, sweet potato, sauteed greens with garlic and olive oil",
+    },
+  ];
+
+  const rationale =
+    reasons.length > 0
+      ? `Plan tailored to: ${reasons.join("; ")}. Pattern emphasizes whole-food sources of micronutrients and fiber, with macronutrient ratio adjusted to support the specific markers above.`
+      : "Balanced longevity-oriented pattern suitable for ongoing maintenance.";
+
+  return {
+    title: pattern,
+    pattern,
+    daily_calories: dailyCalories,
+    macros,
+    emphasize,
+    limit,
+    sample_day: sampleDay,
+    rationale,
+    is_demo: true,
+  };
+}
+
 interface DecryptedPayload {
   bp_systolic: number | null;
   bp_diastolic: number | null;
@@ -398,6 +630,8 @@ interface DecryptedPayload {
   biomarkers: BiomarkerPanel;
   sex: Sex;
   wearable_is_demo: boolean;
+  workout_plan: WorkoutPlan | null;
+  nutrition_plan: NutritionPlan | null;
 }
 
 async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
@@ -457,11 +691,6 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     }
   }
 
-  // Demo fallback: when no real wearable_data row exists for the patient
-  // and SHIELD_DEMO_WEARABLE=true is set on the server, surface plausible
-  // demo metrics so the dashboard isn't empty during pilot demos.
-  // wearable_is_demo is propagated to the response so clients can label
-  // these tiles distinctly if desired.
   let wearableIsDemo = false;
   if (!latestMetric && DEMO_WEARABLE_ENABLED) {
     latestMetric = DEMO_WEARABLE;
@@ -498,6 +727,20 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
   const bpStatusValue = bpStatus(labs.bpSystolic ?? null, labs.bpDiastolic ?? null);
   void bpStatusValue;
 
+  // Demo plan generation. Gated; when off, plan fields stay null and
+  // clients render the existing "Not yet generated" placeholders.
+  let workoutPlan: WorkoutPlan | null = null;
+  let nutritionPlan: NutritionPlan | null = null;
+  if (DEMO_PLANS_ENABLED) {
+    try {
+      workoutPlan = generateWorkoutPlan(biomarkers, latestMetric);
+      nutritionPlan = generateNutritionPlan(biomarkers);
+    } catch {
+      workoutPlan = null;
+      nutritionPlan = null;
+    }
+  }
+
   return {
     bp_systolic: labs.bpSystolic ?? null,
     bp_diastolic: labs.bpDiastolic ?? null,
@@ -525,6 +768,8 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     biomarkers,
     sex,
     wearable_is_demo: wearableIsDemo,
+    workout_plan: workoutPlan,
+    nutrition_plan: nutritionPlan,
   };
 }
 
