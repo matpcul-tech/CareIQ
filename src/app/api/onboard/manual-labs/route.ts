@@ -13,26 +13,37 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/onboard/manual-labs
  *
- * Accepts patient-typed lab values from Step 4 of onboarding. Two shapes
- * are honored, and either or both may appear in the same request:
+ * Accepts patient-typed lab values from Step 4 of onboarding. Two shapes:
  *
- *   1. Legacy flat shape  (camelCase keys directly on the body):
- *        { a1c, ldl, hdl, fastingGlucose, bpSystolic, bpDiastolic,
- *          triglycerides, egfr }
- *      Persisted under `manualLabs` in the encrypted health_history blob.
+ *   1. Legacy flat:  { a1c, ldl, hdl, fastingGlucose, bpSystolic,
+ *                      bpDiastolic, triglycerides, egfr } -> manualLabs
+ *   2. Structured:   { biomarkers: { fasting_glucose: {value,
+ *                      date_collected, source}, ... } } -> biomarkers
  *
- *   2. New structured shape (full longevity panel):
- *        { biomarkers: { fasting_glucose: { value, date_collected, source },
- *                        a1c: { ... }, ... } }
- *      Persisted under `biomarkers` in the encrypted blob, keyed by spec.
+ * Phase 3 addition: every biomarker write also lands in biomarker_log
+ * (append-only, encrypted-value, server-only) so the Shield decrypt
+ * endpoint can compute trend (improving / stable / declining) per
+ * biomarker by comparing the latest two entries.
  *
- * The Shield decrypt endpoint reads both shapes (biomarkers preferred,
- * manualLabs as fallback) so existing records keep working.
- *
- * After persisting, the route mirrors the canonical 8 fields into
- * public.patient_vitals_shared so family-side reads (RLS-scoped) keep
- * working without requiring decryption.
+ * BP is vitals, not a biomarker spec, so it stays in manualLabs only and
+ * is NOT logged to biomarker_log.
  */
+
+// Map legacy camelCase keys to their canonical biomarker_log key, where
+// applicable. bpSystolic / bpDiastolic intentionally not mapped.
+const LEGACY_TO_CANONICAL: Record<string, string> = {
+  a1c: "a1c",
+  ldl: "ldl",
+  hdl: "hdl",
+  fastingGlucose: "fasting_glucose",
+  triglycerides: "triglycerides",
+  egfr: "egfr",
+};
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export async function POST(req: NextRequest) {
   const sessionId = headers().get("x-session-id") || "";
   const session = readSession();
@@ -59,10 +70,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid lab values" }, { status: 400 });
   }
 
-  // Split parsed body into legacy flat fields vs structured biomarkers.
   const { biomarkers: rawBiomarkers, ...legacy } = parsed.data;
 
-  // Legacy: drop empty / non-finite values.
   const cleanedLegacy: Record<string, number> = {};
   for (const [k, v] of Object.entries(legacy)) {
     if (v !== undefined && v !== null && Number.isFinite(v as number)) {
@@ -70,7 +79,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Biomarkers: accept only keys we know about, drop entries with no value.
   const knownKeys = new Set<string>(BIOMARKER_KEYS);
   const cleanedBiomarkers: Record<string, BiomarkerEntryInput> = {};
   if (rawBiomarkers) {
@@ -116,9 +124,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "could not read history" }, { status: 500 });
   }
 
-  // Build the merged blob. We preserve every key on the existing decrypted
-  // record (chronicConditions, medications, etc.) and merge new lab values
-  // on top of `manualLabs` and `biomarkers`.
   let merged: Record<string, unknown> = {};
   if (existing?.data_encrypted) {
     try {
@@ -178,9 +183,64 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "could not save manual labs" }, { status: 500 });
   }
 
-  // Mirror to patient_vitals_shared. Prefer the new structured biomarker
-  // value over the legacy flat value when both exist, so the family mirror
-  // tracks whichever the patient updated most recently.
+  // -------------------------------------------------------------------
+  // Append every biomarker entry to biomarker_log so trends can be
+  // computed on the next Shield decrypt. Best-effort: never fail the
+  // save if the log write errors.
+  // -------------------------------------------------------------------
+  type LogRow = {
+    patient_id: string;
+    biomarker_key: string;
+    date_collected: string;
+    source: "lab" | "wearable" | "self_reported";
+    value_encrypted: string;
+  };
+  const logRows: LogRow[] = [];
+
+  for (const [key, entry] of Object.entries(cleanedBiomarkers)) {
+    if (typeof entry.value !== "number" || !Number.isFinite(entry.value)) continue;
+    const date = entry.date_collected || todayIso();
+    const source = entry.source || "self_reported";
+    const value_encrypted = encryptJson(
+      { value: entry.value },
+      `biomarker_log:${session.patientId}:${key}`,
+    );
+    logRows.push({
+      patient_id: session.patientId,
+      biomarker_key: key,
+      date_collected: date,
+      source,
+      value_encrypted,
+    });
+  }
+
+  for (const [legacyKey, val] of Object.entries(cleanedLegacy)) {
+    const canonical = LEGACY_TO_CANONICAL[legacyKey];
+    if (!canonical) continue;
+    const value_encrypted = encryptJson(
+      { value: val },
+      `biomarker_log:${session.patientId}:${canonical}`,
+    );
+    logRows.push({
+      patient_id: session.patientId,
+      biomarker_key: canonical,
+      date_collected: todayIso(),
+      source: "self_reported",
+      value_encrypted,
+    });
+  }
+
+  if (logRows.length > 0) {
+    const { error: logErr } = await sb.from("biomarker_log").insert(logRows);
+    if (logErr) {
+      // eslint-disable-next-line no-console
+      console.error("[manual-labs] biomarker_log insert failed:", logErr.code || logErr.message);
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // patient_vitals_shared mirror.
+  // -------------------------------------------------------------------
   const numOrNull = (v: unknown): number | null =>
     typeof v === "number" && Number.isFinite(v) ? v : null;
 
@@ -252,14 +312,13 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Tell the consumer ManualLabsInput stays referenced even if a future
-  // refactor narrows the schema; suppresses unused-import linter noise.
   type _ManualLabsRef = ManualLabsInput;
   void (null as unknown as _ManualLabsRef);
 
   return NextResponse.json({
     ok: true,
     saved: enteredCount,
+    logged: logRows.length,
     family_mirror_synced: !mirrorErr,
   });
 }

@@ -39,6 +39,8 @@ export type Sex = "male" | "female" | "unknown";
 
 export type BiomarkerStatus = "ok" | "suboptimal" | "outside_normal" | "unknown";
 
+export type BiomarkerTrend = "improving" | "stable" | "declining" | null;
+
 export interface BiomarkerThresholds {
   normal_low: number | null;
   normal_high: number | null;
@@ -60,10 +62,7 @@ export interface BiomarkerSpec {
   bar_min: number;
   bar_max: number;
   thresholds: BiomarkerThresholds | SexedThresholds;
-  // Optional alternate keys to look up in legacy ManualLabs (camelCase).
-  // The Shield endpoint reads these for back-compat with the old flat shape.
   legacy_keys?: string[];
-  // If true, this biomarker is sourced from wearable_data, not health_history.
   wearable_field?:
     | "heartRate"
     | "steps"
@@ -222,11 +221,6 @@ function loadOverrides(): Record<string, Partial<BiomarkerThresholds>> {
   return OVERRIDES_CACHE;
 }
 
-/**
- * Resolve thresholds for a biomarker given the patient's sex. For sex-
- * dependent biomarkers when sex is "unknown", returns the union (widest
- * normal band) and clears the optimal band so the UI shows neutral.
- */
 export function getThresholds(spec: BiomarkerSpec, sex: Sex): BiomarkerThresholds {
   let base: BiomarkerThresholds;
   const tx = spec.thresholds as BiomarkerThresholds | SexedThresholds;
@@ -256,33 +250,21 @@ function unionWidest(a: BiomarkerThresholds, b: BiomarkerThresholds): BiomarkerT
   return {
     normal_low: minOrNull(a.normal_low, b.normal_low),
     normal_high: maxOrNull(a.normal_high, b.normal_high),
-    // Sex unknown: clear optimal (we cannot compute a sex-correct optimal).
     optimal_low: null,
     optimal_high: null,
   };
 }
 
-/**
- * Compute the longevity-adjusted status for a value:
- *   ok            = value is inside the optimal range (or no optimal range
- *                   defined and value is inside normal)
- *   suboptimal    = value is inside normal but outside optimal
- *   outside_normal= value is outside normal
- *   unknown       = no value, or no thresholds at all
- */
 export function computeStatus(
   value: number | null,
   th: BiomarkerThresholds,
 ): BiomarkerStatus {
   if (value === null) return "unknown";
-
   const outsideNormalLow = th.normal_low !== null && value < th.normal_low;
   const outsideNormalHigh = th.normal_high !== null && value > th.normal_high;
   if (outsideNormalLow || outsideNormalHigh) return "outside_normal";
-
   const hasOptimalLow = th.optimal_low !== null;
   const hasOptimalHigh = th.optimal_high !== null;
-
   if (hasOptimalLow && hasOptimalHigh) {
     if (value >= (th.optimal_low as number) && value <= (th.optimal_high as number)) return "ok";
     return "suboptimal";
@@ -295,10 +277,61 @@ export function computeStatus(
     if (value <= (th.optimal_high as number)) return "ok";
     return "suboptimal";
   }
-
-  // No optimal range defined. Inside normal counts as ok.
   if (th.normal_low !== null || th.normal_high !== null) return "ok";
   return "unknown";
+}
+
+/**
+ * Returns the ideal target value for a biomarker based on its thresholds.
+ * Used by trend computation to decide which direction is "improving".
+ */
+export function getTargetCenter(th: BiomarkerThresholds): number | null {
+  if (th.optimal_low !== null && th.optimal_high !== null) {
+    return (th.optimal_low + th.optimal_high) / 2;
+  }
+  if (th.optimal_low !== null) return th.optimal_low;
+  if (th.optimal_high !== null) return th.optimal_high;
+  if (th.normal_low !== null && th.normal_high !== null) {
+    return (th.normal_low + th.normal_high) / 2;
+  }
+  if (th.normal_low !== null) return th.normal_low;
+  if (th.normal_high !== null) return th.normal_high;
+  return null;
+}
+
+/**
+ * computeTrend: directional change in distance to target.
+ *
+ *   improving   value moved closer to its longevity target
+ *   declining   value moved further from its target
+ *   stable      change smaller than the noise tolerance
+ *   null        no thresholds defined and no usable noise floor
+ *
+ * Noise tolerance defaults to 5% of the larger of |current|, |previous|,
+ * which keeps small day-to-day measurement jitter from flipping the trend
+ * label every save.
+ */
+export function computeTrend(
+  current: number,
+  previous: number,
+  th: BiomarkerThresholds,
+  noiseTolerancePct = 0.05,
+): BiomarkerTrend {
+  const target = getTargetCenter(th);
+  const noise =
+    Math.max(Math.abs(previous), Math.abs(current)) * noiseTolerancePct;
+
+  if (target === null) {
+    // No directionality. Report stable when within noise, else null.
+    if (Math.abs(current - previous) <= noise) return "stable";
+    return null;
+  }
+
+  const dPrev = Math.abs(previous - target);
+  const dCurr = Math.abs(current - target);
+  if (Math.abs(dCurr - dPrev) <= noise) return "stable";
+  if (dCurr < dPrev) return "improving";
+  return "declining";
 }
 
 export const BIOMARKER_KEYS: string[] = BIOMARKER_SPECS.map((s) => s.key);

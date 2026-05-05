@@ -7,34 +7,17 @@ import { logAudit } from "@/lib/audit";
 import {
   BIOMARKER_SPECS,
   computeStatus,
+  computeTrend,
   getThresholds,
   type BiomarkerCategory,
   type BiomarkerSpec,
   type BiomarkerStatus,
+  type BiomarkerTrend,
   type Sex,
 } from "@/lib/biomarker-ranges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/**
- * Sovereign Prompt Shield decryption endpoint.
- *
- * GET or POST /api/shield/decrypt
- *
- * Returns the patient's latest decrypted vital + full longevity biomarker
- * panel, server-side. The decryption key never leaves the server.
- *
- * Auth (one of):
- *   1. Family Bearer JWT (Supabase access_token).
- *   2. Cookie session (sov_auth) for patient self-access / clinician view.
- *
- * Response keeps the legacy flat fields (bp_systolic, a1c, ldl, etc.) for
- * back-compat with care-os clients that have not yet adopted the new
- * `biomarkers` shape. The new `biomarkers` object groups every spec from
- * BIOMARKER_SPECS by category and embeds resolved thresholds + computed
- * status.
- */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -61,7 +44,6 @@ interface BiomarkerEntryStored {
 }
 
 interface ManualLabs {
-  // Legacy flat shape, still written by the existing onboard form.
   a1c?: number;
   ldl?: number;
   hdl?: number;
@@ -77,7 +59,6 @@ interface ManualLabs {
 }
 
 interface BiomarkerBlob {
-  // New per-biomarker structured shape, keyed by spec.key.
   [key: string]: BiomarkerEntryStored | undefined;
 }
 
@@ -197,6 +178,62 @@ async function resolveAuth(req: NextRequest): Promise<AuthResult> {
 }
 
 // ---------------------------------------------------------------------------
+// Trend lookup: fetch last few biomarker_log entries per key for this
+// patient, decrypt the value, and compute the trend label.
+// ---------------------------------------------------------------------------
+
+type TrendMap = Record<string, BiomarkerTrend>;
+
+async function loadTrends(patientId: string, sex: Sex): Promise<TrendMap> {
+  const sb = getServiceClient();
+  // 50 biomarkers * 2 most recent entries = 100; keep a small buffer
+  // for back-dated edits (we sort by date_collected desc not insert order).
+  const { data, error } = await sb
+    .from("biomarker_log")
+    .select("biomarker_key, value_encrypted, date_collected")
+    .eq("patient_id", patientId)
+    .order("date_collected", { ascending: false })
+    .limit(300);
+
+  const out: TrendMap = {};
+  if (error || !data) return out;
+
+  // Group by biomarker_key, keeping only the latest 2 per key.
+  const byKey: Record<string, Array<{ value: number; date: string }>> = {};
+  for (const row of data as Array<{
+    biomarker_key: string;
+    value_encrypted: string;
+    date_collected: string;
+  }>) {
+    const list = byKey[row.biomarker_key] ?? (byKey[row.biomarker_key] = []);
+    if (list.length >= 2) continue;
+    try {
+      const dec = decryptJson<{ value: number }>(
+        row.value_encrypted,
+        `biomarker_log:${patientId}:${row.biomarker_key}`,
+      );
+      if (typeof dec.value === "number" && Number.isFinite(dec.value)) {
+        list.push({ value: dec.value, date: row.date_collected });
+      }
+    } catch {
+      // skip; encrypted payload unreadable
+    }
+  }
+
+  for (const spec of BIOMARKER_SPECS) {
+    const history = byKey[spec.key];
+    if (!history || history.length < 2) {
+      out[spec.key] = null;
+      continue;
+    }
+    const th = getThresholds(spec, sex);
+    out[spec.key] = computeTrend(history[0].value, history[1].value, th);
+  }
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Biomarker resolution.
 // ---------------------------------------------------------------------------
 
@@ -213,7 +250,7 @@ interface BiomarkerResponse {
   bar_min: number;
   bar_max: number;
   status: BiomarkerStatus;
-  trend: "improving" | "stable" | "declining" | null;
+  trend: BiomarkerTrend;
 }
 
 type CategoryGroup = Record<string, BiomarkerResponse>;
@@ -236,7 +273,6 @@ function resolveSourceValue(
   blob: HistoryPlaintext,
   latestWearable: DailyMetric | null,
 ): { value: number | null; date_collected: string | null; source: Source | null } {
-  // 1. Wearable-sourced biomarkers come from the latest wearable_data row.
   if (spec.wearable_field && latestWearable) {
     const v = latestWearable[spec.wearable_field];
     if (typeof v === "number") {
@@ -248,7 +284,6 @@ function resolveSourceValue(
     }
   }
 
-  // 2. New structured biomarkers blob keyed by spec.key.
   const entry = blob.biomarkers?.[spec.key];
   if (entry && typeof entry.value === "number") {
     return {
@@ -258,7 +293,6 @@ function resolveSourceValue(
     };
   }
 
-  // 3. Legacy flat ManualLabs (camelCase) fallback.
   if (spec.legacy_keys && blob.manualLabs) {
     const labs = blob.manualLabs as Record<string, unknown>;
     for (const lk of spec.legacy_keys) {
@@ -276,6 +310,7 @@ function buildBiomarkerPanel(
   blob: HistoryPlaintext,
   latestWearable: DailyMetric | null,
   sex: Sex,
+  trends: TrendMap,
 ): BiomarkerPanel {
   const panel = emptyPanel();
   for (const spec of BIOMARKER_SPECS) {
@@ -295,8 +330,7 @@ function buildBiomarkerPanel(
       bar_min: spec.bar_min,
       bar_max: spec.bar_max,
       status,
-      // Trend requires a time series (planned phase 2). Always null today.
-      trend: null,
+      trend: trends[spec.key] ?? null,
     };
     panel[spec.category][spec.key] = entry;
   }
@@ -331,10 +365,6 @@ function summarizePanel(panel: BiomarkerPanel): {
   return { panel_grade: grade, panel_flagged: flagged, panel_in_range: inRange };
 }
 
-// ---------------------------------------------------------------------------
-// Decrypt orchestration.
-// ---------------------------------------------------------------------------
-
 interface DecryptedPayload {
   bp_systolic: number | null;
   bp_diastolic: number | null;
@@ -366,7 +396,6 @@ interface DecryptedPayload {
 async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
   const sb = getServiceClient();
 
-  // Profile (for sex).
   const { data: pat } = await sb
     .from("patients")
     .select("profile_encrypted")
@@ -382,7 +411,6 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     }
   }
 
-  // Health history (manual labs + structured biomarkers).
   const { data: hh } = await sb
     .from("health_history")
     .select("data_encrypted, updated_at")
@@ -396,13 +424,11 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     try {
       blob = decryptJson<HistoryPlaintext>(hh.data_encrypted, `history:${patientId}`);
     } catch {
-      // Decryption failed (key rotation, corruption). Treat as empty.
       blob = {};
     }
   }
   const labs: ManualLabs = blob.manualLabs ?? {};
 
-  // Wearable (latest).
   const { data: wd } = await sb
     .from("wearable_data")
     .select("data_encrypted, uploaded_at")
@@ -431,16 +457,19 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
         : wearableUpdatedAt
       : historyUpdatedAt || wearableUpdatedAt || null;
 
-  // Build biomarker panel and summary.
-  const biomarkers = buildBiomarkerPanel(blob, latestMetric, sex);
+  // Trends: best-effort, never throw.
+  let trends: TrendMap = {};
+  try {
+    trends = await loadTrends(patientId, sex);
+  } catch {
+    trends = {};
+  }
+
+  const biomarkers = buildBiomarkerPanel(blob, latestMetric, sex, trends);
   const { panel_grade, panel_flagged, panel_in_range } = summarizePanel(biomarkers);
 
-  // Risk score still derived from the original simple model. Phase 2 can
-  // expand it across the full panel.
   const riskScore = calculateRiskScore(labs, latestMetric);
 
-  // Resolve legacy flat fields. We prefer the structured biomarker if it
-  // has a value (so the legacy fields stay consistent with the panel).
   const flat = (k: string): number | null => {
     for (const cat of Object.keys(biomarkers) as BiomarkerCategory[]) {
       const entry = biomarkers[cat][k];
@@ -449,7 +478,6 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     return null;
   };
 
-  // BP is not in BIOMARKER_SPECS (vitals, not a biomarker); keep direct.
   const bpStatusValue = bpStatus(labs.bpSystolic ?? null, labs.bpDiastolic ?? null);
   void bpStatusValue;
 
@@ -492,7 +520,6 @@ function fieldsAccessed(panel: BiomarkerPanel): string {
   }
   fields.push("risk");
   fields.push("grade");
-  // Truncate to 256 chars (audit metadata cap is 256).
   const joined = fields.join(",");
   return joined.length > 256 ? joined.slice(0, 256) : joined;
 }
