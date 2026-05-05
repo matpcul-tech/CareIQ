@@ -22,8 +22,10 @@ export default function LabFilesCard({ files }: { files: LabFile[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>("");
   const [uploaded, setUploaded] = useState<LabFile[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Record<string, true>>({});
+  const [deletingId, setDeletingId] = useState<string>("");
 
-  const all = [...uploaded, ...files];
+  const all = [...uploaded, ...files].filter((f) => !deletedIds[f.id]);
 
   function openPicker() {
     setError("");
@@ -47,16 +49,22 @@ export default function LabFilesCard({ files }: { files: LabFile[] }) {
         body: fd,
         credentials: "same-origin",
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        id?: string;
+        file_type?: string;
+        uploaded_at?: string;
+        error?: string;
+      };
       if (!res.ok || !data?.ok) {
         setError(typeof data?.error === "string" ? data.error : "Upload failed.");
         return;
       }
       setUploaded((prev) => [
         {
-          id: `local-${Date.now()}`,
-          file_type: inferType(file.name, file.type),
-          uploaded_at: new Date().toISOString(),
+          id: data.id || `local-${Date.now()}`,
+          file_type: data.file_type || inferType(file.name, file.type),
+          uploaded_at: data.uploaded_at || new Date().toISOString(),
         },
         ...prev,
       ]);
@@ -64,6 +72,41 @@ export default function LabFilesCard({ files }: { files: LabFile[] }) {
       setError("Network error. Please try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onDelete(id: string) {
+    if (deletingId) return;
+    if (id.startsWith("local-")) {
+      // No server record yet (defensive; shouldn't happen with the new
+      // upload response shape). Just hide locally.
+      setDeletedIds((prev) => ({ ...prev, [id]: true }));
+      return;
+    }
+    if (!window.confirm("Delete this lab file? This cannot be undone.")) return;
+    setDeletingId(id);
+    setError("");
+    try {
+      const res = await fetch("/api/lab-files/delete", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": getCsrfToken(),
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ file_id: id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !data?.ok) {
+        setError(typeof data?.error === "string" ? data.error : "Delete failed.");
+        return;
+      }
+      setDeletedIds((prev) => ({ ...prev, [id]: true }));
+      setUploaded((prev) => prev.filter((f) => f.id !== id));
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setDeletingId("");
     }
   }
 
@@ -97,13 +140,22 @@ export default function LabFilesCard({ files }: { files: LabFile[] }) {
           {all.map((f) => (
             <li
               key={f.id}
-              className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-lg bg-slate-100 px-3 py-2 text-xs"
+              className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 rounded-lg bg-slate-100 px-3 py-2 text-xs"
             >
               <code className="font-mono text-ink">{shortId(f.id)}</code>
               <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold text-ink">
                 {f.file_type.toUpperCase()}
               </span>
               <span className="text-ink-mute">{formatDate(f.uploaded_at)}</span>
+              <button
+                type="button"
+                onClick={() => onDelete(f.id)}
+                disabled={deletingId === f.id}
+                aria-label={`Delete ${f.file_type} file`}
+                className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                {deletingId === f.id ? "..." : "Delete"}
+              </button>
             </li>
           ))}
         </ul>

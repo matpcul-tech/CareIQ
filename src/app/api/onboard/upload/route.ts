@@ -86,12 +86,6 @@ async function handleLab(
   const start = Date.now();
   const stripped = stripMetadata(bytes, type);
 
-  // -------------------------------------------------------------------
-  // Best-effort: parse PDF lab reports for biomarker auto-fill. The
-  // parser library + unpdf are loaded via dynamic import so a module
-  // load failure cannot 500 the upload route. Parse errors are logged
-  // to console + audit metadata; the upload still succeeds.
-  // -------------------------------------------------------------------
   let parsedBiomarkers: Record<string, number> | null = null;
   let parseStats: { text_chars: number; matched: number; reason?: string } | null = null;
   if (type === "pdf") {
@@ -104,6 +98,12 @@ async function handleLab(
         ...(r.reason ? { reason: r.reason } : {}),
       };
       if (r.ok) parsedBiomarkers = r.biomarkers;
+      // eslint-disable-next-line no-console
+      console.log(
+        `[upload] PDF parse done: text_chars=${r.text_chars} matched=${parseStats.matched}` +
+          (r.reason ? ` reason=${r.reason}` : "") +
+          (parsedBiomarkers ? ` keys=${Object.keys(parsedBiomarkers).join(",")}` : ""),
+      );
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[upload] PDF parse module failed:", (err as Error)?.message || "unknown");
@@ -138,14 +138,20 @@ async function handleLab(
     return NextResponse.json({ error: "upload failed" }, { status: 500 });
   }
 
-  const { error: insErr } = await sb.from("lab_files").insert({
-    patient_id: patientId,
-    file_ref: fileRef,
-    file_type: type,
-  });
-  if (insErr) {
+  // Insert + return the row so the client gets the real id and can
+  // delete this exact file without a page refresh.
+  const { data: inserted, error: insErr } = await sb
+    .from("lab_files")
+    .insert({
+      patient_id: patientId,
+      file_ref: fileRef,
+      file_type: type,
+    })
+    .select("id, file_type, uploaded_at")
+    .single();
+  if (insErr || !inserted) {
     // eslint-disable-next-line no-console
-    console.error("[upload] lab_files insert failed:", insErr.code || insErr.message);
+    console.error("[upload] lab_files insert failed:", insErr?.code || insErr?.message || "unknown");
     await sb.storage.from(STORAGE_BUCKET).remove([fileRef]);
     await logAudit({
       sessionId,
@@ -175,12 +181,22 @@ async function handleLab(
     },
   });
 
-  return NextResponse.json({
+  const responsePayload: Record<string, unknown> = {
     ok: true,
-    ...(parsedBiomarkers && Object.keys(parsedBiomarkers).length > 0
-      ? { parsed_biomarkers: parsedBiomarkers, parsed_count: Object.keys(parsedBiomarkers).length }
-      : {}),
-  });
+    id: (inserted as { id: string }).id,
+    file_type: (inserted as { file_type: string }).file_type,
+    uploaded_at: (inserted as { uploaded_at: string }).uploaded_at,
+  };
+  if (parsedBiomarkers && Object.keys(parsedBiomarkers).length > 0) {
+    responsePayload.parsed_biomarkers = parsedBiomarkers;
+    responsePayload.parsed_count = Object.keys(parsedBiomarkers).length;
+  }
+  // eslint-disable-next-line no-console
+  console.log(
+    `[upload] lab response: id=${responsePayload.id} parsed_count=${responsePayload.parsed_count ?? 0}`,
+  );
+
+  return NextResponse.json(responsePayload);
 }
 
 async function handleWearable(

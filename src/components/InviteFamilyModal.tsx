@@ -6,9 +6,7 @@ import { useState } from "react";
  * Minimal Care Circle invite modal.
  *
  * One email input, one Send button. POSTs recipient_email to
- * /api/circle/generate-invite. Status shows inline. We will add the
- * other fields (name, relationship, alert level, personal note) back
- * once this baseline is confirmed working in production.
+ * /api/circle/generate-invite. Status shows inline.
  */
 
 interface InviteFamilyModalProps {
@@ -88,9 +86,6 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard blocked (insecure context, permission denied, etc.).
-      // Fall back to selecting the visible primary link button so the
-      // user can copy manually.
       const el = document.getElementById("ciq-invite-open-link");
       if (el && typeof window !== "undefined" && window.getSelection) {
         const range = document.createRange();
@@ -112,20 +107,7 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
           reset();
           setOpen(true);
         }}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "7px 14px",
-          borderRadius: 10,
-          border: "1px solid rgba(0,212,184,0.4)",
-          background: "rgba(0,212,184,0.1)",
-          color: "#00d4b8",
-          fontFamily: "'Outfit', system-ui, sans-serif",
-          fontSize: 11,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
+        className="btn-primary inline-flex items-center justify-center gap-2 self-start text-sm sm:self-auto"
       >
         + Invite Family Member
       </button>

@@ -17,6 +17,7 @@ export type AuditAction =
   | "patient.history.updated"
   | "patient.lab_file.uploaded"
   | "patient.lab_file.read"
+  | "patient.lab_file.deleted"
   | "patient.wearable.uploaded"
   | "patient.wearable.read"
   | "shield.invoked"
@@ -47,18 +48,6 @@ export interface AuditEntry {
   metadata?: Record<string, string | number | boolean | null>;
 }
 
-/**
- * Append-only audit log. PHI MUST NEVER be passed in. Metadata is for
- * non-identifying technical context only (counts, durations, flags).
- *
- * The session_id stored is the SHA-256 of the rotating cookie session id
- * so that even with read access to audit_log, sessions cannot be replayed.
- *
- * For HIPAA-tier reads (e.g. shield.decrypt) we also accept SHA-256 hashes
- * of the requester user-id and patient-id as metadata. These let an
- * investigator confirm a known requester or patient by hashing the
- * suspected identifier; the audit row itself never holds plaintext IDs.
- */
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
     const sb = getServiceClient();
@@ -72,12 +61,10 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
       metadata,
     });
     if (error) {
-      // Never include PHI in error stream. Log only the audit failure code.
       // eslint-disable-next-line no-console
       console.error("[audit] write failed", error.code || "unknown");
     }
   } catch (err) {
-    // Never throw from audit. Logging failure must not break the request.
     // eslint-disable-next-line no-console
     console.error("[audit] exception", (err as Error)?.name || "unknown");
   }
@@ -97,8 +84,6 @@ const ALLOWED_META_KEYS = new Set<string>([
   "shield_version",
   "invite_id",
   "expires_in_days",
-  // Sovereign Prompt Shield decrypt audit metadata. SHA-256 hex hashes
-  // of identifiers (never plaintext); short comma-joined list of fields.
   "requester_hash",
   "patient_hash",
   "fields_accessed",
