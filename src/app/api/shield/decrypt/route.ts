@@ -23,6 +23,24 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const SHIELD_VERSION = "v5";
 
+// Pilot demo: when no wearable_data row exists for the patient, surface
+// plausible fake metrics so the dashboard isn't empty mid-demo. Gated
+// behind SHIELD_DEMO_WEARABLE env var to keep production clean.
+// Set SHIELD_DEMO_WEARABLE=true on the CareIQ Vercel project to enable;
+// any other value (including unset) leaves wearable fields null when
+// no real data is on file.
+const DEMO_WEARABLE_ENABLED = process.env.SHIELD_DEMO_WEARABLE === "true";
+const DEMO_WEARABLE: DailyMetric = {
+  date: new Date().toISOString().slice(0, 10),
+  heartRate: 62,
+  steps: 8540,
+  sleepHours: 7.4,
+  spo2: 97,
+  calories: 2090,
+  hrv: 58,
+  activeCalories: 540,
+};
+
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -177,17 +195,10 @@ async function resolveAuth(req: NextRequest): Promise<AuthResult> {
   return { kind: "deny", status: 401, message: "authentication required" };
 }
 
-// ---------------------------------------------------------------------------
-// Trend lookup: fetch last few biomarker_log entries per key for this
-// patient, decrypt the value, and compute the trend label.
-// ---------------------------------------------------------------------------
-
 type TrendMap = Record<string, BiomarkerTrend>;
 
 async function loadTrends(patientId: string, sex: Sex): Promise<TrendMap> {
   const sb = getServiceClient();
-  // 50 biomarkers * 2 most recent entries = 100; keep a small buffer
-  // for back-dated edits (we sort by date_collected desc not insert order).
   const { data, error } = await sb
     .from("biomarker_log")
     .select("biomarker_key, value_encrypted, date_collected")
@@ -198,7 +209,6 @@ async function loadTrends(patientId: string, sex: Sex): Promise<TrendMap> {
   const out: TrendMap = {};
   if (error || !data) return out;
 
-  // Group by biomarker_key, keeping only the latest 2 per key.
   const byKey: Record<string, Array<{ value: number; date: string }>> = {};
   for (const row of data as Array<{
     biomarker_key: string;
@@ -216,7 +226,7 @@ async function loadTrends(patientId: string, sex: Sex): Promise<TrendMap> {
         list.push({ value: dec.value, date: row.date_collected });
       }
     } catch {
-      // skip; encrypted payload unreadable
+      // skip
     }
   }
 
@@ -232,10 +242,6 @@ async function loadTrends(patientId: string, sex: Sex): Promise<TrendMap> {
 
   return out;
 }
-
-// ---------------------------------------------------------------------------
-// Biomarker resolution.
-// ---------------------------------------------------------------------------
 
 interface BiomarkerResponse {
   value: number | null;
@@ -391,6 +397,7 @@ interface DecryptedPayload {
   updated_at: string | null;
   biomarkers: BiomarkerPanel;
   sex: Sex;
+  wearable_is_demo: boolean;
 }
 
 async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
@@ -450,6 +457,17 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     }
   }
 
+  // Demo fallback: when no real wearable_data row exists for the patient
+  // and SHIELD_DEMO_WEARABLE=true is set on the server, surface plausible
+  // demo metrics so the dashboard isn't empty during pilot demos.
+  // wearable_is_demo is propagated to the response so clients can label
+  // these tiles distinctly if desired.
+  let wearableIsDemo = false;
+  if (!latestMetric && DEMO_WEARABLE_ENABLED) {
+    latestMetric = DEMO_WEARABLE;
+    wearableIsDemo = true;
+  }
+
   const updatedAt =
     historyUpdatedAt && wearableUpdatedAt
       ? historyUpdatedAt > wearableUpdatedAt
@@ -457,7 +475,6 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
         : wearableUpdatedAt
       : historyUpdatedAt || wearableUpdatedAt || null;
 
-  // Trends: best-effort, never throw.
   let trends: TrendMap = {};
   try {
     trends = await loadTrends(patientId, sex);
@@ -507,6 +524,7 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     updated_at: updatedAt,
     biomarkers,
     sex,
+    wearable_is_demo: wearableIsDemo,
   };
 }
 
