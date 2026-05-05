@@ -11,6 +11,7 @@ import {
 } from "@/lib/validate";
 import { encryptBuffer, encryptJson } from "@/lib/crypto";
 import { parseWearable } from "@/lib/parse-wearable";
+import { parsePdfBiomarkers } from "@/lib/lab-pdf-parser";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
@@ -85,6 +86,34 @@ async function handleLab(
 ) {
   const start = Date.now();
   const stripped = stripMetadata(bytes, type);
+
+  // -------------------------------------------------------------------
+  // Best-effort: parse PDF lab reports for biomarker auto-fill. The
+  // parsed values are returned to the client so the step-4 accordion
+  // can pre-populate. They are NOT persisted server-side here; the
+  // patient will review and submit via /api/onboard/manual-labs as
+  // usual. Failure is silent: upload still succeeds.
+  // -------------------------------------------------------------------
+  let parsedBiomarkers: Record<string, number> | null = null;
+  let parseStats: { text_chars: number; matched: number; reason?: string } | null = null;
+  if (type === "pdf") {
+    try {
+      const r = await parsePdfBiomarkers(stripped);
+      parseStats = {
+        text_chars: r.text_chars,
+        matched: Object.keys(r.biomarkers).length,
+        ...(r.reason ? { reason: r.reason } : {}),
+      };
+      if (r.ok) parsedBiomarkers = r.biomarkers;
+    } catch (err) {
+      parseStats = {
+        text_chars: 0,
+        matched: 0,
+        reason: (err as Error).message?.slice(0, 64) || "parse_threw",
+      };
+    }
+  }
+
   const encrypted = encryptBuffer(Buffer.from(stripped), `lab:${patientId}`);
   const fileRef = `patients/${patientId}/${randomUUID()}.bin`;
 
@@ -112,7 +141,6 @@ async function handleLab(
     file_type: type,
   });
   if (insErr) {
-    // Best effort cleanup of the storage object
     await sb.storage.from(STORAGE_BUCKET).remove([fileRef]);
     await logAudit({
       sessionId,
@@ -133,9 +161,21 @@ async function handleLab(
       file_type: type,
       byte_count: stripped.length,
       duration_ms: Date.now() - start,
+      ...(parseStats
+        ? {
+            metric_count: parseStats.matched,
+            ...(parseStats.reason ? { reason_code: parseStats.reason } : {}),
+          }
+        : {}),
     },
   });
-  return NextResponse.json({ ok: true });
+
+  return NextResponse.json({
+    ok: true,
+    ...(parsedBiomarkers && Object.keys(parsedBiomarkers).length > 0
+      ? { parsed_biomarkers: parsedBiomarkers, parsed_count: Object.keys(parsedBiomarkers).length }
+      : {}),
+  });
 }
 
 async function handleWearable(
@@ -159,9 +199,6 @@ async function handleWearable(
     return NextResponse.json({ error: "could not parse wearable file" }, { status: 400 });
   }
 
-  // Discard raw bytes. Only encrypted parsed metrics persist.
-  // Local variable is allowed to be GC'd; explicitly null reference.
-  // (No third-party transmission of raw file ever occurs.)
   const encrypted = encryptJson(
     {
       device: parsed.deviceType,
