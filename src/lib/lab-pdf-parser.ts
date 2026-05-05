@@ -7,29 +7,15 @@ import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
  * Universal lab PDF parser.
  *
  * Two-stage extraction:
- *   1. unpdf text extraction + line-by-line synonym matching. Free,
- *      fast, deterministic. Covers any vendor that printed-to-PDF with
- *      a real text layer (Quest, LabCorp, Boston Heart, etc.).
- *   2. Claude vision fallback (claude-sonnet-4). Triggered when stage
- *      1 yields fewer than 100 chars of extracted text OR matches
- *      zero biomarkers. Sends the PDF directly to Claude; Claude OCRs
- *      the contents and returns a flat JSON object of biomarker_key ->
- *      numeric value. Keys are passed through to parsed_biomarkers as
- *      returned (the prompt enumerates the canonical keys we care
- *      about; any extra keys Claude returns are still surfaced for
- *      future schema extensions).
+ *   1. unpdf text extraction + line-by-line synonym matching.
+ *   2. Claude vision fallback (claude-sonnet-4) when stage 1 yields
+ *      < 100 chars or matches zero biomarkers.
  *
- * Both stages produce ExtractedBiomarker[] with a confidence label
- * (vision results default to "medium" since the prompt doesn't elicit
- * a self-reported confidence).
- *
- * Output (back-compat with /api/onboard/upload):
- *   biomarkers       Record<key, number>
- *   confidence       Record<key, "high"|"medium"|"low">
- *   details          ExtractedBiomarker[]
- *   text_chars       number
- *   extraction_mode  "text" | "vision" | "none"
- *   reason?          string
+ * unpdf transfers the underlying ArrayBuffer to a pdfjs-dist worker,
+ * leaving the caller's Uint8Array detached / zero-length. To survive
+ * that for the vision fallback we keep a fresh defensive copy of the
+ * input bytes BEFORE running unpdf, and pass that copy to the vision
+ * call. The vision side also defends with an explicit length guard.
  */
 
 export type Confidence = "high" | "medium" | "low";
@@ -411,10 +397,6 @@ const VISION_MODEL = "claude-sonnet-4-20250514";
 const VISION_PROMPT =
   "Extract all lab results from this document. Return ONLY a JSON object with biomarker names as keys and numeric values as values. Use these exact key names where applicable: cortisol_am, dhea_s, testosterone_total, testosterone_free, estradiol, estrone, estriol, ldl, hdl, total_cholesterol, triglycerides, a1c, fasting_glucose, tsh, vitamin_d, cortisol, creatinine, egfr, wbc, rbc, hemoglobin, ferritin, vitamin_b12, hs_crp, homocysteine, apob, lpa, fasting_insulin, igf1, omega3_index. Skip values marked Below Detection Limit or Unable to Calculate. Return only the JSON, no other text.";
 
-/**
- * Extracts the first balanced { ... } object from a string. Tolerates
- * Claude wrapping the JSON in prose, code fences, etc.
- */
 function extractFirstJsonObject(text: string): string | null {
   const start = text.indexOf("{");
   if (start === -1) return null;
@@ -446,6 +428,11 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
     console.warn("[lab-pdf-parser] vision fallback skipped: ANTHROPIC_API_KEY not configured");
     return [];
   }
+  if (!bytes || bytes.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn("[lab-pdf-parser] vision fallback skipped: pdf bytes empty (likely detached by unpdf worker transfer)");
+    return [];
+  }
   if (bytes.length > 30 * 1024 * 1024) {
     // eslint-disable-next-line no-console
     console.warn(`[lab-pdf-parser] vision fallback skipped: pdf too large (${bytes.length} bytes)`);
@@ -456,6 +443,13 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
   try {
     const client = new Anthropic({ apiKey });
     const base64 = Buffer.from(bytes).toString("base64");
+    if (!base64) {
+      // eslint-disable-next-line no-console
+      console.warn("[lab-pdf-parser] vision fallback skipped: base64 empty after encode");
+      return [];
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[lab-pdf-parser] vision: sending ${bytes.length} bytes (base64=${base64.length} chars) to ${VISION_MODEL}`);
     const message = await client.messages.create({
       model: VISION_MODEL,
       max_tokens: 4096,
@@ -542,6 +536,13 @@ export interface ParsePdfResult {
 const MIN_TEXT_CHARS_FOR_REGEX = 100;
 
 export async function parsePdfBiomarkers(bytes: Uint8Array): Promise<ParsePdfResult> {
+  // Defensive copy. unpdf transfers the underlying ArrayBuffer to a
+  // pdfjs-dist worker, leaving the caller's Uint8Array detached. This
+  // copy survives that transfer so the vision fallback below still has
+  // the original PDF bytes to send to Claude.
+  const visionBytes = new Uint8Array(bytes.byteLength);
+  visionBytes.set(bytes);
+
   const text = await extractTextFromPdf(bytes);
   let details: ExtractedBiomarker[] = [];
   let mode: ExtractionMode = "none";
@@ -554,9 +555,9 @@ export async function parsePdfBiomarkers(bytes: Uint8Array): Promise<ParsePdfRes
   if (details.length === 0) {
     // eslint-disable-next-line no-console
     console.log(
-      `[lab-pdf-parser] text stage matched 0; falling back to vision (text_chars=${text.length})`,
+      `[lab-pdf-parser] text stage matched 0; falling back to vision (text_chars=${text.length}, vision_bytes=${visionBytes.length})`,
     );
-    const visionDetails = await claudeExtractBiomarkers(bytes);
+    const visionDetails = await claudeExtractBiomarkers(visionBytes);
     if (visionDetails.length > 0) {
       details = visionDetails;
       mode = "vision";
