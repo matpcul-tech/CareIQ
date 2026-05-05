@@ -405,7 +405,7 @@ function Step1Email() {
         </div>
       </details>
 
-      {error && <div class="alert-error">{error}</div>}
+      {error && <div className="alert-error">{error}</div>}
     </div>
   );
 }
