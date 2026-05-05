@@ -78,9 +78,17 @@ export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
     const mod = await import("unpdf");
     const pdf = await mod.getDocumentProxy(bytes);
     const result = await mod.extractText(pdf, { mergePages: true });
+    // unpdf with mergePages:true is typed as { text: string }, but cast
+    // through unknown so we can defensively handle the string[] shape
+    // (older unpdf versions / non-merged calls) without TypeScript
+    // narrowing the array branch to never.
+    const t = result.text as unknown;
     let text = "";
-    if (typeof result.text === "string") text = result.text;
-    else if (Array.isArray(result.text)) text = result.text.join("\n");
+    if (typeof t === "string") {
+      text = t;
+    } else if (Array.isArray(t)) {
+      text = (t as string[]).join("\n");
+    }
     // eslint-disable-next-line no-console
     console.log(`[lab-pdf-parser] unpdf extracted ${text.length} chars`);
     return text;
