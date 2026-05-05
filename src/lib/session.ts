@@ -8,6 +8,15 @@ const SESSION_COOKIE = "sov_session";
 const AUTH_COOKIE = "sov_auth";
 const SESSION_TS_COOKIE = "sov_session_ts";
 
+// 7-day patient auth window. Was 24h, but pilot demos that ran across a
+// week kept hitting the maxAge expiry and getting bounced to /onboard.
+// 7 days lines up with how often a patient is realistically expected to
+// re-authenticate during a demo cycle. The middleware's rotating session
+// cookie still rotates per request and has its own 24h idle window;
+// sov_auth carries the actual signed-in identity and is the cookie that
+// determines whether the user stays logged in.
+const AUTH_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 7;
+
 export interface ServerSession {
   sessionId: string; // raw rotating session id from middleware
   sessionHash: string; // sha256 of session id (used in audit log)
@@ -72,7 +81,7 @@ export function writeAuthCookie(patientId: string, email: string): {
       secure: true,
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24, // 24h hard cap; idle timeout still 30m via session cookie
+      maxAge: AUTH_COOKIE_MAX_AGE_SEC,
     },
   };
 }
