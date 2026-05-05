@@ -6,7 +6,7 @@ import { decryptJson } from "@/lib/crypto";
 import { logAudit } from "@/lib/audit";
 import HealthChart from "./HealthChart";
 import InsightButton from "./InsightButton";
-import InviteFamilyButton from "./InviteFamilyButton";
+import InviteFamilyModal from "@/components/InviteFamilyModal";
 import LabFilesCard from "./LabFilesCard";
 
 export const dynamic = "force-dynamic";
@@ -145,7 +145,7 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <InviteFamilyButton />
+          <InviteFamilyModal patientName={profile?.firstName} />
           <Link
             href="/clinical"
             className="btn-primary inline-flex items-center justify-center gap-2 self-start text-sm sm:self-auto"
