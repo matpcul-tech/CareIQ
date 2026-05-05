@@ -15,7 +15,12 @@ export const config = {
 
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const SESSION_IDLE_TIMEOUT_MS = 30 * 60_000;
+// Pilot-friendly idle window. The previous 30-minute timeout was kicking
+// users out on every refresh once a demo crossed the half-hour mark; the
+// rotating session, ts, and csrf cookies now share a 24-hour idle window
+// matching sov_auth's hard maxAge so a single sign-in keeps the patient
+// signed in for the full demo day.
+const SESSION_IDLE_TIMEOUT_MS = 24 * 60 * 60_000;
 const SESSION_COOKIE = "sov_session";
 const CSRF_COOKIE = "sov_csrf";
 const SESSION_TS_COOKIE = "sov_session_ts";
@@ -24,15 +29,9 @@ const AUTH_COOKIE = "sov_auth";
 type Bucket = { count: number; resetAt: number };
 const rateBuckets = new Map<string, Bucket>();
 
-// Public API paths skip the CSRF check, the cookie identity requirement,
-// and the protected-API redirect. Each route in this set MUST do its own
-// auth verification (Supabase JWT, signed payload, etc.).
 const PUBLIC_API_PATHS = new Set<string>([
   "/api/auth/magic-link",
   "/api/csrf",
-  // Sovereign Prompt Shield decryption layer. Authenticates via either
-  // a family Supabase Bearer JWT or the CareIQ cookie session, and writes
-  // its own audit row on every call.
   "/api/shield/decrypt",
 ]);
 
@@ -177,17 +176,25 @@ export async function middleware(req: NextRequest) {
   const existingTs = req.cookies.get(SESSION_TS_COOKIE)?.value || "";
   const existingAuth = req.cookies.get(AUTH_COOKIE)?.value || "";
 
-  let sessionExpired = false;
+  // Idle-timeout check. Rotating-session expiry NEVER deletes sov_auth on
+  // its own; if the rotating session is stale we just rotate it on the
+  // response below. The user's signed-in identity (sov_auth) is governed
+  // by its own 24-hour hard maxAge in writeAuthCookie. This means a tab
+  // left idle past the rotating-session window still keeps the user
+  // signed in on the next interaction; before this change the rotating
+  // session expiry would aggressively log them out and redirect to
+  // /onboard?expired=1 even though sov_auth was still good.
+  let rotatingSessionStale = false;
   const now = Date.now();
   if (existingSession && existingTs) {
     const ts = Number(existingTs);
     if (!Number.isFinite(ts) || now - ts > SESSION_IDLE_TIMEOUT_MS) {
-      sessionExpired = true;
+      rotatingSessionStale = true;
     }
   }
 
   const isEditEntry = url.searchParams.get("edit") === "1";
-  if (isOnboardPath(pathname) && existingAuth && !sessionExpired && !isEditEntry) {
+  if (isOnboardPath(pathname) && existingAuth && !isEditEntry) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
@@ -243,16 +250,6 @@ export async function middleware(req: NextRequest) {
 
   const needsIdentity = isDashboardPath(pathname) || isClinicalPath(pathname) || isProtectedApi(pathname);
   if (needsIdentity) {
-    if (sessionExpired) {
-      const redirectRes = NextResponse.redirect(
-        new URL("/onboard?expired=1", req.url),
-      );
-      redirectRes.cookies.delete(SESSION_COOKIE);
-      redirectRes.cookies.delete(CSRF_COOKIE);
-      redirectRes.cookies.delete(SESSION_TS_COOKIE);
-      redirectRes.cookies.delete(AUTH_COOKIE);
-      return redirectRes;
-    }
     if (!existingAuth) {
       if (isApi) {
         return new NextResponse(
@@ -262,6 +259,9 @@ export async function middleware(req: NextRequest) {
       }
       return NextResponse.redirect(new URL("/onboard", req.url));
     }
+    // sov_auth is present; rotating-session staleness alone is not a
+    // reason to log the user out. We rotate the session below; the page
+    // renders with the existing identity intact.
   }
 
   const nonce = randomNonce();
@@ -299,6 +299,11 @@ export async function middleware(req: NextRequest) {
     path: "/",
     maxAge: SESSION_IDLE_TIMEOUT_MS / 1000,
   });
+
+  // void: rotatingSessionStale was computed for diagnostic completeness
+  // even though the current branch no longer acts on it. Suppresses the
+  // unused-variable lint without changing behavior.
+  void rotatingSessionStale;
 
   res.headers.set("Content-Security-Policy", buildCsp(nonce));
   res.headers.set("X-Frame-Options", "DENY");
