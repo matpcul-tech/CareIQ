@@ -405,7 +405,7 @@ function Step1Email() {
         </div>
       </details>
 
-      {error && <div className="alert-error">{error}</div>}
+      {error && <div class="alert-error">{error}</div>}
     </div>
   );
 }
@@ -651,6 +651,7 @@ function Step4Upload({
 }) {
   const [labStatus, setLabStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [autoFillStatus, setAutoFillStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [unreadableStatus, setUnreadableStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [wearableStatus, setWearableStatus] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
@@ -699,6 +700,25 @@ function Step4Upload({
         const data = await res.json().catch(() => ({}));
         if (zone === "lab") {
           setLabStatus({ ok: true, message: "Lab file uploaded and encrypted." });
+          // data is the parsed JSON from /api/onboard/upload. Shape includes ok,
+          // id, file_type, uploaded_at, optional parsed_biomarkers, parsed_count,
+          // extraction_mode, text_chars (when available).
+          const parsedCount = typeof data.parsed_count === "number" ? data.parsed_count : 0;
+          const textChars = typeof data.text_chars === "number" ? data.text_chars : null;
+          const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+          if (
+            isPdf &&
+            parsedCount === 0 &&
+            (textChars === null || textChars < 100)
+          ) {
+            setUnreadableStatus({
+              ok: false,
+              message:
+                "We could not read values from this PDF automatically. It may be a scan or use non-standard encoding. To try again: open the PDF, tap Print, then Save as PDF, and re-upload. Or enter your values manually below.",
+            });
+          } else {
+            setUnreadableStatus(null);
+          }
           // Opportunistic auto-fill from parsed Quest/LabCorp PDF biomarkers.
           // The upload route may return parsed_biomarkers as a map of canonical
           // biomarker key to numeric value. We merge into bioValues without
@@ -887,6 +907,7 @@ function Step4Upload({
           accept=".pdf,.png,.jpg,.jpeg,.heic"
           disabled={busy === "lab"}
           className="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-sov-gold file:px-3 file:py-2 file:text-sm file:font-semibold file:text-sov-bg hover:file:bg-sov-goldDark"
+          onClick={() => setUnreadableStatus(null)}
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) upload("lab", f);
@@ -900,6 +921,11 @@ function Step4Upload({
         {autoFillStatus && (
           <div className={`mt-2 ${autoFillStatus.ok ? "alert-success" : "alert-error"}`}>
             {autoFillStatus.message}
+          </div>
+        )}
+        {unreadableStatus && (
+          <div className="alert-warn mt-2" role="status">
+            {unreadableStatus.message}
           </div>
         )}
       </div>
