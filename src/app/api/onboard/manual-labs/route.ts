@@ -1,36 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { createHmac } from "node:crypto";
 import { manualLabsSchema, type ManualLabsInput, type BiomarkerEntryInput } from "@/lib/validate";
 import { encryptJson, decryptJson } from "@/lib/crypto";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
-import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
+import {
+  BIOMARKER_KEYS,
+  gradeStepsDropped,
+  summarizeFromBlob,
+  type BiomarkerBlobRead,
+  type Sex,
+  type WearableLatest,
+} from "@/lib/biomarker-ranges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * POST /api/onboard/manual-labs
- *
- * Accepts patient-typed lab values from Step 4 of onboarding. Two shapes:
- *
- *   1. Legacy flat:  { a1c, ldl, hdl, fastingGlucose, bpSystolic,
- *                      bpDiastolic, triglycerides, egfr } -> manualLabs
- *   2. Structured:   { biomarkers: { fasting_glucose: {value,
- *                      date_collected, source}, ... } } -> biomarkers
- *
- * Phase 3 addition: every biomarker write also lands in biomarker_log
- * (append-only, encrypted-value, server-only) so the Shield decrypt
- * endpoint can compute trend (improving / stable / declining) per
- * biomarker by comparing the latest two entries.
- *
- * BP is vitals, not a biomarker spec, so it stays in manualLabs only and
- * is NOT logged to biomarker_log.
- */
-
-// Map legacy camelCase keys to their canonical biomarker_log key, where
-// applicable. bpSystolic / bpDiastolic intentionally not mapped.
 const LEGACY_TO_CANONICAL: Record<string, string> = {
   a1c: "a1c",
   ldl: "ldl",
@@ -42,6 +29,68 @@ const LEGACY_TO_CANONICAL: Record<string, string> = {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+interface ProfilePlaintext {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  communityAffiliation?: string;
+  sex?: Sex;
+}
+
+interface WearablePlaintext {
+  device: string;
+  metrics: WearableLatest[];
+}
+
+/**
+ * Best-effort: notify the care-os alert pipeline that the longevity panel
+ * grade just dropped. Never throws; failure logged and swallowed so the
+ * patient-facing save still returns success.
+ */
+async function notifyGradeDrop(args: {
+  patientId: string;
+  prevGrade: string;
+  newGrade: string;
+  flagged: number;
+  inRange: number;
+}): Promise<{ sent: boolean; reason?: string }> {
+  const url = process.env.CARE_OS_ALERTS_URL;
+  const secret = process.env.CAREIQ_ALERT_SIGNING_KEY;
+  if (!url) return { sent: false, reason: "CARE_OS_ALERTS_URL not configured" };
+  if (!secret) return { sent: false, reason: "CAREIQ_ALERT_SIGNING_KEY not configured" };
+
+  const body = JSON.stringify({
+    patient_id: args.patientId,
+    panel_grade_change: {
+      prev_grade: args.prevGrade,
+      new_grade: args.newGrade,
+      flagged: args.flagged,
+      in_range: args.inRange,
+    },
+  });
+  const ts = Math.floor(Date.now() / 1000).toString();
+  const sig = createHmac("sha256", secret).update(ts + ":" + body).digest("hex");
+
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Alert-Signature": sig,
+        "X-Alert-Timestamp": ts,
+      },
+      body,
+    });
+    if (!r.ok) {
+      const text = await r.text().catch(() => "");
+      return { sent: false, reason: `care-os ${r.status}: ${text.slice(0, 200)}` };
+    }
+    return { sent: true };
+  } catch (err) {
+    return { sent: false, reason: (err as Error).message };
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -107,6 +156,7 @@ export async function POST(req: NextRequest) {
   const sb = getServiceClient();
   const aad = `history:${session.patientId}`;
 
+  // ---- Read existing health_history blob ----
   const { data: existing, error: selErr } = await sb
     .from("health_history")
     .select("id, data_encrypted")
@@ -132,6 +182,9 @@ export async function POST(req: NextRequest) {
       merged = {};
     }
   }
+  const priorGrade =
+    typeof merged.last_panel_grade === "string" ? (merged.last_panel_grade as string) : null;
+
   const priorLegacy =
     typeof merged.manualLabs === "object" && merged.manualLabs !== null
       ? (merged.manualLabs as Record<string, number>)
@@ -151,6 +204,46 @@ export async function POST(req: NextRequest) {
   } else if (Object.keys(priorBiomarkers).length > 0) {
     merged.biomarkers = priorBiomarkers;
   }
+
+  // ---- Resolve sex from profile (best-effort) ----
+  let sex: Sex = "unknown";
+  const { data: pat } = await sb
+    .from("patients")
+    .select("profile_encrypted")
+    .eq("id", session.patientId)
+    .maybeSingle();
+  if (pat?.profile_encrypted) {
+    try {
+      const profile = decryptJson<ProfilePlaintext>(pat.profile_encrypted, `profile:${session.patientId}`);
+      if (profile.sex === "male" || profile.sex === "female") sex = profile.sex;
+    } catch {
+      // unreadable, treat as unknown
+    }
+  }
+
+  // ---- Resolve latest wearable metric (for grade computation) ----
+  let latestWearable: WearableLatest | null = null;
+  const { data: wd } = await sb
+    .from("wearable_data")
+    .select("data_encrypted")
+    .eq("patient_id", session.patientId)
+    .order("uploaded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (wd?.data_encrypted) {
+    try {
+      const parsed = decryptJson<WearablePlaintext>(wd.data_encrypted, `wearable:${session.patientId}`);
+      const metrics = parsed.metrics || [];
+      latestWearable = metrics[metrics.length - 1] || null;
+    } catch {
+      // unreadable, treat as no wearable
+    }
+  }
+
+  // ---- Compute new panel grade and persist it inside the encrypted blob ----
+  const blobForGrade = merged as BiomarkerBlobRead;
+  const summary = summarizeFromBlob(blobForGrade, sex, latestWearable);
+  merged.last_panel_grade = summary.panel_grade;
 
   const encrypted = encryptJson(merged, aad);
 
@@ -183,11 +276,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "could not save manual labs" }, { status: 500 });
   }
 
-  // -------------------------------------------------------------------
-  // Append every biomarker entry to biomarker_log so trends can be
-  // computed on the next Shield decrypt. Best-effort: never fail the
-  // save if the log write errors.
-  // -------------------------------------------------------------------
+  // ---- biomarker_log append (phase 3) ----
   type LogRow = {
     patient_id: string;
     biomarker_key: string;
@@ -196,7 +285,6 @@ export async function POST(req: NextRequest) {
     value_encrypted: string;
   };
   const logRows: LogRow[] = [];
-
   for (const [key, entry] of Object.entries(cleanedBiomarkers)) {
     if (typeof entry.value !== "number" || !Number.isFinite(entry.value)) continue;
     const date = entry.date_collected || todayIso();
@@ -213,7 +301,6 @@ export async function POST(req: NextRequest) {
       value_encrypted,
     });
   }
-
   for (const [legacyKey, val] of Object.entries(cleanedLegacy)) {
     const canonical = LEGACY_TO_CANONICAL[legacyKey];
     if (!canonical) continue;
@@ -229,7 +316,6 @@ export async function POST(req: NextRequest) {
       value_encrypted,
     });
   }
-
   if (logRows.length > 0) {
     const { error: logErr } = await sb.from("biomarker_log").insert(logRows);
     if (logErr) {
@@ -238,9 +324,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // -------------------------------------------------------------------
-  // patient_vitals_shared mirror.
-  // -------------------------------------------------------------------
+  // ---- patient_vitals_shared mirror ----
   const numOrNull = (v: unknown): number | null =>
     typeof v === "number" && Number.isFinite(v) ? v : null;
 
@@ -293,24 +377,36 @@ export async function POST(req: NextRequest) {
     .upsert(sharedRow, { onConflict: "patient_id" });
 
   if (mirrorErr) {
-    await logAudit({
-      sessionId,
-      action: "patient.history.updated",
-      dataType: "health_history",
-      success: true,
-      metadata: { reason_code: "mirror_failed", metric_count: enteredCount },
-    });
     // eslint-disable-next-line no-console
     console.error("[manual-labs] mirror upsert failed:", mirrorErr.code || mirrorErr.message);
-  } else {
-    await logAudit({
-      sessionId,
-      action: "patient.history.updated",
-      dataType: "health_history",
-      success: true,
-      metadata: { metric_count: enteredCount },
-    });
   }
+
+  // ---- Grade-drop alert fan-out (phase 4) ----
+  let gradeDropDelivery: { sent: boolean; reason?: string } | null = null;
+  if (priorGrade && gradeStepsDropped(priorGrade, summary.panel_grade) > 0) {
+    gradeDropDelivery = await notifyGradeDrop({
+      patientId: session.patientId,
+      prevGrade: priorGrade,
+      newGrade: summary.panel_grade,
+      flagged: summary.panel_flagged,
+      inRange: summary.panel_in_range,
+    });
+    if (!gradeDropDelivery.sent) {
+      // eslint-disable-next-line no-console
+      console.error("[manual-labs] grade-drop alert failed:", gradeDropDelivery.reason);
+    }
+  }
+
+  await logAudit({
+    sessionId,
+    action: "patient.history.updated",
+    dataType: "health_history",
+    success: true,
+    metadata: {
+      metric_count: enteredCount,
+      ...(mirrorErr ? { reason_code: "mirror_failed" } : {}),
+    },
+  });
 
   type _ManualLabsRef = ManualLabsInput;
   void (null as unknown as _ManualLabsRef);
@@ -320,5 +416,11 @@ export async function POST(req: NextRequest) {
     saved: enteredCount,
     logged: logRows.length,
     family_mirror_synced: !mirrorErr,
+    panel_grade: summary.panel_grade,
+    panel_grade_dropped:
+      priorGrade && gradeStepsDropped(priorGrade, summary.panel_grade) > 0
+        ? { prev: priorGrade, current: summary.panel_grade }
+        : null,
+    grade_drop_alert_sent: gradeDropDelivery?.sent ?? null,
   });
 }

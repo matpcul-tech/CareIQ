@@ -281,10 +281,6 @@ export function computeStatus(
   return "unknown";
 }
 
-/**
- * Returns the ideal target value for a biomarker based on its thresholds.
- * Used by trend computation to decide which direction is "improving".
- */
 export function getTargetCenter(th: BiomarkerThresholds): number | null {
   if (th.optimal_low !== null && th.optimal_high !== null) {
     return (th.optimal_low + th.optimal_high) / 2;
@@ -299,18 +295,6 @@ export function getTargetCenter(th: BiomarkerThresholds): number | null {
   return null;
 }
 
-/**
- * computeTrend: directional change in distance to target.
- *
- *   improving   value moved closer to its longevity target
- *   declining   value moved further from its target
- *   stable      change smaller than the noise tolerance
- *   null        no thresholds defined and no usable noise floor
- *
- * Noise tolerance defaults to 5% of the larger of |current|, |previous|,
- * which keeps small day-to-day measurement jitter from flipping the trend
- * label every save.
- */
 export function computeTrend(
   current: number,
   previous: number,
@@ -320,13 +304,10 @@ export function computeTrend(
   const target = getTargetCenter(th);
   const noise =
     Math.max(Math.abs(previous), Math.abs(current)) * noiseTolerancePct;
-
   if (target === null) {
-    // No directionality. Report stable when within noise, else null.
     if (Math.abs(current - previous) <= noise) return "stable";
     return null;
   }
-
   const dPrev = Math.abs(previous - target);
   const dCurr = Math.abs(current - target);
   if (Math.abs(dCurr - dPrev) <= noise) return "stable";
@@ -335,3 +316,100 @@ export function computeTrend(
 }
 
 export const BIOMARKER_KEYS: string[] = BIOMARKER_SPECS.map((s) => s.key);
+
+// ---------------------------------------------------------------------------
+// Panel summary helpers (shared by Shield decrypt route + manual-labs route).
+// ---------------------------------------------------------------------------
+
+export interface BiomarkerEntryRead {
+  value?: number | null;
+  date_collected?: string;
+  source?: "lab" | "wearable" | "self_reported";
+}
+
+export interface BiomarkerBlobRead {
+  manualLabs?: Record<string, number>;
+  biomarkers?: Record<string, BiomarkerEntryRead>;
+}
+
+export interface WearableLatest {
+  heartRate?: number;
+  steps?: number;
+  spo2?: number;
+  sleepHours?: number;
+  hrv?: number;
+  activeCalories?: number;
+  calories?: number;
+}
+
+export function resolveValueForSpec(
+  spec: BiomarkerSpec,
+  blob: BiomarkerBlobRead,
+  latestWearable: WearableLatest | null,
+): number | null {
+  if (spec.wearable_field && latestWearable) {
+    const v = (latestWearable as Record<string, number | undefined>)[spec.wearable_field];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  const entry = blob.biomarkers?.[spec.key];
+  if (entry && typeof entry.value === "number" && Number.isFinite(entry.value)) return entry.value;
+  if (spec.legacy_keys && blob.manualLabs) {
+    for (const lk of spec.legacy_keys) {
+      const v = blob.manualLabs[lk];
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+    }
+  }
+  return null;
+}
+
+export interface PanelSummary {
+  panel_grade: string;
+  panel_flagged: number;
+  panel_in_range: number;
+}
+
+/**
+ * Compute the overall panel grade from a decrypted health_history blob,
+ * the patient's sex, and the latest wearable metric. Same scoring used by
+ * the Shield decrypt endpoint, extracted here so the manual-labs save
+ * route can compute it without duplicating logic and detect grade drops.
+ */
+export function summarizeFromBlob(
+  blob: BiomarkerBlobRead,
+  sex: Sex,
+  latestWearable: WearableLatest | null,
+): PanelSummary {
+  let inRange = 0;
+  let flagged = 0;
+  for (const spec of BIOMARKER_SPECS) {
+    const value = resolveValueForSpec(spec, blob, latestWearable);
+    const status = computeStatus(value, getThresholds(spec, sex));
+    if (status === "ok") inRange += 1;
+    else if (status === "suboptimal" || status === "outside_normal") flagged += 1;
+  }
+  const total = inRange + flagged;
+  let grade = "-";
+  if (total > 0) {
+    const pct = inRange / total;
+    if (pct >= 1) grade = "A";
+    else if (pct >= 0.8) grade = "B";
+    else if (pct >= 0.6) grade = "C";
+    else if (pct >= 0.4) grade = "D";
+    else grade = "F";
+  }
+  return { panel_grade: grade, panel_flagged: flagged, panel_in_range: inRange };
+}
+
+const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, F: 4 };
+
+/**
+ * How many letter-grade steps did the panel grade DROP?
+ *   0 = stable or improved (B -> A returns 0, B -> B returns 0)
+ *   1 = single-letter drop (B -> C)
+ *   2+ = multi-letter drop (B -> D returns 2)
+ * Returns 0 for unknown grades or the placeholder "-".
+ */
+export function gradeStepsDropped(prev: string, next: string): number {
+  if (!(prev in GRADE_ORDER) || !(next in GRADE_ORDER)) return 0;
+  return Math.max(0, GRADE_ORDER[next] - GRADE_ORDER[prev]);
+}
