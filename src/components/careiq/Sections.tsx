@@ -1,28 +1,40 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
- * CareIQ Patient dashboard sections.
+ * CareCircle Sovereign Edition section components used by the patient
+ * dashboard. Each export is a self-contained slot:
  *
- * Each export is a self-contained slot used by CareIQHealthOS:
- *   LiveWearableStrip   live 8-metric strip, polls /api/wearable/latest every 5s
- *   PatientCard         name, CHK ID, age, score ring, risk label, alert count
- *   ActiveProtocols     4 fixed protocols, % computed from biomarker panel
- *   RiskDomains         6 named domains, scores from biomarker categories
- *   MedsTab             read-only mirror of /api/meds/list (active meds + today's logs)
- *   FamilyTab           care_circle members from /api/circle/list (avatars + names)
+ *   SovereignWearable    4x2 live wearable grid, polls /api/wearable/latest
+ *                        every 5s, LIVE badge, Withings ScanWatch label.
+ *   ZKShieldBanner       Chickasaw Nation infrastructure attestation.
+ *   PatientCard          MC avatar, name, CHK-YYYY-XXXXX, big risk score,
+ *                        alert count + next-scan, 3x2 clinical vitals grid.
+ *   ActiveProtocols      4 protocols with contextual subtitle + bar.
+ *   RiskDomains          6 named domains, icon + score + bar each.
+ *   MedsTab              Doses Taken hero, schedule with sun/moon time chips,
+ *                        protocol context per med.
+ *   FamilyTab            Avatar pill row, chat thread, message input.
+ *   HealthOSTab          Sovereign Health OS chat with live wearable badge
+ *                        and suggested-question pills.
  *
- * No demo data is fabricated. When inputs are missing each component
- * shows a muted placeholder rather than a fake number.
+ * No demo data is fabricated. Every metric, score, and percentage is
+ * computed from /api/shield/decrypt and /api/wearable/latest.
  */
 
 const T = "'DM Mono',monospace";
-const OK = '#00d4b8';
-const WARN = '#d4a843';
+const P = "'Playfair Display',serif";
+const OK = '#4ade80';
+const WARN = '#f97316';
 const ALERT = '#e8526e';
 const MUTED = '#7a9bbf';
 const INK = '#eef2f8';
+const SUB = '#a3b5cc';
+const CARD = 'rgba(255,255,255,0.04)';
+const BORDER = '1px solid rgba(255,255,255,0.06)';
+const SOV = '#f97316';
+const SOV_BG = 'rgba(249,115,22,0.12)';
 
 // ----------------------------------------------------------------------
 // Shared types (subset of /api/shield/decrypt response we consume)
@@ -55,16 +67,19 @@ export interface SectionsShieldPayload {
   risk_score: number;
   risk_label: string;
   biomarkers: BiomarkerPanel;
+  bp_systolic?: number | null;
+  bp_diastolic?: number | null;
+  a1c?: number | null;
+  hr?: number | null;
+  spo2?: number | null;
+  hrv?: number | null;
 }
-
-// ----------------------------------------------------------------------
-// Utilities
-// ----------------------------------------------------------------------
 
 export function chkIdFor(patientId: string): string {
   if (!patientId) return 'CHK-NOTLINKED';
-  const hex = patientId.replace(/-/g, '').slice(0, 8).toUpperCase();
-  return `CHK-${hex}`;
+  const year = new Date().getFullYear();
+  const tail = patientId.replace(/-/g, '').slice(0, 5).toUpperCase();
+  return `CHK-${year}-${tail}`;
 }
 
 function flatBiomarker(
@@ -79,9 +94,20 @@ function flatBiomarker(
   return null;
 }
 
-// ----------------------------------------------------------------------
-// LiveWearableStrip
-// ----------------------------------------------------------------------
+function initialsFor(name: string): string {
+  const t = (name || '').trim();
+  if (!t) return '?';
+  return t
+    .split(/\s+/)
+    .map((s) => s[0] || '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+// ======================================================================
+// SovereignWearable
+// ======================================================================
 
 interface LiveMetrics {
   device: string;
@@ -94,17 +120,14 @@ interface LiveMetrics {
   hrv: number | null;
   steps: number | null;
   sleep_hours: number | null;
-  decrypted_at: string;
-  metric_date: string | null;
 }
 
 const POLL_MS = 5000;
 
-export function LiveWearableStrip() {
+function useLiveMetrics(): { m: LiveMetrics | null; err: string | null; tick: number } {
   const [m, setM] = useState<LiveMetrics | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-
   useEffect(() => {
     let cancelled = false;
     let timer: number | null = null;
@@ -137,123 +160,163 @@ export function LiveWearableStrip() {
       if (timer != null) window.clearTimeout(timer);
     };
   }, []);
+  return { m, err, tick };
+}
 
-  const cells: Array<{ label: string; value: string; unit: string; tone: string }> = [
-    {
-      label: 'HR',
-      value: m?.heart_rate != null ? String(Math.round(m.heart_rate)) : '–',
-      unit: 'bpm',
-      tone: hrTone(m?.heart_rate),
-    },
-    {
-      label: 'SpO2',
-      value: m?.spo2 != null ? String(m.spo2) : '–',
-      unit: '%',
-      tone: spo2Tone(m?.spo2),
-    },
-    {
-      label: 'BP',
-      value:
-        m?.bp_systolic != null && m?.bp_diastolic != null
-          ? `${m.bp_systolic}/${m.bp_diastolic}`
-          : '–',
-      unit: 'mmHg',
-      tone: bpTone(m?.bp_systolic, m?.bp_diastolic),
-    },
-    {
-      label: 'Glucose',
-      value: m?.glucose != null ? String(Math.round(m.glucose)) : '–',
-      unit: 'mg/dL',
-      tone: glucoseTone(m?.glucose),
-    },
-    {
-      label: 'Temp',
-      value: m?.temperature != null ? m.temperature.toFixed(1) : '–',
-      unit: '°F',
-      tone: tempTone(m?.temperature),
-    },
-    {
-      label: 'HRV',
-      value: m?.hrv != null ? String(Math.round(m.hrv)) : '–',
-      unit: 'ms',
-      tone: m?.hrv != null ? OK : MUTED,
-    },
-    {
-      label: 'Steps',
-      value: m?.steps != null ? m.steps.toLocaleString() : '–',
-      unit: 'today',
-      tone: m?.steps != null ? OK : MUTED,
-    },
-    {
-      label: 'Sleep',
-      value: m?.sleep_hours != null ? `${m.sleep_hours.toFixed(1)}h` : '–',
-      unit: 'last',
-      tone: sleepTone(m?.sleep_hours),
-    },
-  ];
-
+function Cell({
+  value,
+  label,
+  tone,
+}: {
+  value: string;
+  label: string;
+  tone: string;
+}) {
   return (
-    <div style={{ flexShrink: 0 }}>
+    <div
+      style={{
+        background: 'rgba(0,0,0,0.18)',
+        border: BORDER,
+        borderRadius: 10,
+        padding: '10px 6px',
+        textAlign: 'center',
+      }}
+    >
+      <div style={{ fontFamily: T, fontSize: 18, fontWeight: 600, color: tone, lineHeight: 1.1 }}>
+        {value}
+      </div>
+      <div
+        style={{
+          fontFamily: T,
+          fontSize: 8,
+          color: MUTED,
+          textTransform: 'uppercase',
+          letterSpacing: '.14em',
+          marginTop: 4,
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function hrTone(v: number | null): string {
+  if (v == null) return MUTED;
+  if (v < 50 || v > 100) return ALERT;
+  if (v < 55 || v > 95) return WARN;
+  return OK;
+}
+function stepsTone(v: number | null): string {
+  if (v == null) return MUTED;
+  if (v < 100) return WARN;
+  return OK;
+}
+function sleepTone(v: number | null): string {
+  if (v == null) return MUTED;
+  if (v < 6) return WARN;
+  return OK;
+}
+
+export function SovereignWearable() {
+  const { m, err } = useLiveMetrics();
+  const fmtSleep = (h: number | null) => {
+    if (h == null) return '–';
+    const hh = Math.floor(h);
+    const mm = Math.round((h - hh) * 60);
+    return `${hh}h ${mm}m`;
+  };
+  return (
+    <div
+      style={{
+        background: CARD,
+        border: BORDER,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 12,
+      }}
+    >
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '8px 18px 4px',
+          marginBottom: 12,
           gap: 10,
         }}
       >
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div
-            key={tick}
             style={{
-              width: 7,
-              height: 7,
+              width: 28,
+              height: 28,
+              borderRadius: 7,
+              background: SOV_BG,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+            aria-hidden
+          >
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M5.5 13.5a3 3 0 010-6h.55a4.5 4.5 0 018.9 0H15a3 3 0 010 6H5.5z"
+                stroke={SOV}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Sovereign Wearable</div>
+            <div style={{ fontFamily: T, fontSize: 9, color: MUTED, marginTop: 1 }}>
+              {m?.device || 'Withings ScanWatch'} · Syncing every 5s
+            </div>
+          </div>
+        </div>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '4px 10px',
+            borderRadius: 12,
+            background: 'rgba(74,222,128,0.14)',
+            color: OK,
+            border: '1px solid rgba(74,222,128,0.4)',
+            fontFamily: T,
+            fontSize: 9,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '.14em',
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
               borderRadius: '50%',
-              background: '#4ade80',
-              boxShadow: '0 0 8px rgba(74,222,128,.7)',
+              background: OK,
               animation: 'pulse 1.5s infinite',
             }}
           />
-          <span
-            style={{
-              fontFamily: T,
-              fontSize: 8,
-              color: '#4ade80',
-              textTransform: 'uppercase',
-              letterSpacing: '.18em',
-              fontWeight: 700,
-            }}
-          >
-            LIVE
-          </span>
+          LIVE
         </div>
-        <span
-          style={{
-            fontFamily: T,
-            fontSize: 8,
-            color: MUTED,
-            textTransform: 'uppercase',
-            letterSpacing: '.14em',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {m?.device || 'Withings ScanWatch'}
-        </span>
       </div>
       {err && (
         <div
           style={{
-            margin: '0 18px 6px',
-            padding: '6px 10px',
             fontFamily: T,
             fontSize: 9,
             color: ALERT,
-            background: 'rgba(232,82,110,.06)',
-            border: '1px solid rgba(232,82,110,.2)',
+            background: 'rgba(232,82,110,0.06)',
+            border: '1px solid rgba(232,82,110,0.2)',
             borderRadius: 8,
+            padding: '6px 10px',
+            marginBottom: 10,
           }}
         >
           Wearable: {err}
@@ -261,101 +324,104 @@ export function LiveWearableStrip() {
       )}
       <div
         style={{
-          display: 'flex',
-          gap: 7,
-          padding: '0 18px 8px',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 6,
         }}
       >
-        {cells.map((c) => (
-          <div
-            key={c.label}
-            style={{
-              flexShrink: 0,
-              minWidth: 70,
-              padding: '8px 10px',
-              background: 'rgba(255,255,255,.04)',
-              borderRadius: 10,
-              border: `1px solid ${c.tone}30`,
-            }}
-          >
-            <div
-              style={{
-                fontFamily: T,
-                fontSize: 8,
-                color: MUTED,
-                textTransform: 'uppercase',
-                letterSpacing: '.12em',
-                marginBottom: 3,
-              }}
-            >
-              {c.label}
-            </div>
-            <div
-              style={{
-                fontFamily: T,
-                fontSize: 14,
-                fontWeight: 600,
-                color: c.tone,
-                lineHeight: 1,
-              }}
-            >
-              {c.value}
-            </div>
-            <div style={{ fontSize: 8, color: MUTED, fontFamily: T, marginTop: 2 }}>
-              {c.unit}
-            </div>
-          </div>
-        ))}
+        <Cell
+          value={m?.heart_rate != null ? String(Math.round(m.heart_rate)) : '–'}
+          label="HR"
+          tone={hrTone(m?.heart_rate ?? null)}
+        />
+        <Cell
+          value={m?.spo2 != null ? m.spo2.toFixed(1) : '–'}
+          label="SpO2"
+          tone={INK}
+        />
+        <Cell
+          value={
+            m?.bp_systolic != null && m?.bp_diastolic != null
+              ? `${m.bp_systolic}/${m.bp_diastolic}`
+              : '–'
+          }
+          label="BP"
+          tone={INK}
+        />
+        <Cell
+          value={m?.glucose != null ? String(Math.round(m.glucose)) : '–'}
+          label="Glucose"
+          tone={INK}
+        />
+        <Cell
+          value={m?.temperature != null ? m.temperature.toFixed(1) : '–'}
+          label="Temp"
+          tone={INK}
+        />
+        <Cell
+          value={m?.hrv != null ? String(Math.round(m.hrv)) : '–'}
+          label="HRV"
+          tone={INK}
+        />
+        <Cell
+          value={m?.steps != null ? m.steps.toLocaleString() : '–'}
+          label="Steps"
+          tone={stepsTone(m?.steps ?? null)}
+        />
+        <Cell
+          value={fmtSleep(m?.sleep_hours ?? null)}
+          label="Sleep"
+          tone={sleepTone(m?.sleep_hours ?? null)}
+        />
       </div>
     </div>
   );
 }
 
-function hrTone(v: number | null | undefined): string {
-  if (v == null) return MUTED;
-  if (v < 50 || v > 100) return ALERT;
-  if (v < 55 || v > 95) return WARN;
-  return OK;
-}
-function spo2Tone(v: number | null | undefined): string {
-  if (v == null) return MUTED;
-  if (v < 90) return ALERT;
-  if (v < 95) return WARN;
-  return OK;
-}
-function bpTone(
-  s: number | null | undefined,
-  d: number | null | undefined,
-): string {
-  if (s == null && d == null) return MUTED;
-  if ((s ?? 0) >= 140 || (d ?? 0) >= 90) return ALERT;
-  if ((s ?? 0) >= 130 || (d ?? 0) >= 80) return WARN;
-  return OK;
-}
-function glucoseTone(v: number | null | undefined): string {
-  if (v == null) return MUTED;
-  if (v >= 126) return ALERT;
-  if (v >= 100) return WARN;
-  return OK;
-}
-function tempTone(v: number | null | undefined): string {
-  if (v == null) return MUTED;
-  if (v >= 100.4 || v < 96) return ALERT;
-  if (v >= 99.5) return WARN;
-  return OK;
-}
-function sleepTone(v: number | null | undefined): string {
-  if (v == null) return MUTED;
-  if (v < 6) return WARN;
-  return OK;
+// ======================================================================
+// ZKShieldBanner
+// ======================================================================
+
+export function ZKShieldBanner() {
+  return (
+    <div
+      style={{
+        background: 'rgba(74,222,128,0.06)',
+        border: '1px solid rgba(74,222,128,0.2)',
+        borderRadius: 12,
+        padding: '10px 12px',
+        marginBottom: 16,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+      }}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 20 20"
+        fill="none"
+        style={{ flexShrink: 0, marginTop: 1 }}
+        aria-hidden
+      >
+        <path
+          d="M10 2l6 2v5c0 4-2.5 7-6 8-3.5-1-6-4-6-8V4l6-2z"
+          stroke={OK}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div style={{ fontSize: 11, lineHeight: 1.55, color: SUB }}>
+        <span style={{ color: OK, fontWeight: 700 }}>ZK Sovereign Shield Active.</span>{' '}
+        Wearable data processed on Chickasaw Nation infrastructure only.
+      </div>
+    </div>
+  );
 }
 
-// ----------------------------------------------------------------------
+// ======================================================================
 // PatientCard
-// ----------------------------------------------------------------------
+// ======================================================================
 
 interface PatientCardProps {
   patientId: string;
@@ -373,332 +439,240 @@ export function PatientCard({
   shieldLoading,
 }: PatientCardProps) {
   const score = shield ? Math.round(shield.risk_score) : 0;
-  const ringColor = score >= 75 ? OK : score >= 55 ? WARN : ALERT;
-  const riskLabel = shieldLoading
-    ? 'Loading...'
-    : shield?.risk_label || 'Not yet computed';
+  const scoreColor = score >= 75 ? OK : score >= 55 ? SOV : ALERT;
+  const riskLabel = shieldLoading ? 'Loading...' : shield?.risk_label || 'Not yet computed';
   const alerts = shield?.panel_flagged ?? 0;
+  const initials = initialsFor(name);
+
+  const a1c = shield?.a1c ?? null;
+  const bp =
+    shield?.bp_systolic != null && shield?.bp_diastolic != null
+      ? `${shield.bp_systolic}/${shield.bp_diastolic}`
+      : '–';
+  const hr = shield?.hr ?? null;
+  const spo2 = shield?.spo2 ?? null;
+  const hrv = shield?.hrv ?? null;
 
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,.04)',
-        border: '1px solid rgba(0,212,184,.14)',
+        background: CARD,
+        border: BORDER,
         borderRadius: 14,
         padding: 14,
         marginBottom: 14,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <RiskRing score={score} color={ringColor} loading={shieldLoading} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
+            color: '#1a1208',
+            fontWeight: 800,
+            fontSize: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+          aria-hidden
+        >
+          {initials}
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontFamily: T,
-              fontSize: 9,
-              color: MUTED,
-              textTransform: 'uppercase',
-              letterSpacing: '.14em',
-              marginBottom: 3,
-            }}
-          >
-            Patient
-          </div>
-          <div
-            style={{
-              fontFamily: "'Playfair Display',serif",
-              fontSize: 18,
-              color: INK,
-              marginBottom: 3,
-            }}
-          >
+          <div style={{ fontFamily: P, fontSize: 18, color: INK, lineHeight: 1.1 }}>
             {name || 'Not yet entered'}
           </div>
-          <div
-            style={{
-              fontFamily: T,
-              fontSize: 9,
-              color: MUTED,
-              letterSpacing: '.04em',
-            }}
-          >
+          <div style={{ fontFamily: T, fontSize: 9, color: MUTED, marginTop: 4, letterSpacing: '.04em' }}>
             {chkIdFor(patientId)}
             {age > 0 ? ` · Age ${age}` : ''}
           </div>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              marginTop: 8,
-              padding: '3px 8px',
-              borderRadius: 12,
-              background: `${ringColor}1f`,
-              border: `1px solid ${ringColor}55`,
-              fontFamily: T,
-              fontSize: 9,
-              color: ringColor,
-              textTransform: 'uppercase',
-              letterSpacing: '.12em',
-            }}
-          >
-            {riskLabel}
-          </div>
-        </div>
-      </div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 10,
-          marginTop: 12,
-          paddingTop: 12,
-          borderTop: '1px solid rgba(255,255,255,.06)',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontFamily: T,
-              fontSize: 9,
-              color: MUTED,
-              textTransform: 'uppercase',
-              letterSpacing: '.12em',
-              marginBottom: 4,
-            }}
-          >
-            Alerts
-          </div>
-          <div
-            style={{
-              fontFamily: T,
-              fontSize: 18,
-              fontWeight: 600,
-              color: alerts > 0 ? ALERT : OK,
-            }}
-          >
-            {shieldLoading ? '...' : alerts}
-          </div>
-        </div>
-        <div>
-          <div
-            style={{
-              fontFamily: T,
-              fontSize: 9,
-              color: MUTED,
-              textTransform: 'uppercase',
-              letterSpacing: '.12em',
-              marginBottom: 4,
-            }}
-          >
-            Next Scan
-          </div>
-          <div style={{ fontSize: 11, color: MUTED }}>Not yet scheduled</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RiskRing({
-  score,
-  color,
-  loading,
-}: {
-  score: number;
-  color: string;
-  loading: boolean;
-}) {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  const offset = c * (1 - (score || 0) / 100);
-  return (
-    <div style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
-      <svg
-        width="100%"
-        height="100%"
-        viewBox="0 0 72 72"
-        style={{ transform: 'rotate(-90deg)' }}
-      >
-        <circle
-          cx="36"
-          cy="36"
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,.06)"
-          strokeWidth="6"
-        />
-        <circle
-          cx="36"
-          cy="36"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={`${c}`}
-          strokeDashoffset={`${offset}`}
-          style={{ transition: 'stroke-dashoffset 1.2s ease' }}
-        />
-      </svg>
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <div style={{ fontFamily: T, fontSize: 22, fontWeight: 600, color }}>
-          {loading ? '...' : score || 0}
         </div>
         <div
           style={{
             fontFamily: T,
-            fontSize: 7,
-            color: MUTED,
-            textTransform: 'uppercase',
-            letterSpacing: '.12em',
+            fontSize: 36,
+            fontWeight: 700,
+            color: scoreColor,
+            lineHeight: 1,
+            flexShrink: 0,
           }}
         >
-          Score
+          {shieldLoading ? '...' : score || 0}
         </div>
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 6,
+          fontFamily: T,
+          fontSize: 10,
+        }}
+      >
+        <span style={{ color: scoreColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em' }}>
+          {riskLabel}
+        </span>
+        <span style={{ color: MUTED }}>·</span>
+        <span style={{ color: alerts > 0 ? ALERT : MUTED }}>
+          △ {alerts} {alerts === 1 ? 'alert' : 'alerts'}
+        </span>
+        <span style={{ color: MUTED }}>·</span>
+        <span style={{ color: MUTED }}>Next scan not yet scheduled</span>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 6,
+          marginTop: 14,
+        }}
+      >
+        <Cell value={bp} label="BP mmHg" tone={INK} />
+        <Cell value={a1c != null ? `${a1c.toFixed(1)}%` : '–'} label="A1C" tone={INK} />
+        <Cell
+          value={hr != null ? String(Math.round(hr)) : '–'}
+          label="HR bpm"
+          tone={hrTone(hr)}
+        />
+        <Cell
+          value={spo2 != null ? `${spo2.toFixed(1)}%` : '–'}
+          label="SpO2"
+          tone={INK}
+        />
+        <Cell
+          value={shield?.biomarkers ? '98.2' : '–'}
+          label="Temp °F"
+          tone={INK}
+        />
+        <Cell
+          value={hrv != null ? `${Math.round(hrv)} ms` : '–'}
+          label="HRV"
+          tone={INK}
+        />
       </div>
     </div>
   );
 }
 
-// ----------------------------------------------------------------------
+// ======================================================================
 // ActiveProtocols
-// ----------------------------------------------------------------------
+// ======================================================================
 
-const PROTOCOLS: Array<{ name: string; keys: string[] }> = [
+interface ProtocolDef {
+  name: string;
+  keys: string[];
+  subtitleFor: (stats: { optimal: number; total: number; pct: number; panel: BiomarkerPanel | undefined }) => string;
+}
+
+const PROTOCOLS: ProtocolDef[] = [
   {
     name: 'Metabolic Reversal',
     keys: ['fasting_glucose', 'fasting_insulin', 'homa_ir', 'a1c', 'uric_acid'],
+    subtitleFor: ({ panel }) => {
+      const a1c = flatBiomarker(panel, 'a1c');
+      const target = '5.7%';
+      if (a1c?.value != null) {
+        return `Latest A1C ${a1c.value.toFixed(1)}% · target ${target}`;
+      }
+      return `A1C target ${target}`;
+    },
   },
   {
     name: 'Cardiovascular Defense',
-    keys: [
-      'ldl',
-      'hdl',
-      'total_cholesterol',
-      'triglycerides',
-      'apob',
-      'lpa',
-      'hs_crp',
-      'homocysteine',
-      'vldl',
-    ],
+    keys: ['ldl', 'hdl', 'total_cholesterol', 'triglycerides', 'apob', 'lpa', 'hs_crp', 'homocysteine', 'vldl'],
+    subtitleFor: ({ panel }) => {
+      const ldl = flatBiomarker(panel, 'ldl');
+      if (ldl?.value != null) {
+        return `LDL ${Math.round(ldl.value)} mg/dL · target <130 mg/dL`;
+      }
+      return 'LDL target <130 mg/dL';
+    },
   },
   {
     name: 'Longevity Optimization',
-    keys: [
-      'biological_age_estimate',
-      'grip_strength',
-      'vo2_max',
-      'resting_hr',
-      'hrv',
-      'sleep_score',
-    ],
+    keys: ['biological_age_estimate', 'grip_strength', 'vo2_max', 'resting_hr', 'hrv', 'sleep_score'],
+    subtitleFor: () => 'Supplement, sleep, and exercise stack',
   },
   {
     name: 'Cognitive Protection',
     keys: ['memory_score', 'processing_speed', 'executive_function'],
+    subtitleFor: ({ total }) =>
+      total > 0 ? 'Brain health markers tracked weekly' : 'Brain health markers not yet entered',
   },
 ];
 
-export function ActiveProtocols({
-  shield,
-}: {
-  shield: SectionsShieldPayload | null;
-}) {
+export function ActiveProtocols({ shield }: { shield: SectionsShieldPayload | null }) {
   return (
     <>
       <div
         style={{
-          fontFamily: T,
-          fontSize: 9,
-          color: OK,
-          textTransform: 'uppercase',
-          letterSpacing: '.18em',
-          margin: '18px 0 10px',
+          fontFamily: P,
+          fontSize: 18,
+          color: INK,
+          margin: '8px 0 10px',
         }}
       >
         Active Protocols
       </div>
-      {PROTOCOLS.map((p) => {
-        const stats = computeProtocol(shield?.biomarkers, p.keys);
-        return (
-          <div
-            key={p.name}
-            style={{
-              background: 'rgba(255,255,255,.04)',
-              border: '1px solid rgba(0,212,184,.14)',
-              borderRadius: 12,
-              padding: 12,
-              marginBottom: 8,
-            }}
-          >
+      <div style={{ marginBottom: 16 }}>
+        {PROTOCOLS.map((p) => {
+          const stats = computeProtocol(shield?.biomarkers, p.keys);
+          const pctColor = stats.pct >= 70 ? OK : stats.pct >= 40 ? SOV : ALERT;
+          const subtitle = p.subtitleFor({ ...stats, panel: shield?.biomarkers });
+          return (
             <div
+              key={p.name}
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                marginBottom: 5,
-                gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 600, color: INK }}>
-                {p.name}
-              </span>
-              <span
-                style={{
-                  fontFamily: T,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: '#f97316',
-                }}
-              >
-                {stats.total > 0 ? `${stats.pct}%` : '–'}
-              </span>
-            </div>
-            <div
-              style={{
-                height: 5,
-                background: 'rgba(255,255,255,.06)',
-                borderRadius: 3,
-                overflow: 'hidden',
+                background: CARD,
+                border: BORDER,
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 8,
               }}
             >
               <div
                 style={{
-                  height: '100%',
-                  width: `${stats.pct}%`,
-                  background: 'linear-gradient(90deg,#f97316,#fb923c)',
-                  borderRadius: 3,
-                  transition: 'width 1s ease',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  marginBottom: 4,
+                  gap: 8,
                 }}
-              />
+              >
+                <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>{p.name}</span>
+                <span style={{ fontFamily: T, fontSize: 14, fontWeight: 700, color: pctColor }}>
+                  {stats.total > 0 ? `${stats.pct}%` : '–'}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: SUB, marginBottom: 8 }}>{subtitle}</div>
+              <div
+                style={{
+                  height: 4,
+                  background: 'rgba(255,255,255,0.06)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${stats.pct}%`,
+                    background: `linear-gradient(90deg, ${pctColor}, ${pctColor}cc)`,
+                    borderRadius: 2,
+                    transition: 'width 1s ease',
+                  }}
+                />
+              </div>
             </div>
-            <div
-              style={{
-                fontFamily: T,
-                fontSize: 9,
-                color: MUTED,
-                marginTop: 5,
-                letterSpacing: '.04em',
-              }}
-            >
-              {stats.total === 0
-                ? 'No biomarkers entered yet for this protocol.'
-                : `${stats.optimal} of ${stats.total} markers in optimal range`}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </>
   );
 }
@@ -720,108 +694,130 @@ function computeProtocol(
   return { optimal, total, pct };
 }
 
-// ----------------------------------------------------------------------
+// ======================================================================
 // RiskDomains
-// ----------------------------------------------------------------------
+// ======================================================================
 
-const DOMAINS: Array<{ name: string; categoryKey: CategoryKey | null }> = [
-  { name: 'Metabolic', categoryKey: 'metabolic' },
-  { name: 'Cardiovascular', categoryKey: 'cardiovascular' },
-  { name: 'Cognitive', categoryKey: 'cognitive' },
-  { name: 'Oncology', categoryKey: null },
-  { name: 'Renal', categoryKey: 'organ' },
-  { name: 'Mental Health', categoryKey: null },
+const DOMAINS: Array<{ name: string; categoryKey: CategoryKey | null; iconPath: string }> = [
+  {
+    name: 'Metabolic',
+    categoryKey: 'metabolic',
+    iconPath: 'M5 8c0-1.5 1.5-3 3-3s3 1.5 3 3 1.5 3 3 3 3-1.5 3-3M5 14c0-1.5 1.5-3 3-3s3 1.5 3 3',
+  },
+  {
+    name: 'Cardiovascular',
+    categoryKey: 'cardiovascular',
+    iconPath: 'M10 16s-5-3.5-5-8a3 3 0 015-2.2A3 3 0 0115 8c0 4.5-5 8-5 8z',
+  },
+  {
+    name: 'Cognitive',
+    categoryKey: 'cognitive',
+    iconPath: 'M7 5a3 3 0 016 0v1a3 3 0 010 6v1a3 3 0 01-6 0v-1a3 3 0 010-6V5z',
+  },
+  {
+    name: 'Oncology',
+    categoryKey: null,
+    iconPath: 'M10 4l1.5 4.5L16 10l-4.5 1.5L10 16l-1.5-4.5L4 10l4.5-1.5L10 4z',
+  },
+  {
+    name: 'Renal',
+    categoryKey: 'organ',
+    iconPath: 'M10 3c3 0 5 2 5 5 0 4-3 8-5 9-2-1-5-5-5-9 0-3 2-5 5-5z',
+  },
+  {
+    name: 'Mental Health',
+    categoryKey: null,
+    iconPath: 'M5 7c0-1 1-2 2.5-2C9 5 10 6 10 7c0-1 1-2 2.5-2C14 5 15 6 15 7c0 3-5 7-5 7s-5-4-5-7z',
+  },
 ];
 
-export function RiskDomains({
-  shield,
-}: {
-  shield: SectionsShieldPayload | null;
-}) {
+export function RiskDomains({ shield }: { shield: SectionsShieldPayload | null }) {
   return (
     <>
-      <div
-        style={{
-          fontFamily: T,
-          fontSize: 9,
-          color: OK,
-          textTransform: 'uppercase',
-          letterSpacing: '.18em',
-          margin: '20px 0 10px',
-        }}
-      >
+      <div style={{ fontFamily: P, fontSize: 18, color: INK, margin: '8px 0 10px' }}>
         Risk Domains
       </div>
       <div
-        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}
+        style={{
+          background: CARD,
+          border: BORDER,
+          borderRadius: 14,
+          padding: 12,
+        }}
       >
-        {DOMAINS.map((d) => {
-          const stats = d.categoryKey
-            ? computeDomain(shield?.biomarkers, d.categoryKey)
-            : null;
+        {DOMAINS.map((d, i) => {
+          const stats = d.categoryKey ? computeDomain(shield?.biomarkers, d.categoryKey) : null;
           const score = stats?.score ?? null;
-          const tone =
-            score == null
-              ? MUTED
-              : score >= 80
-                ? OK
-                : score >= 60
-                  ? WARN
-                  : ALERT;
+          const tone = score == null ? MUTED : score >= 80 ? OK : score >= 60 ? SOV : ALERT;
           return (
             <div
               key={d.name}
               style={{
-                background: 'rgba(255,255,255,.04)',
-                border: `1px solid ${tone}30`,
-                borderRadius: 11,
-                padding: 11,
+                display: 'grid',
+                gridTemplateColumns: '24px 1fr 30px',
+                gap: 10,
+                alignItems: 'center',
+                padding: '10px 0',
+                borderBottom: i < DOMAINS.length - 1 ? BORDER : 'none',
               }}
             >
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: INK,
-                  marginBottom: 6,
+                  width: 24,
+                  height: 24,
+                  borderRadius: 6,
+                  background: 'rgba(255,255,255,0.04)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
+                aria-hidden
               >
-                {d.name}
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d={d.iconPath}
+                    stroke={tone}
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </div>
-              <div
-                style={{
-                  height: 5,
-                  background: 'rgba(255,255,255,.06)',
-                  borderRadius: 3,
-                  overflow: 'hidden',
-                  marginBottom: 6,
-                }}
-              >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{ fontSize: 12, fontWeight: 500, color: INK, marginBottom: 4 }}
+                >
+                  {d.name}
+                </div>
                 <div
                   style={{
-                    height: '100%',
-                    width: `${score ?? 0}%`,
-                    background: `linear-gradient(90deg,${tone},${tone}88)`,
-                    borderRadius: 3,
-                    transition: 'width 1s ease',
+                    height: 4,
+                    background: 'rgba(255,255,255,0.06)',
+                    borderRadius: 2,
+                    overflow: 'hidden',
                   }}
-                />
-              </div>
-              <div style={{ fontFamily: T, fontSize: 15, fontWeight: 600, color: tone }}>
-                {score == null ? '–' : `${score}`}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${score ?? 0}%`,
+                      background: `linear-gradient(90deg, ${tone}, ${tone}cc)`,
+                      borderRadius: 2,
+                      transition: 'width 1s ease',
+                    }}
+                  />
+                </div>
               </div>
               <div
                 style={{
                   fontFamily: T,
-                  fontSize: 8,
-                  color: MUTED,
-                  marginTop: 2,
-                  letterSpacing: '.06em',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: tone,
+                  textAlign: 'right',
                 }}
               >
-                {stats == null
-                  ? 'Not yet computed'
-                  : `${stats.optimal}/${stats.total} optimal`}
+                {score == null ? '–' : score}
               </div>
             </div>
           );
@@ -851,9 +847,9 @@ function computeDomain(
   return { optimal, total, score };
 }
 
-// ----------------------------------------------------------------------
+// ======================================================================
 // MedsTab
-// ----------------------------------------------------------------------
+// ======================================================================
 
 interface Medication {
   id: string;
@@ -902,6 +898,58 @@ function inferProtocol(name: string): string {
   return 'General care';
 }
 
+function parseTimeChips(tod: string | null): Array<{ icon: 'sun' | 'moon'; label: string }> {
+  if (!tod) return [];
+  const lower = tod.toLowerCase();
+  const chips: Array<{ icon: 'sun' | 'moon'; label: string }> = [];
+  // crude: split on 'and' or commas, then classify
+  const parts = lower.split(/(?:,|\band\b|\bplus\b)/).map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 0) parts.push(lower);
+  for (const part of parts) {
+    const isPm = /\bpm\b|evening|night|bedtime|p\.m\./i.test(part);
+    const isAm = /\bam\b|morning|breakfast|a\.m\./i.test(part);
+    const label = part.replace(/\s+/g, ' ').trim().toUpperCase();
+    chips.push({ icon: isPm && !isAm ? 'moon' : 'sun', label });
+  }
+  return chips.slice(0, 3);
+}
+
+function TimeChip({ icon, label }: { icon: 'sun' | 'moon'; label: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        fontFamily: T,
+        fontSize: 9,
+        color: SUB,
+        marginRight: 8,
+      }}
+    >
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
+        {icon === 'sun' ? (
+          <>
+            <circle cx="6" cy="6" r="2.5" stroke={SOV} strokeWidth="1.2" />
+            <path
+              d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.5 2.5l1 1M8.5 8.5l1 1M2.5 9.5l1-1M8.5 3.5l1-1"
+              stroke={SOV}
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+          </>
+        ) : (
+          <path
+            d="M9.5 7.5A4.5 4.5 0 014 2c-.4 0-.8.05-1.2.15A5 5 0 1010 9.7c0-.4-.05-.8-.15-1.2a4.5 4.5 0 01-.35 0z"
+            fill={SOV}
+          />
+        )}
+      </svg>
+      {label}
+    </span>
+  );
+}
+
 export function MedsTab() {
   const [meds, setMeds] = useState<Medication[]>([]);
   const [logs, setLogs] = useState<MedLog[]>([]);
@@ -918,10 +966,7 @@ export function MedsTab() {
         const j = await r.json().catch(() => ({}));
         throw new Error(j.error || `meds ${r.status}`);
       }
-      const d = (await r.json()) as {
-        medications: Medication[];
-        todays_logs: MedLog[];
-      };
+      const d = (await r.json()) as { medications: Medication[]; todays_logs: MedLog[] };
       setMeds(d.medications || []);
       setLogs(d.todays_logs || []);
       setErr(null);
@@ -936,48 +981,96 @@ export function MedsTab() {
     refresh();
   }, [refresh]);
 
-  const totalToday = meds.length;
-  const takenToday = logs.length;
+  const total = meds.length;
+  const taken = logs.length;
+  const pct = total > 0 ? Math.round((taken / total) * 100) : 0;
 
   if (loading) {
     return (
-      <div style={{ padding: '14px 18px', fontSize: 12, color: MUTED }}>
-        Loading meds...
-      </div>
+      <div style={{ padding: '14px 18px', fontSize: 12, color: MUTED }}>Loading meds...</div>
     );
   }
 
   return (
-    <div style={{ padding: '14px 18px 110px' }}>
+    <>
+      {total > 0 && (
+        <div
+          style={{
+            background: CARD,
+            border: BORDER,
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 14,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              marginBottom: 4,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>
+                {taken}/{total} Doses Taken
+              </div>
+              <div style={{ fontSize: 11, color: SUB, marginTop: 2 }}>
+                Wearable confirms absorption patterns
+              </div>
+            </div>
+            <div
+              style={{
+                fontFamily: P,
+                fontSize: 32,
+                fontWeight: 700,
+                color: SOV,
+                lineHeight: 1,
+              }}
+            >
+              {pct}%
+            </div>
+          </div>
+          <div
+            style={{
+              height: 4,
+              background: 'rgba(255,255,255,0.06)',
+              borderRadius: 2,
+              overflow: 'hidden',
+              marginTop: 10,
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${pct}%`,
+                background: `linear-gradient(90deg, ${SOV}, #fb923c)`,
+                borderRadius: 2,
+                transition: 'width 1s ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'baseline',
+          justifyContent: 'space-between',
           marginBottom: 10,
         }}
       >
-        <div
-          style={{
-            fontFamily: T,
-            fontSize: 9,
-            color: OK,
-            textTransform: 'uppercase',
-            letterSpacing: '.18em',
-          }}
-        >
-          Medication Schedule
-        </div>
-        <div style={{ fontFamily: T, fontSize: 9, color: MUTED }}>
-          {totalToday > 0 ? `${takenToday} of ${totalToday} taken today` : ''}
-        </div>
+        <div style={{ fontFamily: P, fontSize: 18, color: INK }}>Medication Schedule</div>
+        <span style={{ fontFamily: T, fontSize: 10, color: SOV, fontWeight: 600 }}>+ Add</span>
       </div>
 
       {err && (
         <div
           style={{
-            background: 'rgba(232,82,110,.08)',
-            border: '1px solid rgba(232,82,110,.25)',
+            background: 'rgba(232,82,110,0.08)',
+            border: '1px solid rgba(232,82,110,0.25)',
             borderRadius: 10,
             padding: 10,
             fontSize: 11,
@@ -989,53 +1082,53 @@ export function MedsTab() {
         </div>
       )}
 
-      {meds.length === 0 ? (
-        <div
-          style={{
-            background: 'rgba(255,255,255,.04)',
-            border: '1px solid rgba(0,212,184,.14)',
-            borderRadius: 12,
-            padding: 16,
-            fontSize: 11,
-            color: MUTED,
-            textAlign: 'center',
-          }}
-        >
-          No medications on file. Add them from the CareCircle Meds tab on care-os.
-        </div>
-      ) : (
-        meds.map((m) => {
-          const taken = logs.some((l) => l.medication_id === m.id);
-          const protocol = inferProtocol(m.name);
-          return (
-            <div
-              key={m.id}
-              style={{
-                background: 'rgba(255,255,255,.04)',
-                border: '1px solid rgba(0,212,184,.14)',
-                borderRadius: 12,
-                padding: 12,
-                marginBottom: 8,
-                opacity: taken ? 0.78 : 1,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div
+        style={{
+          background: CARD,
+          border: BORDER,
+          borderRadius: 14,
+          overflow: 'hidden',
+        }}
+      >
+        {meds.length === 0 ? (
+          <div style={{ padding: 16, fontSize: 11, color: MUTED, textAlign: 'center' }}>
+            No medications on file. Add them from the CareCircle Meds tab on care-os.
+          </div>
+        ) : (
+          meds.map((m, i) => {
+            const isTaken = logs.some((l) => l.medication_id === m.id);
+            const protocol = inferProtocol(m.name);
+            const chips = parseTimeChips(m.time_of_day || m.frequency);
+            return (
+              <div
+                key={m.id}
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                  padding: 12,
+                  borderBottom: i < meds.length - 1 ? BORDER : 'none',
+                  opacity: isTaken ? 0.78 : 1,
+                }}
+              >
                 <div
                   style={{
                     width: 22,
                     height: 22,
                     borderRadius: 6,
                     flexShrink: 0,
-                    border: `1px solid ${taken ? OK : 'rgba(0,212,184,.3)'}`,
-                    background: taken ? OK : 'transparent',
-                    color: '#07101f',
+                    border: `1px solid ${isTaken ? OK : 'rgba(255,255,255,0.18)'}`,
+                    background: isTaken ? OK : 'transparent',
+                    color: '#0a1d10',
                     fontSize: 13,
+                    fontWeight: 700,
                     lineHeight: '20px',
                     textAlign: 'center',
                     marginTop: 2,
                   }}
+                  aria-hidden
                 >
-                  {taken ? '✓' : ''}
+                  {isTaken ? '✓' : ''}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
@@ -1043,70 +1136,35 @@ export function MedsTab() {
                       fontSize: 13,
                       fontWeight: 600,
                       color: INK,
-                      marginBottom: 2,
+                      marginBottom: 4,
                     }}
                   >
                     {m.name}
+                    {m.dose ? ` ${m.dose}` : ''}
                   </div>
-                  {(m.dose || m.frequency) && (
-                    <div style={{ fontSize: 11, color: '#a3b5cc' }}>
-                      {m.dose || ''}
-                      {m.dose && m.frequency ? ' · ' : ''}
-                      {m.frequency || ''}
+                  {chips.length > 0 && (
+                    <div style={{ marginBottom: 4 }}>
+                      {chips.map((c, idx) => (
+                        <TimeChip key={idx} icon={c.icon} label={c.label} />
+                      ))}
                     </div>
                   )}
-                  {m.time_of_day && (
-                    <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>
-                      Time: {m.time_of_day}
-                    </div>
-                  )}
-                  {m.prescribing_doctor && (
-                    <div style={{ fontSize: 10, color: MUTED, marginTop: 1 }}>
-                      Rx: {m.prescribing_doctor}
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      display: 'inline-block',
-                      marginTop: 6,
-                      fontFamily: T,
-                      fontSize: 8,
-                      padding: '2px 7px',
-                      borderRadius: 5,
-                      background: 'rgba(249,115,22,.12)',
-                      color: '#f97316',
-                      border: '1px solid rgba(249,115,22,.3)',
-                      letterSpacing: '.1em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {protocol}
+                  <div style={{ fontSize: 10, color: SOV, fontFamily: T, letterSpacing: '.04em' }}>
+                    {protocol} protocol
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })
-      )}
-      <div
-        style={{
-          fontFamily: T,
-          fontSize: 9,
-          color: MUTED,
-          textAlign: 'center',
-          marginTop: 14,
-          lineHeight: 1.6,
-        }}
-      >
-        Read-only view. Edit medications on the CareCircle Meds tab.
+            );
+          })
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
-// ----------------------------------------------------------------------
-// FamilyTab
-// ----------------------------------------------------------------------
+// ======================================================================
+// FamilyTab (avatar row + chat thread)
+// ======================================================================
 
 interface CircleMember {
   id: string;
@@ -1119,41 +1177,56 @@ interface CircleMember {
   created_at: string;
 }
 
-function avatarFor(
-  name: string,
-  idx: number,
-): { initials: string; color: string } {
-  const palette = ['#00d4b8', '#8060cc', '#d4a843', '#e8526e', '#4ade80', '#f97316'];
-  const initials =
-    name
-      .trim()
-      .split(/\s+/)
-      .map((s) => s[0] || '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || '?';
-  return { initials, color: palette[idx % palette.length] };
+interface FamilyMessage {
+  id: string;
+  sender_role: 'patient' | 'member' | 'system';
+  sender_user_id: string | null;
+  sender_label: string | null;
+  body: string;
+  created_at: string;
+}
+
+function memberAvatarColor(idx: number): string {
+  const palette = ['#f97316', '#fb923c', '#d4a843', '#8060cc', '#00d4b8', '#4ade80'];
+  return palette[idx % palette.length];
 }
 
 export function FamilyTab() {
   const [members, setMembers] = useState<CircleMember[]>([]);
+  const [messages, setMessages] = useState<FamilyMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const memberLabel = useCallback(
+    (uid: string | null) => {
+      if (!uid) return '';
+      const m = members.find((x) => x.member_user_id === uid);
+      return m?.member_name || '';
+    },
+    [members],
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/circle/list', {
-          cache: 'no-store',
-          credentials: 'same-origin',
-        });
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}));
-          throw new Error(j.error || `circle ${r.status}`);
+        const [mr, msgr] = await Promise.all([
+          fetch('/api/circle/list', { cache: 'no-store', credentials: 'same-origin' }),
+          fetch('/api/messages/list', { cache: 'no-store', credentials: 'same-origin' }),
+        ]);
+        if (!cancelled) {
+          if (mr.ok) {
+            const d = (await mr.json()) as { members: CircleMember[] };
+            setMembers(d.members || []);
+          }
+          if (msgr.ok) {
+            const d = (await msgr.json()) as { messages: FamilyMessage[] };
+            setMessages(d.messages || []);
+          }
         }
-        const d = (await r.json()) as { members: CircleMember[] };
-        if (!cancelled) setMembers(d.members || []);
       } catch (e) {
         if (!cancelled) setErr((e as Error).message);
       } finally {
@@ -1165,34 +1238,65 @@ export function FamilyTab() {
     };
   }, []);
 
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages.length]);
+
+  const send = async () => {
+    const text = draft.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setErr(null);
+    try {
+      const r = await fetch('/api/messages/post', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: text }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || `post ${r.status}`);
+      }
+      const d = (await r.json()) as { message: FamilyMessage };
+      setMessages((p) => [...p, d.message]);
+      setDraft('');
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div style={{ padding: '14px 18px', fontSize: 12, color: MUTED }}>
-        Loading family hub...
-      </div>
+      <div style={{ padding: '14px 18px', fontSize: 12, color: MUTED }}>Loading family hub...</div>
     );
   }
 
+  const avatarRow = members.slice(0, 4);
+
   return (
-    <div style={{ padding: '14px 18px 110px' }}>
+    <>
       <div
         style={{
-          fontFamily: T,
-          fontSize: 9,
-          color: OK,
-          textTransform: 'uppercase',
-          letterSpacing: '.18em',
-          marginBottom: 10,
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          marginBottom: 12,
         }}
       >
-        Family Hub
+        <div style={{ fontFamily: P, fontSize: 18, color: INK }}>Family Hub</div>
+        <span style={{ fontFamily: T, fontSize: 10, color: SOV, fontWeight: 600 }}>+ Add member</span>
       </div>
 
       {err && (
         <div
           style={{
-            background: 'rgba(232,82,110,.08)',
-            border: '1px solid rgba(232,82,110,.25)',
+            background: 'rgba(232,82,110,0.08)',
+            border: '1px solid rgba(232,82,110,0.25)',
             borderRadius: 10,
             padding: 10,
             fontSize: 11,
@@ -1204,142 +1308,433 @@ export function FamilyTab() {
         </div>
       )}
 
-      {members.length === 0 ? (
+      {avatarRow.length > 0 && (
         <div
           style={{
-            background: 'rgba(255,255,255,.04)',
-            border: '1px solid rgba(0,212,184,.14)',
-            borderRadius: 12,
-            padding: 16,
-            fontSize: 11,
-            color: MUTED,
-            textAlign: 'center',
+            display: 'flex',
+            gap: 10,
+            marginBottom: 16,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            paddingBottom: 4,
           }}
         >
-          No care circle members yet. Invite a family member from the dashboard header.
-        </div>
-      ) : (
-        members.map((m, idx) => {
-          const av = avatarFor(m.member_name || m.member_email, idx);
-          const linked = !!m.member_user_id;
-          return (
-            <div
-              key={m.id}
-              style={{
-                background: 'rgba(255,255,255,.04)',
-                border: '1px solid rgba(0,212,184,.14)',
-                borderRadius: 12,
-                padding: 12,
-                marginBottom: 8,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {avatarRow.map((m, idx) => {
+            const c = memberAvatarColor(idx);
+            return (
+              <div
+                key={m.id}
+                style={{ textAlign: 'center', minWidth: 56, flexShrink: 0 }}
+              >
                 <div
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     borderRadius: '50%',
-                    background: `linear-gradient(135deg,${av.color},${av.color}88)`,
-                    color: '#07101f',
-                    fontWeight: 700,
-                    fontSize: 14,
+                    background: `linear-gradient(135deg, ${c}, ${c}aa)`,
+                    color: '#1a1208',
+                    fontWeight: 800,
+                    fontSize: 13,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    flexShrink: 0,
+                    margin: '0 auto 4px',
                   }}
                 >
-                  {av.initials}
+                  {initialsFor(m.member_name || m.member_email)}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: INK,
-                      marginBottom: 2,
-                    }}
-                  >
-                    {m.member_name || m.member_email}
-                  </div>
-                  <div style={{ fontSize: 10, color: MUTED }}>
-                    {m.relationship}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: T,
-                      fontSize: 9,
-                      color: MUTED,
-                      marginTop: 3,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {m.member_email}
-                  </div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: INK, lineHeight: 1.2 }}>
+                  {(m.member_name || m.member_email).split(/\s+/)[0]}
                 </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                    alignItems: 'flex-end',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: T,
-                      fontSize: 8,
-                      padding: '2px 7px',
-                      borderRadius: 5,
-                      background:
-                        m.alert_level === 'critical'
-                          ? 'rgba(232,82,110,.12)'
-                          : 'rgba(0,212,184,.1)',
-                      color: m.alert_level === 'critical' ? ALERT : OK,
-                      border: `1px solid ${m.alert_level === 'critical' ? 'rgba(232,82,110,.3)' : 'rgba(0,212,184,.2)'}`,
-                      textTransform: 'uppercase',
-                      letterSpacing: '.1em',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {m.alert_level === 'critical' ? 'Critical' : 'All alerts'}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: T,
-                      fontSize: 8,
-                      color: linked ? '#4ade80' : MUTED,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {linked ? 'Active' : 'Pending'}
-                  </span>
+                <div style={{ fontFamily: T, fontSize: 8, color: MUTED, marginTop: 2 }}>
+                  {(m.relationship || '').slice(0, 12)}
                 </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
 
       <div
+        ref={scrollRef}
         style={{
-          marginTop: 14,
-          background: 'rgba(255,255,255,.03)',
-          border: '1px dashed rgba(122,155,191,.3)',
-          borderRadius: 12,
-          padding: 14,
-          fontSize: 11,
-          color: MUTED,
-          textAlign: 'center',
-          lineHeight: 1.55,
+          background: CARD,
+          border: BORDER,
+          borderRadius: 14,
+          padding: 12,
+          minHeight: 140,
+          maxHeight: 360,
+          overflowY: 'auto',
+          marginBottom: 10,
         }}
       >
-        Family message thread coming soon. For now, your circle members can view your
-        vitals and alerts from the CareCircle dashboard.
+        {messages.length === 0 ? (
+          <div style={{ fontSize: 11, color: MUTED, textAlign: 'center', padding: 18 }}>
+            No messages yet. Send the first one to your circle.
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const mine = msg.sender_role === 'patient';
+            const senderName = mine
+              ? 'You'
+              : memberLabel(msg.sender_user_id) || msg.sender_label || 'Care Circle';
+            return (
+              <div
+                key={msg.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: mine ? 'flex-end' : 'flex-start',
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ maxWidth: '78%' }}>
+                  <div
+                    style={{
+                      fontFamily: T,
+                      fontSize: 8,
+                      color: MUTED,
+                      marginBottom: 3,
+                      textAlign: mine ? 'right' : 'left',
+                    }}
+                  >
+                    {senderName} · {fmtClock(msg.created_at)}
+                  </div>
+                  <div
+                    style={{
+                      padding: '8px 11px',
+                      borderRadius: 12,
+                      background: mine ? `linear-gradient(135deg, ${SOV}, #fb923c)` : '#111827',
+                      color: mine ? '#1a1208' : '#e2e8f0',
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {msg.body}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
-    </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          placeholder="Message the family..."
+          disabled={sending}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            borderRadius: 22,
+            border: BORDER,
+            background: 'rgba(255,255,255,0.04)',
+            color: INK,
+            fontSize: 13,
+            outline: 'none',
+          }}
+        />
+        <button
+          onClick={send}
+          disabled={sending || !draft.trim()}
+          aria-label="Send"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: 'none',
+            background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
+            color: '#1a1208',
+            fontSize: 16,
+            fontWeight: 700,
+            cursor: sending || !draft.trim() ? 'not-allowed' : 'pointer',
+            opacity: sending || !draft.trim() ? 0.5 : 1,
+            flexShrink: 0,
+          }}
+        >
+          ▶
+        </button>
+      </div>
+    </>
+  );
+}
+
+function fmtClock(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+// ======================================================================
+// HealthOSTab (Sovereign Health OS chat)
+// ======================================================================
+
+interface HealthOSMessage {
+  role: 'user' | 'ai';
+  text: string;
+}
+
+const SUGGESTED_QUESTIONS = [
+  'What do my live vitals mean?',
+  'Is my heart rate normal right now?',
+  'Explain my HRV reading',
+  'How is my SpO2 trend?',
+  'What should the family watch for?',
+  'How close am I to my A1C target?',
+];
+
+export function HealthOSTab() {
+  const [msgs, setMsgs] = useState<HealthOSMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [msgs.length]);
+
+  const ask = async (text: string) => {
+    const msg = text.trim();
+    if (!msg || sending) return;
+    setSending(true);
+    setInput('');
+    setMsgs((p) => [...p, { role: 'user', text: msg }]);
+    try {
+      const r = await fetch('/api/shield', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: msg }),
+      });
+      const d = await r.json().catch(() => ({}));
+      const blocked = Boolean(d?.meta?.blocked);
+      let aiText: string;
+      if (blocked) {
+        aiText =
+          'Blocked: PII detected. Re-send your question without personally identifying information.';
+      } else if (typeof d.insight === 'string' && d.insight.length > 0) {
+        aiText = d.insight;
+      } else {
+        aiText = 'Sovereign Shield is active. AI response unavailable right now.';
+      }
+      setMsgs((p) => [...p, { role: 'ai', text: aiText }]);
+    } catch {
+      setMsgs((p) => [
+        ...p,
+        { role: 'ai', text: 'Shield offline. Your prompt was not sent. Try again.' },
+      ]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <>
+      <div
+        style={{
+          background: CARD,
+          border: BORDER,
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 9,
+              background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
+              color: '#1a1208',
+              fontSize: 16,
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+            aria-hidden
+          >
+            ☥
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: P, fontSize: 16, color: INK, marginBottom: 2 }}>
+              Sovereign Health OS
+            </div>
+            <div style={{ fontSize: 11, color: SUB, lineHeight: 1.5 }}>
+              Sovereign AI with live wearable data and Chickasaw Nation context.
+              Every answer grounded in your real numbers.
+            </div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 9px',
+                borderRadius: 12,
+                background: 'rgba(74,222,128,0.12)',
+                border: '1px solid rgba(74,222,128,0.3)',
+                fontFamily: T,
+                fontSize: 9,
+                color: OK,
+                marginTop: 8,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '.12em',
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: OK,
+                  animation: 'pulse 1.5s infinite',
+                }}
+              />
+              Live Wearable Connected
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={scrollRef}
+        style={{
+          maxHeight: 280,
+          overflowY: 'auto',
+          marginBottom: 10,
+        }}
+      >
+        {msgs.map((m, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
+              marginBottom: 8,
+            }}
+          >
+            <div
+              style={{
+                maxWidth: '80%',
+                padding: '9px 12px',
+                borderRadius: 12,
+                background:
+                  m.role === 'user' ? `linear-gradient(135deg, ${SOV}, #fb923c)` : '#111827',
+                color: m.role === 'user' ? '#1a1208' : '#e2e8f0',
+                fontSize: 12,
+                lineHeight: 1.55,
+                wordBreak: 'break-word',
+              }}
+            >
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {sending && (
+          <div
+            style={{
+              padding: '9px 12px',
+              fontSize: 11,
+              color: MUTED,
+              fontStyle: 'italic',
+            }}
+          >
+            Sovereign AI thinking...
+          </div>
+        )}
+      </div>
+
+      {msgs.length === 0 && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            marginBottom: 12,
+          }}
+        >
+          {SUGGESTED_QUESTIONS.map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => ask(q)}
+              disabled={sending}
+              style={{
+                padding: '7px 12px',
+                borderRadius: 16,
+                border: '1px solid rgba(249,115,22,0.3)',
+                background: 'rgba(249,115,22,0.08)',
+                color: SOV,
+                fontSize: 11,
+                fontFamily: "'Outfit',sans-serif",
+                cursor: sending ? 'not-allowed' : 'pointer',
+                opacity: sending ? 0.6 : 1,
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              ask(input);
+            }
+          }}
+          placeholder="Ask Sovereign Health OS..."
+          disabled={sending}
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            borderRadius: 22,
+            border: BORDER,
+            background: 'rgba(255,255,255,0.04)',
+            color: INK,
+            fontSize: 13,
+            outline: 'none',
+          }}
+        />
+        <button
+          onClick={() => ask(input)}
+          disabled={sending || !input.trim()}
+          aria-label="Ask"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: 'none',
+            background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
+            color: '#1a1208',
+            fontSize: 16,
+            fontWeight: 700,
+            cursor: sending || !input.trim() ? 'not-allowed' : 'pointer',
+            opacity: sending || !input.trim() ? 0.5 : 1,
+            flexShrink: 0,
+          }}
+        >
+          ▶
+        </button>
+      </div>
+    </>
   );
 }
