@@ -82,7 +82,9 @@ interface ShieldState {
 const ShieldContext = createContext<ShieldState>({ payload: null, error: null, loading: true });
 
 // ----------------------------------------------------------------------
-// ClinicalData context (only used to source patient name + age + id)
+// ClinicalData context. The new patient surface only consumes patient.*
+// (name, id, age, score). The remaining shape is retained as exported
+// types so legacy importers in src/app/clinical/page.tsx still type-check.
 // ----------------------------------------------------------------------
 
 export interface ClinicalPatient {
@@ -91,13 +93,44 @@ export interface ClinicalPatient {
   age: number;
   score: number;
 }
+export interface ClinicalVital {
+  icon: string;
+  val: string;
+  unit: string;
+  name: string;
+  s: string;
+}
+export interface ClinicalDomain {
+  name: string;
+  score: number;
+}
+export interface ClinicalInsight {
+  type: string;
+  icon: string;
+  title: string;
+  body: string;
+  cta: string;
+  conf: string;
+}
+export interface ClinicalTimelineItem {
+  dot: string;
+  date: string;
+  title: string;
+  text: string;
+}
+export interface ClinicalMeal {
+  time: string;
+  name: string;
+  desc: string;
+  tags: string[];
+}
 export interface ClinicalData {
   patient: ClinicalPatient;
-  vitals: unknown[];
-  domains: unknown[];
-  insights: unknown[];
-  timeline: unknown[];
-  meals: unknown[];
+  vitals: ClinicalVital[];
+  domains: ClinicalDomain[];
+  insights: ClinicalInsight[];
+  timeline: ClinicalTimelineItem[];
+  meals: ClinicalMeal[];
   wearHr7Day: number[];
   wearSteps7Day: number[];
   wearDays: string[];
