@@ -4,15 +4,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * CareIQ Health Intelligence section components used by the patient
- * dashboard. Uses the same orange/gold visual standard as the
- * CareCircle Sovereign Edition, but rebranded as CareIQ for
- * non-native healthcare systems. Each export is a self-contained
- * slot:
+ * dashboard. Uses the CareCircle teal visual standard, branded as
+ * CareIQ for non-native healthcare systems. Each export is a
+ * self-contained slot:
  *
  *   LiveWearable         4x2 live wearable grid, polls /api/wearable/latest
  *                        every 5s, LIVE badge, Withings ScanWatch label.
  *   ZKShieldBanner       HIPAA + AES-256-GCM attestation.
- *   PatientCard          Orange initials avatar, name, CHK-YYYY-XXXXX,
+ *   PatientCard          Teal initials avatar, name, CHK-YYYY-XXXXX,
  *                        big risk score, alert count + next-scan,
  *                        3x2 clinical vitals grid.
  *   ActiveProtocols      4 protocols with contextual subtitle + bar.
@@ -30,15 +29,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 const T = "'DM Mono',monospace";
 const P = "'Playfair Display',serif";
 const OK = '#4ade80';
-const WARN = '#f97316';
+const WARN = '#d4a843';
 const ALERT = '#e8526e';
 const MUTED = '#7a9bbf';
 const INK = '#eef2f8';
 const SUB = '#a3b5cc';
 const CARD = 'rgba(255,255,255,0.04)';
 const BORDER = '1px solid rgba(255,255,255,0.06)';
-const SOV = '#f97316';
-const SOV_BG = 'rgba(249,115,22,0.12)';
+const SOV = '#14b8a6';
+const SOV2 = '#2dd4bf';
+const SOV_BG = 'rgba(20,184,166,0.12)';
+const SOV_INK = '#042f2a';
 
 // ----------------------------------------------------------------------
 // Shared types (subset of /api/shield/decrypt response we consume)
@@ -478,8 +479,8 @@ export function PatientCard({
             width: 44,
             height: 44,
             borderRadius: '50%',
-            background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
-            color: '#1a1208',
+            background: `linear-gradient(135deg, ${SOV}, ${SOV2})`,
+            color: SOV_INK,
             fontWeight: 800,
             fontSize: 16,
             display: 'flex',
@@ -1053,7 +1054,7 @@ export function MedsTab() {
               style={{
                 height: '100%',
                 width: `${pct}%`,
-                background: `linear-gradient(90deg, ${SOV}, #fb923c)`,
+                background: `linear-gradient(90deg, ${SOV}, ${SOV2})`,
                 borderRadius: 2,
                 transition: 'width 1s ease',
               }}
@@ -1195,7 +1196,7 @@ interface FamilyMessage {
 }
 
 function memberAvatarColor(idx: number): string {
-  const palette = ['#f97316', '#fb923c', '#d4a843', '#8060cc', '#00d4b8', '#4ade80'];
+  const palette = ['#14b8a6', '#2dd4bf', '#06b6d4', '#8b5cf6', '#0ea5e9', '#4ade80'];
   return palette[idx % palette.length];
 }
 
@@ -1340,7 +1341,7 @@ export function FamilyTab() {
                     height: 44,
                     borderRadius: '50%',
                     background: `linear-gradient(135deg, ${c}, ${c}aa)`,
-                    color: '#1a1208',
+                    color: SOV_INK,
                     fontWeight: 800,
                     fontSize: 13,
                     display: 'flex',
@@ -1411,8 +1412,8 @@ export function FamilyTab() {
                     style={{
                       padding: '8px 11px',
                       borderRadius: 12,
-                      background: mine ? `linear-gradient(135deg, ${SOV}, #fb923c)` : '#111827',
-                      color: mine ? '#1a1208' : '#e2e8f0',
+                      background: mine ? `linear-gradient(135deg, ${SOV}, ${SOV2})` : '#111827',
+                      color: mine ? SOV_INK : '#e2e8f0',
                       fontSize: 12,
                       lineHeight: 1.5,
                       wordBreak: 'break-word',
@@ -1459,8 +1460,8 @@ export function FamilyTab() {
             height: 40,
             borderRadius: '50%',
             border: 'none',
-            background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
-            color: '#1a1208',
+            background: `linear-gradient(135deg, ${SOV}, ${SOV2})`,
+            color: SOV_INK,
             fontSize: 16,
             fontWeight: 700,
             cursor: sending || !draft.trim() ? 'not-allowed' : 'pointer',
@@ -1564,8 +1565,8 @@ export function HealthIntelTab() {
               width: 36,
               height: 36,
               borderRadius: 9,
-              background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
-              color: '#1a1208',
+              background: `linear-gradient(135deg, ${SOV}, ${SOV2})`,
+              color: SOV_INK,
               fontSize: 13,
               fontWeight: 800,
               display: 'flex',
@@ -1642,8 +1643,8 @@ export function HealthIntelTab() {
                 padding: '9px 12px',
                 borderRadius: 12,
                 background:
-                  m.role === 'user' ? `linear-gradient(135deg, ${SOV}, #fb923c)` : '#111827',
-                color: m.role === 'user' ? '#1a1208' : '#e2e8f0',
+                  m.role === 'user' ? `linear-gradient(135deg, ${SOV}, ${SOV2})` : '#111827',
+                color: m.role === 'user' ? SOV_INK : '#e2e8f0',
                 fontSize: 12,
                 lineHeight: 1.55,
                 wordBreak: 'break-word',
@@ -1685,8 +1686,8 @@ export function HealthIntelTab() {
               style={{
                 padding: '7px 12px',
                 borderRadius: 16,
-                border: '1px solid rgba(249,115,22,0.3)',
-                background: 'rgba(249,115,22,0.08)',
+                border: '1px solid rgba(20,184,166,0.3)',
+                background: 'rgba(20,184,166,0.08)',
                 color: SOV,
                 fontSize: 11,
                 fontFamily: "'Outfit',sans-serif",
@@ -1732,8 +1733,8 @@ export function HealthIntelTab() {
             height: 40,
             borderRadius: '50%',
             border: 'none',
-            background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
-            color: '#1a1208',
+            background: `linear-gradient(135deg, ${SOV}, ${SOV2})`,
+            color: SOV_INK,
             fontSize: 16,
             fontWeight: 700,
             cursor: sending || !input.trim() ? 'not-allowed' : 'pointer',

@@ -17,11 +17,10 @@ import {
 /* ======================================================================
    CareIQ patient surface.
 
-   Uses the same orange/gold visual standard as the CareCircle Sovereign
-   Edition mockups, but branded as CareIQ for non-native healthcare
-   systems. Above the fold every screen carries the Live Wearable strip
-   and the ZK Shield attestation banner. Bottom nav is four tabs:
-   Home, Meds, Family, Health Intel.
+   Uses the CareCircle teal visual standard, branded as CareIQ for
+   non-native healthcare systems. Above the fold every screen carries
+   the Live Wearable strip and the ZK Shield attestation banner. Bottom
+   nav is four tabs: Home, Meds, Family, Health Intel.
 
    Data plane: Shield decrypt response (panel + risk score) flows through
    ShieldContext; lightweight wearable polling happens inside
@@ -32,23 +31,23 @@ import {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-.sov{display:flex;flex-direction:column;height:100vh;height:100dvh;font-family:'Outfit',sans-serif;color:#eef2f8;background:#0b1220;position:relative;overflow:hidden;max-width:480px;margin:0 auto}
-.sov::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 40% at 80% 0%,rgba(249,115,22,0.08) 0%,transparent 60%),radial-gradient(ellipse 60% 60% at 0% 100%,rgba(128,96,204,0.06) 0%,transparent 60%)}
-.sov-hdr{position:relative;z-index:10;flex-shrink:0;padding:14px 18px 12px;background:rgba(11,18,32,0.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.06)}
+.sov{display:flex;flex-direction:column;height:100vh;height:100dvh;font-family:'Outfit',sans-serif;color:#eef2f8;background:#0a1628;position:relative;overflow:hidden;max-width:480px;margin:0 auto}
+.sov::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 40% at 80% 0%,rgba(20,184,166,0.08) 0%,transparent 60%),radial-gradient(ellipse 60% 60% at 0% 100%,rgba(45,212,191,0.06) 0%,transparent 60%)}
+.sov-hdr{position:relative;z-index:10;flex-shrink:0;padding:14px 18px 12px;background:rgba(10,22,40,0.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.06)}
 .sov-hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .sov-logo{display:flex;align-items:center;gap:10px;min-width:0}
-.sov-logo-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#f97316,#fb923c);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#1a1208;flex-shrink:0;letter-spacing:.05em}
+.sov-logo-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#14b8a6,#2dd4bf);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#042f2a;flex-shrink:0;letter-spacing:.05em}
 .sov-logo-name{font-family:'Playfair Display',serif;font-size:17px;color:#eef2f8;line-height:1}
-.sov-logo-sub{font-family:'DM Mono',monospace;font-size:8px;color:#f97316;letter-spacing:.22em;text-transform:uppercase;margin-top:3px}
+.sov-logo-sub{font-family:'DM Mono',monospace;font-size:8px;color:#14b8a6;letter-spacing:.22em;text-transform:uppercase;margin-top:3px}
 .zk-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.35);font-family:'DM Mono',monospace;font-size:9px;color:#4ade80;font-weight:700;letter-spacing:.14em;text-transform:uppercase;flex-shrink:0;white-space:nowrap}
 .zk-pill .dot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .sov-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:1}
 .sov-pad{padding:14px 18px calc(96px + env(safe-area-inset-bottom,0px))}
-.sov-bnav{position:fixed;bottom:0;left:0;right:0;background:rgba(11,18,32,0.97);backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,0.06);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 4px calc(10px + env(safe-area-inset-bottom,0px));z-index:20;max-width:480px;margin:0 auto}
+.sov-bnav{position:fixed;bottom:0;left:0;right:0;background:rgba(10,22,40,0.97);backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,0.06);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 4px calc(10px + env(safe-area-inset-bottom,0px));z-index:20;max-width:480px;margin:0 auto}
 .sov-bnav-btn{background:transparent;border:none;color:#7a9bbf;font-family:'Outfit',sans-serif;font-size:10px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px;border-radius:9px;transition:color .2s;min-height:50px;justify-content:center;position:relative}
-.sov-bnav-btn.on{color:#f97316}
-.sov-bnav-btn.on::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:32px;height:2px;background:linear-gradient(90deg,#f97316,#fb923c);border-radius:0 0 2px 2px}
+.sov-bnav-btn.on{color:#14b8a6}
+.sov-bnav-btn.on::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:32px;height:2px;background:linear-gradient(90deg,#14b8a6,#2dd4bf);border-radius:0 0 2px 2px}
 .sov-bnav-icon{font-size:16px;line-height:1}
 .sov-bnav-lbl{font-size:9px;letter-spacing:.04em}
 .sov-err{padding:14px;background:rgba(232,82,110,0.06);border:1px solid rgba(232,82,110,0.25);border-radius:11px;margin:14px 18px;color:#e8526e;font-size:11px;line-height:1.5}
