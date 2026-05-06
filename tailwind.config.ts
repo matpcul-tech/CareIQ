@@ -19,22 +19,28 @@ const config: Config = {
           soft: "#a3b5cc",
           mute: "#7a9bbf",
         },
-        // Sovereign Health OS palette. Matches the inline-CSS palette used
-        // inside CareIQHealthOS.tsx so the landing page, onboarding,
-        // dashboard, and clinical OS all read as one product.
+        // CareIQ palette. Matches the inline-CSS palette used inside
+        // CareIQHealthOS.tsx so the landing page, onboarding, dashboard,
+        // and clinical OS all read as one product.
+        //
+        // The accent (formerly gold #d4a843) was repointed to the
+        // CareCircle marketing-site teal so the entire CareIQ surface
+        // matches care-os. The token names `gold` / `goldDark` are kept
+        // for backwards compatibility with existing utility class usages
+        // throughout the codebase.
         sov: {
           bg: "#07101f",        // dark navy page background
           card: "#0d1a30",      // dark navy card background
           panel: "#11243d",     // slightly lifted panel
           border: "#1e3a5f",    // subtle navy border
-          gold: "#d4a843",      // primary accent
-          goldDark: "#b8902f",  // gold on hover / pressed
+          gold: "#14b8a6",      // primary accent (teal)
+          goldDark: "#0d9488",  // accent on hover / pressed
           teal: "#00d4b8",      // secondary accent
           tealDark: "#00b89e",  // teal on hover
           violet: "#8060cc",
           green: "#4ade80",
           rose: "#e8526e",
-          accent: "#d4a843",
+          accent: "#14b8a6",
           link: "#00d4b8",
         },
       },
@@ -72,7 +78,7 @@ const config: Config = {
       boxShadow: {
         card: "0 1px 3px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.25)",
         cardLg: "0 1px 3px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.35)",
-        gold: "0 0 0 1px rgba(212,168,67,0.25), 0 4px 18px rgba(212,168,67,0.15)",
+        gold: "0 0 0 1px rgba(20,184,166,0.25), 0 4px 18px rgba(20,184,166,0.15)",
         teal: "0 0 0 1px rgba(0,212,184,0.25), 0 4px 18px rgba(0,212,184,0.15)",
       },
       borderRadius: {

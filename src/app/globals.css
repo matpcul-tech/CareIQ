@@ -15,8 +15,8 @@
     -moz-osx-font-smoothing: grayscale;
     background-color: #07101f;
     background-image:
-      radial-gradient(ellipse 90% 50% at 15% 5%, rgba(0, 212, 184, 0.07) 0%, transparent 55%),
-      radial-gradient(ellipse 70% 70% at 85% 95%, rgba(128, 96, 204, 0.07) 0%, transparent 55%);
+      radial-gradient(ellipse 90% 50% at 15% 5%, rgba(20, 184, 166, 0.07) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 70% at 85% 95%, rgba(45, 212, 191, 0.07) 0%, transparent 55%);
     background-attachment: fixed;
   }
   *, *::before, *::after { box-sizing: border-box; }
@@ -33,14 +33,14 @@
 }
 
 @layer components {
-  /* Primary CTA: gold on navy. Matches the clinical OS gold accent. */
+  /* Primary CTA: teal on navy. Matches the CareCircle marketing accent. */
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sov-gold disabled:cursor-not-allowed disabled:opacity-60;
-    background: linear-gradient(135deg, #d4a843, #b8902f);
-    color: #07101f;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 4px 16px rgba(212, 168, 67, 0.18);
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+    color: #042f2a;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 4px 16px rgba(20, 184, 166, 0.18);
   }
-  .btn-primary:hover { background: linear-gradient(135deg, #e0b455, #c89a37); }
+  .btn-primary:hover { background: linear-gradient(135deg, #2dd4bf, #14b8a6); }
 
   /* Secondary CTA: teal outline on dark. */
   .btn-secondary {
@@ -69,14 +69,14 @@
   .field-textarea::placeholder { color: #7a9bbf; }
   .field-input:focus,
   .field-textarea:focus {
-    border-color: #d4a843;
-    box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.25);
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.25);
   }
 
   .card {
     @apply rounded-2xl p-6 shadow-card;
     background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(0, 212, 184, 0.14);
+    border: 1px solid rgba(20, 184, 166, 0.14);
     color: #eef2f8;
   }
 
@@ -125,23 +125,23 @@
     color: #7a9bbf;
   }
   .step-pill-on {
-    background: linear-gradient(135deg, #d4a843, #b8902f);
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
     border-color: transparent;
-    color: #07101f;
+    color: #042f2a;
   }
   .step-pill-done {
-    background: rgba(212, 168, 67, 0.12);
-    border-color: rgba(212, 168, 67, 0.4);
-    color: #d4a843;
+    background: rgba(20, 184, 166, 0.12);
+    border-color: rgba(20, 184, 166, 0.4);
+    color: #14b8a6;
   }
 
-  /* Gold progress bar used on onboard. */
+  /* Teal progress bar used on onboard. */
   .progress-track {
     @apply h-1.5 w-full overflow-hidden rounded-full;
     background: rgba(255, 255, 255, 0.06);
   }
   .progress-fill {
     @apply h-full rounded-full transition-all;
-    background: linear-gradient(90deg, #d4a843, #e0b455);
+    background: linear-gradient(90deg, #14b8a6, #2dd4bf);
   }
 }

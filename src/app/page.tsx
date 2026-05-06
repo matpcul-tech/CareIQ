@@ -16,7 +16,7 @@ export default function Home() {
           <span
             aria-hidden
             className="grid h-9 w-9 place-items-center rounded-xl text-lg"
-            style={{ background: "linear-gradient(135deg, #00d4b8, #8060cc)" }}
+            style={{ background: "linear-gradient(135deg, #14b8a6, #2dd4bf)", color: "#042f2a" }}
           >
             +
           </span>
@@ -39,7 +39,7 @@ export default function Home() {
         </span>
         <h1
           className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-sov-gold sm:text-6xl md:text-7xl"
-          style={{ textShadow: "0 0 28px rgba(212,168,67,0.18)" }}
+          style={{ textShadow: "0 0 28px rgba(20,184,166,0.18)" }}
         >
           CARE
           <br />
