@@ -2,6 +2,16 @@
 import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode, type CSSProperties } from "react";
 import InviteFamilyModal from "@/components/InviteFamilyModal";
 import LongevityPanel, { type ShieldPayload as LongevityShieldPayload } from "@/components/LongevityPanel";
+import {
+  LiveWearableStrip,
+  PatientCard,
+  ActiveProtocols,
+  RiskDomains,
+  MedsTab as MedsTabSection,
+  FamilyTab as FamilyTabSection,
+  chkIdFor,
+  type SectionsShieldPayload,
+} from "@/components/careiq/Sections";
 
 const ZK_SALT = "CARE-IQ-SOVEREIGN-SHIELD-2026";
 const ZK_TERMS = ["fqhc","careiq","sovereign","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
@@ -446,11 +456,22 @@ function EmptyState({text}:{text:string}){
 const RISK_DOMAIN_NAMES = ["Metabolic","Cardiovascular","Cognitive","Oncology","Renal","Mental Health"];
 
 function Overview(){
-  const { payload: shield, error: shieldErr } = useContext(ShieldContext);
+  const { payload: shield, error: shieldErr, loading: shieldLoading } = useContext(ShieldContext);
+  const { patient } = useContext(ClinicalDataContext);
   const demoNarrative = process.env.NEXT_PUBLIC_SHIELD_DEMO_PLANS === "true";
+  const sectionsShield = shield as unknown as SectionsShieldPayload | null;
   return(
     <div className="pad">
-      <div className="sec">Today, In Plain Language</div>
+      <PatientCard
+        patientId={shield?.patient_id || patient.id || ""}
+        name={patient.name || ""}
+        age={patient.age || 0}
+        shield={sectionsShield}
+        shieldLoading={shieldLoading}
+      />
+      <ActiveProtocols shield={sectionsShield} />
+      <RiskDomains shield={sectionsShield} />
+      <div className="sec" style={{margin:"22px 0 10px"}}>Today, In Plain Language</div>
       <div className="card">
         <div className="card-hdr">
           <span className="card-title">Health Narrative</span>
@@ -466,6 +487,9 @@ function Overview(){
     </div>
   );
 }
+
+function MedsTab(){ return <MedsTabSection />; }
+function FamilyTab(){ return <FamilyTabSection />; }
 
 function Insights(){
   const { payload: shield } = useContext(ShieldContext);
@@ -1082,7 +1106,7 @@ function Wearable(){
   );
 }
 
-const PNAV=[{id:"overview",icon:"H",label:"Health"},{id:"insights",icon:"I",label:"Insights"},{id:"nutrition",icon:"N",label:"Nutrition"},{id:"wearable",icon:"W",label:"Wearable"},{id:"ai",icon:"AI",label:"AI"},{id:"profile",icon:"P",label:"Profile"}];
+const PNAV=[{id:"overview",icon:"H",label:"Health"},{id:"meds",icon:"M",label:"Meds"},{id:"ai",icon:"AI",label:"AI"},{id:"family",icon:"F",label:"Family"},{id:"profile",icon:"P",label:"Profile"}];
 const CNAV=[{id:"blood",icon:"B",label:"Blood"},{id:"telehealth",icon:"T",label:"Telehealth"},{id:"sovereignty",icon:"S",label:"Sovereign"},{id:"impact",icon:"$",label:"Impact"},{id:"shield",icon:"X",label:"Shield"}];
 
 const RING_R=37;
@@ -1142,13 +1166,12 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
     vitals: shield ? vitalsFromShield(shield) : [],
   };
 
-  const { patient, vitals } = data;
+  const { patient } = data;
 
   const [mode,setMode]=useState("patient");
   const [page,setPage]=useState("overview");
   const [logs,setLogs]=useState<SLog[]>([]);
   const [elder,setElder]=useState(false);
-  const [ringPct,setRingPct]=useState(0);
 
   useEffect(()=>{
     getZKDict();
@@ -1163,23 +1186,18 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
   },[elder]);
 
   useEffect(()=>{
-    const target = shield ? Math.round(shield.risk_score) : 0;
-    const t=setTimeout(()=>setRingPct(target),120);
-    return()=>clearTimeout(t);
-  },[shield]);
-
-  useEffect(()=>{
     const nav=mode==="patient"?PNAV:CNAV;
     if(!nav.find(n=>n.id===page))setPage(nav[0].id);
   },[mode,page]);
 
   const addLog=useCallback((log:SLog)=>setLogs(p=>[...p,log]),[]);
   const nav=mode==="patient"?PNAV:CNAV;
-  const showRing=mode==="patient"&&page!=="ai"&&page!=="profile";
 
   const renderPage=()=>{
     switch(page){
       case"overview":return<Overview/>;
+      case"meds":return<MedsTab/>;
+      case"family":return<FamilyTab/>;
       case"insights":return<Insights/>;
       case"nutrition":return<Nutrition/>;
       case"wearable":return<Wearable/>;
@@ -1191,6 +1209,10 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
       case"profile":return<Profile/>;
       case"ai":return(
         <div style={{height:"100%",display:"flex",flexDirection:"column",padding:`12px 18px calc(110px + env(safe-area-inset-bottom,0px))`,minHeight:0}}>
+          <div style={{
+            fontFamily:"'DM Mono',monospace",fontSize:9,color:"#00d4b8",
+            textTransform:"uppercase",letterSpacing:".18em",marginBottom:10,
+          }}>Sovereign Health OS</div>
           <AIChat onLog={addLog}/>
         </div>
       );
@@ -1198,27 +1220,9 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
     }
   };
 
-  const offset = shield ? RING_C*(1-ringPct/100) : RING_C;
-
-  // Risk label / sub-label rendering, derived only from real Shield data.
-  let riskTitle: string;
-  let riskTitleColor = "#eef2f8";
-  if (shieldErr) {
-    riskTitle = `Vitals not available: ${shieldErr}`;
-    riskTitleColor = "#e8526e";
-  } else if (shieldLoading || !shield) {
-    riskTitle = "Loading vitals...";
-    riskTitleColor = MUTED;
-  } else {
-    riskTitle = shield.risk_label || NOT_AVAILABLE;
-  }
-
-  // Ring center number: blank while loading, else the real risk score.
-  const ringCenterNum = shieldLoading ? "" : (shield ? String(Math.round(shield.risk_score)) : "");
-
   // Header patient label, only show name when we actually have one.
   const headerName = patient.name || (shieldLoading ? "Loading..." : NOT_ENTERED);
-  const headerId = patient.id || (shield?.patient_id || "");
+  const headerId = chkIdFor(patient.id || shield?.patient_id || "");
 
   return(
     <ClinicalDataContext.Provider value={data}>
@@ -1246,48 +1250,7 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
               Demo data - <a href="/onboard?step=2&edit=1">complete your profile</a> to see your health intelligence.
             </div>
           )}
-          {showRing&&(
-            <>
-              <div className="ring-wrap">
-                <div className="ring-pos">
-                  <svg width="100%" height="100%" viewBox="0 0 88 88" className="ring-svg" preserveAspectRatio="xMidYMid meet">
-                    <circle cx="44" cy="44" r={RING_R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7"/>
-                    <circle className="ring-progress" cx="44" cy="44" r={RING_R} fill="none" stroke="url(#rg)" strokeWidth="7"
-                      strokeLinecap="round" strokeDasharray={`${RING_C}`} strokeDashoffset={`${offset}`}/>
-                    <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#00d4b8"/><stop offset="100%" stopColor="#8060cc"/>
-                    </linearGradient></defs>
-                  </svg>
-                  <div className="ring-inner">
-                    <div className="ring-num">{ringCenterNum || (shieldLoading ? "..." : "")}</div>
-                    <div className="ring-lbl">Score</div>
-                  </div>
-                </div>
-                <div className="score-info">
-                  <div className="score-title" style={{color: riskTitleColor}}>{riskTitle}</div>
-                </div>
-              </div>
-              <div className="vitals-row">
-                {vitals.length === 0 ? (
-                  <div className="vital" style={{minWidth: 220}}>
-                    <div className="vital-name" style={{marginTop:0}}>
-                      {shieldErr ? `Vitals not available: ${shieldErr}` : (shieldLoading ? "Loading vitals..." : NOT_ENTERED)}
-                    </div>
-                  </div>
-                ) : vitals.map((v,i)=>{
-                  const isEmpty = v.s === "muted";
-                  return (
-                    <div className="vital" key={i} style={isEmpty ? {minWidth: 110} : undefined}>
-                      <div className="vital-icon">{v.icon}</div>
-                      <div className={`vital-val ${v.s}`} style={isEmpty ? {fontSize: 10, lineHeight: 1.3} : undefined}>{v.val}</div>
-                      {!isEmpty && <div className="vital-unit">{v.unit}</div>}
-                      <div className="vital-name">{v.name}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
+          {mode==="patient"&&<LiveWearableStrip/>}
           <div className="mode-bar">
             <button className={`mbtn ${mode==="patient"?"on":""}`} onClick={()=>setMode("patient")} aria-pressed={mode==="patient"}>Patient</button>
             <button className={`mbtn ${mode==="clinical"?"on":""}`} onClick={()=>setMode("clinical")} aria-pressed={mode==="clinical"}>Clinical</button>
