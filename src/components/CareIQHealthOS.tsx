@@ -3,29 +3,30 @@
 import { useState, useEffect, useContext, createContext, Component, ReactNode } from "react";
 import InviteFamilyModal from "@/components/InviteFamilyModal";
 import {
-  SovereignWearable,
+  LiveWearable,
   ZKShieldBanner,
   PatientCard,
   ActiveProtocols,
   RiskDomains,
   MedsTab,
   FamilyTab,
-  HealthOSTab,
+  HealthIntelTab,
   type SectionsShieldPayload,
 } from "@/components/careiq/Sections";
 
 /* ======================================================================
-   CareCircle Sovereign Edition shell.
+   CareIQ patient surface.
 
-   The patient surface is rebuilt around the orange/gold Sovereign Edition
-   visual standard. Above the fold every screen carries the Sovereign
-   Wearable strip and the ZK Sovereign Shield attestation banner. Bottom
-   nav is four tabs: Home, Meds, Family, Health OS.
+   Uses the same orange/gold visual standard as the CareCircle Sovereign
+   Edition mockups, but branded as CareIQ for non-native healthcare
+   systems. Above the fold every screen carries the Live Wearable strip
+   and the ZK Shield attestation banner. Bottom nav is four tabs:
+   Home, Meds, Family, Health Intel.
 
-   Data plane stays the same: the Shield decrypt response (panel + risk
-   score) flows through ShieldContext, the lightweight wearable polling
-   happens inside SovereignWearable, and the medication / circle / message
-   reads happen inside their respective tab components.
+   Data plane: Shield decrypt response (panel + risk score) flows through
+   ShieldContext; lightweight wearable polling happens inside
+   LiveWearable; medication / circle / message reads happen inside
+   their respective tab components.
    ====================================================================== */
 
 const CSS = `
@@ -36,7 +37,7 @@ const CSS = `
 .sov-hdr{position:relative;z-index:10;flex-shrink:0;padding:14px 18px 12px;background:rgba(11,18,32,0.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.06)}
 .sov-hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .sov-logo{display:flex;align-items:center;gap:10px;min-width:0}
-.sov-logo-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#f97316,#fb923c);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#1a1208;flex-shrink:0;letter-spacing:.05em}
+.sov-logo-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#f97316,#fb923c);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#1a1208;flex-shrink:0;letter-spacing:.05em}
 .sov-logo-name{font-family:'Playfair Display',serif;font-size:17px;color:#eef2f8;line-height:1}
 .sov-logo-sub{font-family:'DM Mono',monospace;font-size:8px;color:#f97316;letter-spacing:.22em;text-transform:uppercase;margin-top:3px}
 .zk-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:14px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.35);font-family:'DM Mono',monospace;font-size:9px;color:#4ade80;font-weight:700;letter-spacing:.14em;text-transform:uppercase;flex-shrink:0;white-space:nowrap}
@@ -134,7 +135,7 @@ class TabErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
     if (this.state.hasError) {
       return (
         <div className="sov-err">
-          This tab could not load. Other tabs and the Sovereign Shield are unaffected.
+          This tab could not load. Other tabs and the ZK Shield are unaffected.
           Try switching tabs and returning.
         </div>
       );
@@ -153,7 +154,7 @@ function HomeTab() {
   const sectionsShield = shield as unknown as SectionsShieldPayload | null;
   return (
     <>
-      <SovereignWearable />
+      <LiveWearable />
       <ZKShieldBanner />
       <PatientCard
         patientId={shield?.patient_id || patient.id || ""}
@@ -172,13 +173,13 @@ function HomeTab() {
 // Top-level component
 // ----------------------------------------------------------------------
 
-type TabId = "home" | "meds" | "family" | "healthos";
+type TabId = "home" | "meds" | "family" | "healthintel";
 
 const NAV: Array<{ id: TabId; icon: string; label: string }> = [
   { id: "home", icon: "⌂", label: "Home" },
   { id: "meds", icon: "☥", label: "Meds" },
   { id: "family", icon: "♤", label: "Family" },
-  { id: "healthos", icon: "☸", label: "Health OS" },
+  { id: "healthintel", icon: "☸", label: "Health Intel" },
 ];
 
 interface CareIQHealthOSProps {
@@ -246,18 +247,16 @@ export default function CareIQHealthOS({
         return <MedsTab />;
       case "family":
         return <FamilyTab />;
-      case "healthos":
-        return <HealthOSTab />;
+      case "healthintel":
+        return <HealthIntelTab />;
       case "home":
       default:
         return <HomeTab />;
     }
   };
 
-  // Top of every tab: Sovereign Wearable + ZK banner.
-  // Home tab ALSO includes them (we render the home composition once via
-  // HomeTab so we don't duplicate them when on home; for non-home tabs we
-  // surface them above the tab body so the live strip is always visible).
+  // Top of every NON-home tab: Live Wearable + ZK banner so the live
+  // strip is visible everywhere. HomeTab includes them itself.
   const showWearableAtTop = tab !== "home";
 
   return (
@@ -270,10 +269,10 @@ export default function CareIQHealthOS({
           <div className="sov-hdr">
             <div className="sov-hdr-row">
               <div className="sov-logo">
-                <div className="sov-logo-mark">CC</div>
+                <div className="sov-logo-mark">IQ</div>
                 <div>
-                  <div className="sov-logo-name">CareCircle</div>
-                  <div className="sov-logo-sub">Sovereign Edition</div>
+                  <div className="sov-logo-name">CareIQ</div>
+                  <div className="sov-logo-sub">Health Intelligence</div>
                 </div>
               </div>
               <div className="zk-pill">
@@ -294,7 +293,7 @@ export default function CareIQHealthOS({
             <div className="sov-pad">
               {showWearableAtTop && (
                 <>
-                  <SovereignWearable />
+                  <LiveWearable />
                   <ZKShieldBanner />
                 </>
               )}

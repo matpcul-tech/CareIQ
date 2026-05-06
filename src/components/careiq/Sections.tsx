@@ -3,20 +3,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
- * CareCircle Sovereign Edition section components used by the patient
- * dashboard. Each export is a self-contained slot:
+ * CareIQ Health Intelligence section components used by the patient
+ * dashboard. Uses the same orange/gold visual standard as the
+ * CareCircle Sovereign Edition, but rebranded as CareIQ for
+ * non-native healthcare systems. Each export is a self-contained
+ * slot:
  *
- *   SovereignWearable    4x2 live wearable grid, polls /api/wearable/latest
+ *   LiveWearable         4x2 live wearable grid, polls /api/wearable/latest
  *                        every 5s, LIVE badge, Withings ScanWatch label.
- *   ZKShieldBanner       Chickasaw Nation infrastructure attestation.
- *   PatientCard          MC avatar, name, CHK-YYYY-XXXXX, big risk score,
- *                        alert count + next-scan, 3x2 clinical vitals grid.
+ *   ZKShieldBanner       HIPAA + AES-256-GCM attestation.
+ *   PatientCard          Orange initials avatar, name, CHK-YYYY-XXXXX,
+ *                        big risk score, alert count + next-scan,
+ *                        3x2 clinical vitals grid.
  *   ActiveProtocols      4 protocols with contextual subtitle + bar.
  *   RiskDomains          6 named domains, icon + score + bar each.
  *   MedsTab              Doses Taken hero, schedule with sun/moon time chips,
  *                        protocol context per med.
  *   FamilyTab            Avatar pill row, chat thread, message input.
- *   HealthOSTab          Sovereign Health OS chat with live wearable badge
+ *   HealthIntelTab       CareIQ AI chat with live wearable badge
  *                        and suggested-question pills.
  *
  * No demo data is fabricated. Every metric, score, and percentage is
@@ -106,7 +110,7 @@ function initialsFor(name: string): string {
 }
 
 // ======================================================================
-// SovereignWearable
+// LiveWearable
 // ======================================================================
 
 interface LiveMetrics {
@@ -218,7 +222,7 @@ function sleepTone(v: number | null): string {
   return OK;
 }
 
-export function SovereignWearable() {
+export function LiveWearable() {
   const { m, err } = useLiveMetrics();
   const fmtSleep = (h: number | null) => {
     if (h == null) return '–';
@@ -270,7 +274,7 @@ export function SovereignWearable() {
             </svg>
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Sovereign Wearable</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Live Wearable</div>
             <div style={{ fontFamily: T, fontSize: 9, color: MUTED, marginTop: 1 }}>
               {m?.device || 'Withings ScanWatch'} · Syncing every 5s
             </div>
@@ -378,6 +382,9 @@ export function SovereignWearable() {
   );
 }
 
+// Back-compat alias for callers that imported the previous name.
+export const SovereignWearable = LiveWearable;
+
 // ======================================================================
 // ZKShieldBanner
 // ======================================================================
@@ -412,8 +419,8 @@ export function ZKShieldBanner() {
         />
       </svg>
       <div style={{ fontSize: 11, lineHeight: 1.55, color: SUB }}>
-        <span style={{ color: OK, fontWeight: 700 }}>ZK Sovereign Shield Active.</span>{' '}
-        Wearable data processed on Chickasaw Nation infrastructure only.
+        <span style={{ color: OK, fontWeight: 700 }}>ZK Shield Active.</span>{' '}
+        AES-256-GCM at rest, HIPAA-compliant infrastructure, audit logged.
       </div>
     </div>
   );
@@ -452,6 +459,8 @@ export function PatientCard({
   const hr = shield?.hr ?? null;
   const spo2 = shield?.spo2 ?? null;
   const hrv = shield?.hrv ?? null;
+  const tempEntry = flatBiomarker(shield?.biomarkers, 'body_temperature');
+  const temp = tempEntry?.value ?? null;
 
   return (
     <div
@@ -546,7 +555,7 @@ export function PatientCard({
           tone={INK}
         />
         <Cell
-          value={shield?.biomarkers ? '98.2' : '–'}
+          value={temp != null ? temp.toFixed(1) : '–'}
           label="Temp °F"
           tone={INK}
         />
@@ -902,7 +911,6 @@ function parseTimeChips(tod: string | null): Array<{ icon: 'sun' | 'moon'; label
   if (!tod) return [];
   const lower = tod.toLowerCase();
   const chips: Array<{ icon: 'sun' | 'moon'; label: string }> = [];
-  // crude: split on 'and' or commas, then classify
   const parts = lower.split(/(?:,|\band\b|\bplus\b)/).map((s) => s.trim()).filter(Boolean);
   if (parts.length === 0) parts.push(lower);
   for (const part of parts) {
@@ -1477,10 +1485,10 @@ function fmtClock(iso: string): string {
 }
 
 // ======================================================================
-// HealthOSTab (Sovereign Health OS chat)
+// HealthIntelTab (CareIQ AI chat)
 // ======================================================================
 
-interface HealthOSMessage {
+interface HealthIntelMessage {
   role: 'user' | 'ai';
   text: string;
 }
@@ -1494,8 +1502,8 @@ const SUGGESTED_QUESTIONS = [
   'How close am I to my A1C target?',
 ];
 
-export function HealthOSTab() {
-  const [msgs, setMsgs] = useState<HealthOSMessage[]>([]);
+export function HealthIntelTab() {
+  const [msgs, setMsgs] = useState<HealthIntelMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -1526,13 +1534,13 @@ export function HealthOSTab() {
       } else if (typeof d.insight === 'string' && d.insight.length > 0) {
         aiText = d.insight;
       } else {
-        aiText = 'Sovereign Shield is active. AI response unavailable right now.';
+        aiText = 'CareIQ AI is unavailable right now. Try again in a moment.';
       }
       setMsgs((p) => [...p, { role: 'ai', text: aiText }]);
     } catch {
       setMsgs((p) => [
         ...p,
-        { role: 'ai', text: 'Shield offline. Your prompt was not sent. Try again.' },
+        { role: 'ai', text: 'Network error. Your prompt was not sent. Try again.' },
       ]);
     } finally {
       setSending(false);
@@ -1558,24 +1566,25 @@ export function HealthOSTab() {
               borderRadius: 9,
               background: `linear-gradient(135deg, ${SOV}, #fb923c)`,
               color: '#1a1208',
-              fontSize: 16,
+              fontSize: 13,
               fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              letterSpacing: '.05em',
             }}
             aria-hidden
           >
-            ☥
+            IQ
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: P, fontSize: 16, color: INK, marginBottom: 2 }}>
-              Sovereign Health OS
+              CareIQ AI
             </div>
             <div style={{ fontSize: 11, color: SUB, lineHeight: 1.5 }}>
-              Sovereign AI with live wearable data and Chickasaw Nation context.
-              Every answer grounded in your real numbers.
+              Live wearable data plus your clinical panel. Every answer
+              grounded in your real numbers.
             </div>
             <div
               style={{
@@ -1653,7 +1662,7 @@ export function HealthOSTab() {
               fontStyle: 'italic',
             }}
           >
-            Sovereign AI thinking...
+            CareIQ AI thinking...
           </div>
         )}
       </div>
@@ -1701,7 +1710,7 @@ export function HealthOSTab() {
               ask(input);
             }
           }}
-          placeholder="Ask Sovereign Health OS..."
+          placeholder="Ask CareIQ AI..."
           disabled={sending}
           style={{
             flex: 1,
@@ -1738,3 +1747,6 @@ export function HealthOSTab() {
     </>
   );
 }
+
+// Back-compat alias for the previous Sovereign Health OS export.
+export const HealthOSTab = HealthIntelTab;
