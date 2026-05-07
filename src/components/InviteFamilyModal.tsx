@@ -6,7 +6,9 @@ import { createPortal } from "react-dom";
 /**
  * Minimal Care Circle invite modal.
  *
- * One email input, one Send button. POSTs recipient_email to
+ * One email input, one Send button. POSTs recipient_email plus the
+ * patient's display name (so the family-side cc-session can show the
+ * patient's name instead of falling back to "Your loved one") to
  * /api/circle/generate-invite. Status shows inline.
  *
  * Renders the modal through a document.body portal so it escapes any
@@ -36,7 +38,7 @@ function getCsrfToken(): string {
   return decodeURIComponent(m[1]).split(".")[0];
 }
 
-export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
+export default function InviteFamilyModal(props: InviteFamilyModalProps) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,6 +81,15 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
     setBusy(true);
     setError("");
     try {
+      // Pass the patient's display name through so the generate-invite
+      // route writes care_circle_invites.patient_name correctly. The
+      // redeem route on care-os uses that value verbatim and falls back
+      // to auth.users metadata only when this field is missing; sending
+      // it here removes that fallback path on the happy flow.
+      const patientName = (props.patientName || "").trim();
+      const payload: Record<string, unknown> = { recipient_email: trimmed };
+      if (patientName) payload.patient_name = patientName;
+
       const r = await fetch("/api/circle/generate-invite", {
         method: "POST",
         headers: {
@@ -86,7 +97,7 @@ export default function InviteFamilyModal(_props: InviteFamilyModalProps) {
           "x-csrf-token": getCsrfToken(),
         },
         credentials: "same-origin",
-        body: JSON.stringify({ recipient_email: trimmed }),
+        body: JSON.stringify(payload),
       });
       const d = (await r.json().catch(() => ({}))) as Partial<InviteResponse> & {
         error?: string;
