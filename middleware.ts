@@ -35,6 +35,8 @@ const PUBLIC_API_PATHS = new Set<string>([
   "/api/shield/decrypt",
   // Twilio cannot send the app CSRF cookie. The route checks X-Twilio-Signature.
   "/api/clinic/wellness/inbound",
+  // Fictional clinic snapshot. The route itself rejects every write.
+  "/api/demo",
 ]);
 
 function getClientIp(req: NextRequest): string {
