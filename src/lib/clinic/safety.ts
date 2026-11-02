@@ -71,7 +71,7 @@ export function colorectalMet(events: CancerEvent[], asOf: string): boolean {
 }
 
 export function breastMet(sex: string | null, age: number | null, events: CancerEvent[], asOf: string): "out" | "met" | "gap" {
-  if (sex !== "female" || age == null || age < 50 || age > 74) return "out";
+  if (sex !== "female" || age == null || age < 52 || age > 74) return "out";
   const met = events.some((event) => event.kind === "breast" && methodInWindow("mammogram", event.screened_on, asOf));
   return met ? "met" : "gap";
 }

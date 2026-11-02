@@ -79,6 +79,14 @@ test("cancer screening gaps stay open until follow-up and carry barrier flags", 
     row({ external_id: "M1", age: 60, sex: "male" }),
   ], {}, AS_OF, "2026-11");
   assert.equal(male.measures.find((measure) => measure.id === "cms125")?.denominator, 0);
+  const age51 = buildScorecard([
+    row({ external_id: "Y1", age: 51, sex: "female" }),
+  ], {}, AS_OF, "2026-11");
+  assert.equal(age51.measures.find((measure) => measure.id === "cms125")?.denominator, 0);
+  const age52 = buildScorecard([
+    row({ external_id: "Y2", age: 52, sex: "female" }),
+  ], {}, AS_OF, "2026-11");
+  assert.equal(age52.measures.find((measure) => measure.id === "cms125")?.denominator, 1);
 });
 
 test("missed wellness check-in escalates to family before the care team", async () => {
@@ -118,13 +126,33 @@ test("missed wellness check-in escalates to family before the care team", async 
   if (!first.ok) return;
   assert.equal(first.data.escalations[0].step, "family");
   assert.equal(first.data.escalations[0].sms, "sms_not_configured");
-  const second = await tickWellness(store, staff, { nowIso: "2026-11-04T12:00:00Z", env: {} });
+  const afterMiss = await store.getPatient(saved[0].id);
+  assert.equal(afterMiss?.wellness_family_notified_at, null);
+  const stillFamily = await tickWellness(store, staff, { nowIso: "2026-11-04T12:00:00Z", env: {} });
+  assert.equal(stillFamily.ok, true);
+  if (!stillFamily.ok) return;
+  assert.equal(stillFamily.data.escalations[0].step, "family");
+  const sent = await tickWellness(store, staff, {
+    nowIso: "2026-11-02T12:00:00Z",
+    env: { accountSid: "ACexample", authToken: "token-example", from: "+15555550100" },
+    fetchImpl: async () => new Response("{}", { status: 201 }),
+  });
+  assert.equal(sent.ok, true);
+  if (!sent.ok) return;
+  assert.equal(sent.data.escalations[0].sms, "sent");
+  const marked = await store.getPatient(saved[0].id);
+  assert.equal(marked?.wellness_family_notified_at, "2026-11-02T12:00:00Z");
+  const second = await tickWellness(store, staff, {
+    nowIso: "2026-11-04T12:00:00Z",
+    env: { accountSid: "ACexample", authToken: "token-example", from: "+15555550100" },
+    fetchImpl: async () => new Response("{}", { status: 201 }),
+  });
   assert.equal(second.ok, true);
   if (!second.ok) return;
   assert.equal(second.data.escalations[0].step, "care_team");
-  assert.equal(second.data.escalations[0].sms, "sms_not_configured");
   const reply = await wellnessSmsReply(store, { phone: "+15555550122", body: "OK", at: "2026-11-04T13:00:00Z" });
   assert.equal(reply.data.matched, true);
+  assert.equal("external_id" in reply.data, false);
   const quiet = await tickWellness(store, staff, { nowIso: "2026-11-04T18:00:00Z", env: {} });
   assert.equal(quiet.ok, true);
   if (!quiet.ok) return;

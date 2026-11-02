@@ -30,7 +30,6 @@ import {
   setBarriers,
   setClinicThresholds,
   tickWellness,
-  wellnessSmsReply,
 } from "./actions";
 import type { Actor, CircleRole, StaffRole } from "./logic";
 import type { SmsEnv } from "./sms";
@@ -234,9 +233,6 @@ async function dispatch(
   }
   if (action === "wellness_tick") {
     return tickWellness(deps.store, actor, { nowIso: String(body.at || `${deps.asOf}T12:00:00Z`), env: deps.smsEnv, fetchImpl: deps.fetchImpl });
-  }
-  if (action === "wellness_sms") {
-    return wellnessSmsReply(deps.store, { phone: String(body.phone || ""), body: String(body.body || ""), at: String(body.at || `${deps.asOf}T12:00:00Z`) });
   }
   if (action === "cognitive") {
     return recordCognitive(deps.store, actor, { clinicPatientId: id, score: num(body.score) || 0, on: String(body.on || deps.asOf) });

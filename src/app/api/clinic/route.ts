@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clinicCsrfFailure } from "@/lib/clinic/csrf";
 import { handleClinicHttp } from "@/lib/clinic/http";
 import { smsEnvFromProcess } from "@/lib/clinic/sms";
 import { SupabaseClinicStore } from "@/lib/clinic/supabase-store";
-import { readClinicActor, signClinicActor } from "@/lib/clinic/token";
-import type { Actor, StaffRole } from "@/lib/clinic/logic";
+import { readClinicActor } from "@/lib/clinic/token";
+import type { Actor } from "@/lib/clinic/logic";
 import { readSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 
 async function respond(req: NextRequest) {
   const secret = process.env.CSRF_SECRET || "";
@@ -35,25 +34,8 @@ async function respond(req: NextRequest) {
       asOf: new Date().toISOString().slice(0, 10),
     });
     const payload = await response.json() as Record<string, unknown>;
-    if (
-      payload &&
-      typeof payload.staff_id === "string" &&
-      typeof payload.clinic_id === "string" &&
-      (payload.role === "provider" || payload.role === "ma" || payload.role === "chw")
-    ) {
-      const token = signClinicActor(
-        {
-          kind: "staff",
-          clinicId: payload.clinic_id,
-          staffId: payload.staff_id,
-          role: payload.role as StaffRole,
-        },
-        secret,
-        Date.now() + TWELVE_HOURS_MS,
-      );
-      payload.staff_token = token;
-      if (!token) payload.sign_in = "not_configured";
-    }
+    delete payload.staff_token;
+    delete payload.sign_in;
     return NextResponse.json(payload, {
       status: response.status,
       headers: { "cache-control": "private, no-store" },
@@ -73,5 +55,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const failure = clinicCsrfFailure(
+    req.headers.get("x-csrf-token") || "",
+    req.cookies.get("sov_csrf")?.value || "",
+  );
+  if (failure === "missing") {
+    return NextResponse.json({ error: "CSRF token missing" }, { status: 403 });
+  }
+  if (failure === "mismatch") {
+    return NextResponse.json({ error: "CSRF token mismatch" }, { status: 403 });
+  }
   return respond(req);
 }

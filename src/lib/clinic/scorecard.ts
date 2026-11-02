@@ -1,7 +1,8 @@
 /**
  * Clinic scorecard estimates. Not validated CMS, HEDIS, or IHS GPRA measures.
  * RPM and CCM figures are tracking only, not claims submission.
- * Default targets and RPM dollar amounts come from the Nov 2 2026 scorecard.
+ * Built-in targets and RPM dollar amounts are examples. This repo does not
+ * include a cited fee schedule or national target table. 99470 is unconfirmed.
  */
 
 import { daysBetween, MEASUREMENT_DAYS } from "./logic";
@@ -28,7 +29,7 @@ export const P4P_LABEL =
   "Estimate only. Example MCO tiers of $40, $80, and $100 per compliant member. Not a payment.";
 
 export const RPM_DOLLAR_LABEL =
-  "Tracking only. Not claims submission. RPM dollar amounts are the scorecard's NACHC figures and are estimates.";
+  "Tracking only. Not claims submission. RPM dollar amounts are examples, not a cited fee schedule. 99470 is unconfirmed.";
 
 export const CCM_LABEL =
   "CCM or APCM time is tracking only. The scorecard did not list a dollar amount, so none is estimated.";
@@ -51,7 +52,7 @@ export const MEASURE_IDS = [
 
 export type MeasureId = (typeof MEASURE_IDS)[number];
 
-/** Null means the scorecard did not publish a default percent. */
+/** Example rates only. Null means this repo has no cited default percent. */
 export const SCORECARD_DEFAULT_TARGETS: Record<MeasureId, number | null> = {
   cms165: 0.6908,
   hedis_cbp: 0.6387,
@@ -122,7 +123,7 @@ export interface MeasureCard {
   denominator: number;
   rate: number | null;
   target: number | null;
-  target_source: "scorecard" | "clinic" | "none";
+  target_source: "example" | "clinic" | "none";
   gap: number | null;
   needed: number | null;
   patient_count: number;
@@ -229,15 +230,15 @@ function add(bucket: Bucket, id: string, inNumerator: boolean, opensGap: boolean
   if (opensGap) bucket.open.push(id);
 }
 
-export function resolveTargets(overrides: Partial<Record<MeasureId, number>>): Record<MeasureId, { target: number | null; source: "scorecard" | "clinic" | "none" }> {
-  const out = {} as Record<MeasureId, { target: number | null; source: "scorecard" | "clinic" | "none" }>;
+export function resolveTargets(overrides: Partial<Record<MeasureId, number>>): Record<MeasureId, { target: number | null; source: "example" | "clinic" | "none" }> {
+  const out = {} as Record<MeasureId, { target: number | null; source: "example" | "clinic" | "none" }>;
   for (const id of MEASURE_IDS) {
     if (typeof overrides[id] === "number") {
       out[id] = { target: overrides[id] as number, source: "clinic" };
     } else if (SCORECARD_DEFAULT_TARGETS[id] == null) {
       out[id] = { target: null, source: "none" };
     } else {
-      out[id] = { target: SCORECARD_DEFAULT_TARGETS[id], source: "scorecard" };
+      out[id] = { target: SCORECARD_DEFAULT_TARGETS[id], source: "example" };
     }
   }
   return out;
@@ -330,7 +331,7 @@ export function estimateCareManagement(rows: ScorecardPatient[], month: string):
     { code: "99454", units: device, dollars_each: RPM_DEVICE_DAYS, dollars: device * RPM_DEVICE_DAYS, rule: "16 or more reading days in the month." },
     { code: "99457", units: first20, dollars_each: RPM_FIRST_20, dollars: first20 * RPM_FIRST_20, rule: "20 or more care minutes in the month." },
     { code: "99458", units: extra20, dollars_each: RPM_EXTRA_20, dollars: extra20 * RPM_EXTRA_20, rule: "Each extra 20 minutes after the first 20." },
-    { code: "99470", units: short10, dollars_each: RPM_SHORT_10, dollars: short10 * RPM_SHORT_10, rule: "10 to 19 care minutes. Not stacked with 99457. The minute split is a tracking assumption." },
+    { code: "99470", units: short10, dollars_each: RPM_SHORT_10, dollars: short10 * RPM_SHORT_10, rule: "10 to 19 care minutes. Not stacked with 99457. 99470 is unconfirmed, and this dollar amount is an example." },
   ];
   return {
     label: RPM_DOLLAR_LABEL,

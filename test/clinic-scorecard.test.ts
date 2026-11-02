@@ -71,7 +71,7 @@ test("scorecard rates, targets, gap patients, and example dollars", () => {
   const cms165 = card(result, "cms165");
   assert.equal(cms165.rate, 0.5);
   assert.equal(cms165.target, 0.6908);
-  assert.equal(cms165.target_source, "scorecard");
+  assert.equal(cms165.target_source, "example");
   assert.equal(cms165.gap, 0.191);
   assert.equal(cms165.needed, 1);
   assert.deepEqual(cms165.patients, ["P1"]);
@@ -177,6 +177,8 @@ test("RPM dollar estimates follow the scorecard amounts and do not price CCM", (
   assert.equal(shortCodes["99457"], 0);
   assert.equal(short.rpm_dollars, 48);
   assert.match(full.label, /Not claims submission/);
+  assert.match(full.label, /99470 is unconfirmed/);
+  assert.match(String(full.rpm.find((line) => line.code === "99470")?.rule), /unconfirmed/);
 });
 
 test("circle PHQ check-in feeds the clinic scorecard", async () => {

@@ -463,17 +463,17 @@ export async function addCareTeamStaff(
   actor: Actor,
   input: { clinicId: string; role: StaffRole; displayName: string; phone?: string | null },
 ) {
-  if (actor.kind !== "patient" && !(actor.kind === "circle" && actor.role === "admin" && !actor.revoked)) {
-    return fail(403, "only the patient or an admin can add members");
+  if (!isActiveStaff(actor) || actor.role !== "provider" || actor.clinicId !== input.clinicId) {
+    return fail(403, "only an active provider can add staff");
+  }
+  const current = await store.getStaff(actor.staffId);
+  if (!current || current.revoked_at || current.role !== "provider" || current.clinic_id !== input.clinicId) {
+    return fail(403, "only an active provider can add staff");
   }
   const patients = await store.listPatients(input.clinicId);
-  const owns = actor.kind === "patient"
-    ? patients.some((row) => row.patient_id === actor.patientId)
-    : patients.some((row) => row.id === actor.clinicPatientId);
-  if (!owns) return fail(403, "not your clinic");
   const staff = await store.addStaff(input.clinicId, input.role, input.displayName, input.phone);
   await attachCareTeam(store, input.clinicId, patients.map((row) => row.id));
-  return { ok: true as const, data: { staff_id: staff.id, role: staff.role, clinic_id: input.clinicId } };
+  return { ok: true as const, data: { role: staff.role } };
 }
 
 export async function listCircle(store: ClinicStore, actor: Actor, clinicPatientId: string) {
@@ -590,10 +590,11 @@ export async function recordCancerFollowUp(
   if (!isActiveStaff(actor)) return fail(403, "clinic staff only");
   const existing = await store.getSafety(input.eventId);
   if (!existing) return fail(404, "screening not found");
+  const patient = await store.getPatient(existing.clinic_patient_id);
+  if (!patient || patient.clinic_id !== actor.clinicId) return fail(403, "clinic access revoked");
+  if (!(await detailAllowed(store, actor, patient))) return fail(403, "circle access revoked");
   const updated = await store.updateSafety(input.eventId, { follow_up_on: input.on });
   if (!updated) return fail(404, "screening not found");
-  const patient = await store.getPatient(updated.clinic_patient_id);
-  if (!patient || patient.clinic_id !== actor.clinicId) return fail(403, "clinic access revoked");
   return { ok: true as const, data: { id: updated.id, follow_up_on: input.on } };
 }
 
@@ -632,9 +633,9 @@ export async function markWellnessOk(
   actor: Actor,
   input: { clinicPatientId: string; at: string },
 ) {
+  if (actor.kind !== "patient") return fail(403, "patient only");
   const patient = await patientForActor(store, actor, input.clinicPatientId);
   if ("ok" in patient) return patient;
-  if (actor.kind === "staff") return fail(403, "patient or caregiver only");
   await store.updatePatient(patient.id, {
     wellness_last_ok: input.at,
     wellness_family_notified_at: null,
@@ -663,7 +664,9 @@ export async function tickWellness(
     }, input.nowIso, settings.wellness_window_hours);
     if (decision === "escalate_family") {
       const sms = await deliverSms(input.env, patient.wellness_family_phone, input.fetchImpl);
-      await store.updatePatient(patient.id, { wellness_family_notified_at: input.nowIso });
+      if (sms.delivered) {
+        await store.updatePatient(patient.id, { wellness_family_notified_at: input.nowIso });
+      }
       escalations.push({ external_id: patient.external_id, step: "family", sms: sms.reason });
     } else if (decision === "escalate_care_team" && !patient.wellness_team_notified_at) {
       const staff = await store.getStaff(actor.staffId);
@@ -687,7 +690,7 @@ export async function wellnessSmsReply(
     wellness_family_notified_at: null,
     wellness_team_notified_at: null,
   });
-  return { ok: true as const, data: { matched: true, external_id: patient.external_id } };
+  return { ok: true as const, data: { matched: true } };
 }
 
 export async function recordCognitive(
