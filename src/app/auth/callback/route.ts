@@ -5,6 +5,10 @@ import { getServiceClient } from "@/lib/supabase-server";
 import { getPublicOrigin } from "@/lib/origin";
 import { upsertPatientByEmail, writeAuthCookie } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
+import { hashEmail } from "@/lib/crypto";
+import { SupabaseClinicStore } from "@/lib/clinic/supabase-store";
+import { bindStaffOnSignIn } from "@/lib/clinic/staff-auth";
+import { issueStaffToken, staffAuthCookie, STAFF_COOKIE_NAME } from "@/lib/clinic/staff-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,6 +94,8 @@ export async function GET(req: NextRequest) {
 
     let userId: string | null = null;
     let email: string | null = null;
+    let userMetadata: Record<string, unknown> | null = null;
+    let appMetadata: Record<string, unknown> | null = null;
     let lastError = "unknown";
 
     if (tokenHash) {
@@ -102,6 +108,8 @@ export async function GET(req: NextRequest) {
       } else if (data?.user) {
         userId = data.user.id;
         email = data.user.email ?? null;
+        userMetadata = asRecord(data.user.user_metadata);
+        appMetadata = asRecord(data.user.app_metadata);
       }
     }
 
@@ -112,6 +120,8 @@ export async function GET(req: NextRequest) {
       } else if (data?.user) {
         userId = data.user.id;
         email = data.user.email ?? null;
+        userMetadata = asRecord(data.user.user_metadata);
+        appMetadata = asRecord(data.user.app_metadata);
       }
     }
 
@@ -124,10 +134,23 @@ export async function GET(req: NextRequest) {
         const sb = getServiceClient();
         const { data } = await sb.auth.admin.getUserById(userId);
         email = data?.user?.email ?? null;
+        if (!userMetadata) userMetadata = asRecord(data?.user?.user_metadata);
+        if (!appMetadata) appMetadata = asRecord(data?.user?.app_metadata);
       } catch {
         // proceed without email
       }
     }
+
+    const staffGate = await staffSignInResponse({
+      origin,
+      sessionId,
+      userId,
+      email,
+      userMetadata,
+      appMetadata,
+    });
+    if (staffGate.kind === "response") return staffGate.response;
+    if (staffGate.kind === "failed") return fail("staff_session_not_configured");
 
     let patientId = userId;
     if (email) {
@@ -171,6 +194,7 @@ export async function GET(req: NextRequest) {
 
     const response = NextResponse.redirect(`${origin}/dashboard`);
     response.cookies.set(cookie.name, cookie.value, cookie.options);
+    response.cookies.set(STAFF_COOKIE_NAME, "", { path: "/", maxAge: 0 });
     return response;
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -179,6 +203,54 @@ export async function GET(req: NextRequest) {
       sanitizeErrorCode((err as Error)?.message),
     );
     return fail("unhandled_exception");
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+async function staffSignInResponse(input: {
+  origin: string;
+  sessionId: string;
+  userId: string;
+  email: string | null;
+  userMetadata: Record<string, unknown> | null;
+  appMetadata: Record<string, unknown> | null;
+}): Promise<{ kind: "none" } | { kind: "failed" } | { kind: "response"; response: NextResponse }> {
+  if (!input.email) return { kind: "none" };
+  try {
+    const actor = await bindStaffOnSignIn(new SupabaseClinicStore(), {
+      emailHash: hashEmail(input.email),
+      authUserId: input.userId,
+      userMetadata: input.userMetadata,
+      appMetadata: input.appMetadata,
+    });
+    if (!actor) return { kind: "none" };
+    const token = issueStaffToken(actor, process.env.CSRF_SECRET || "", Date.now());
+    if (!token) return { kind: "failed" };
+    try {
+      await logAudit({
+        sessionId: input.sessionId,
+        action: "auth.magic_link.consumed",
+        dataType: "auth",
+        success: true,
+        metadata: { reason_code: "staff_session" },
+      });
+    } catch {
+      // audit failure must not block sign-in completion
+    }
+    const cookie = staffAuthCookie(token);
+    const response = NextResponse.redirect(`${input.origin}/clinic`);
+    response.cookies.set(cookie.name, cookie.value, cookie.options);
+    return { kind: "response", response };
+  } catch (err) {
+    console.warn(
+      "[auth/callback] staff bind failed:",
+      sanitizeErrorCode((err as Error)?.message),
+    );
+    return { kind: "none" };
   }
 }
 

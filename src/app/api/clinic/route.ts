@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clinicCsrfFailure } from "@/lib/clinic/csrf";
 import { handleClinicHttp } from "@/lib/clinic/http";
+import { enforceStaffClinic } from "@/lib/clinic/staff-auth";
+import { deliverStaffInvite, sendStaffLinkEmail } from "@/lib/clinic/staff-mail";
 import { smsEnvFromProcess } from "@/lib/clinic/sms";
+import { toPublicClinicPayload } from "@/lib/clinic/public-payload";
 import { SupabaseClinicStore } from "@/lib/clinic/supabase-store";
 import { readClinicActor } from "@/lib/clinic/token";
 import type { Actor } from "@/lib/clinic/logic";
+import { hashEmail } from "@/lib/crypto";
+import { getPublicOrigin } from "@/lib/origin";
 import { readSession } from "@/lib/session";
+import { getServiceClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,21 +27,24 @@ async function respond(req: NextRequest) {
   }
   try {
     const store = new SupabaseClinicStore();
-    if (actor?.kind === "staff") {
-      const staff = await store.getStaff(actor.staffId);
-      if (!staff || staff.revoked_at || staff.clinic_id !== actor.clinicId) {
-        actor = { ...actor, revoked: true };
-      }
-    }
+    actor = await enforceStaffClinic(store, actor);
+    const origin = getPublicOrigin(req);
     const response = await handleClinicHttp(req, {
       store,
       actor,
       smsEnv: smsEnvFromProcess(),
       asOf: new Date().toISOString().slice(0, 10),
+      hashStaffEmail: (email) => hashEmail(email),
+      sendStaffInvite: async (email) => {
+        const redirectTo = `${origin}/auth/callback`;
+        const admin = getServiceClient().auth.admin;
+        const sendLink = process.env.RESEND_API_KEY
+          ? (link: string) => sendStaffLinkEmail(email, link)
+          : undefined;
+        return deliverStaffInvite(admin, email, redirectTo, sendLink);
+      },
     });
-    const payload = await response.json() as Record<string, unknown>;
-    delete payload.staff_token;
-    delete payload.sign_in;
+    const payload = toPublicClinicPayload(await response.json() as Record<string, unknown>);
     return NextResponse.json(payload, {
       status: response.status,
       headers: { "cache-control": "private, no-store" },

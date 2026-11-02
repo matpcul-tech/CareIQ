@@ -35,6 +35,26 @@ Reduced summary -> /api/shield -> Anthropic API -> response
 3. Settings, then Environment Variables, then add the variables in `.env.example`.
 4. Redeploy.
 
+## Clinic staff
+
+Patients sign in at `/onboard`. Clinic staff sign in at `/clinic`. A staff session is created only when the email matches a `clinic_staff` row. Patient profile data and Supabase user metadata cannot grant a provider, care manager, or front desk role.
+
+The first clinic admin is created with a one-time script, not from the patient app:
+
+```
+CLINIC_BOOTSTRAP_ENABLED=1 \
+CLINIC_BOOTSTRAP_EMAIL=admin@example.org \
+CLINIC_BOOTSTRAP_CLINIC_NAME="Example FQHC" \
+CLINIC_BOOTSTRAP_DISPLAY_NAME="Clinic Admin" \
+npm run bootstrap:clinic-admin
+```
+
+The script reads `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ENCRYPTION_KEY`, and `NEXT_PUBLIC_SITE_URL` from the environment. `SUPABASE_SERVICE_KEY` still works and logs a warning. Apply migrations `0010` and `0011` before the first run. The script prints the clinic id. It does not print the service key.
+
+Set `RESEND_API_KEY` if staff invite mail should be sent by Resend. Without it, Supabase Auth sends the invite email, so the project's email provider has to be enabled. Add the site origin and `/auth/callback` to the Supabase redirect allow list.
+
+After the admin signs in, they can invite a provider, care manager, or front desk teammate from `/clinic`. Each staff session is limited to that person's clinic. MA and CHW roster rows from the existing care team action do not create a sign-in by themselves.
+
 ## Demo the Shield
 
 In the AI tab, try these prompts:

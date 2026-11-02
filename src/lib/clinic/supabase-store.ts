@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getServiceClient } from "@/lib/supabase-server";
-import { DEFAULT_THRESHOLDS, type StaffRole, type Thresholds } from "./logic";
+import { DEFAULT_THRESHOLDS, type CsvPatient, type StaffRole, type Thresholds } from "./logic";
 import { toE164 } from "./phone";
 import { DEFAULT_CARE_SETTINGS, type CareSettings } from "./safety";
 import type {
@@ -17,9 +17,9 @@ import type {
   ReadingRecord,
   SafetyEvent,
   ScreenRecord,
+  StaffInsertExtras,
   StaffRecord,
 } from "./store";
-import type { CsvPatient } from "./logic";
 
 type Row = Record<string, unknown>;
 
@@ -63,6 +63,26 @@ function patientFrom(row: Row): PatientRecord {
   };
 }
 
+const STAFF_COLUMNS = "id,clinic_id,role,display_name,phone,revoked_at,email_hash,auth_user_id,is_admin";
+
+function staffFrom(row: Row): StaffRecord {
+  const role = String(row.role);
+  if (role !== "provider" && role !== "ma" && role !== "chw" && role !== "care_manager" && role !== "front_desk") {
+    throw new Error("staff role is not recognized");
+  }
+  return {
+    id: String(row.id),
+    clinic_id: String(row.clinic_id),
+    role: role as StaffRole,
+    display_name: String(row.display_name),
+    phone: row.phone ? String(row.phone) : null,
+    revoked_at: row.revoked_at ? String(row.revoked_at) : null,
+    email_hash: row.email_hash ? String(row.email_hash) : null,
+    auth_user_id: row.auth_user_id ? String(row.auth_user_id) : null,
+    is_admin: row.is_admin === true,
+  };
+}
+
 function memberFrom(row: Row): MemberRecord {
   return {
     id: String(row.id),
@@ -85,55 +105,69 @@ export class SupabaseClinicStore implements ClinicStore {
     return { id: data.id, name: data.name };
   }
 
-  async addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null): Promise<StaffRecord> {
+  async addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null, extras?: StaffInsertExtras): Promise<StaffRecord> {
     const { data, error } = await this.sb()
       .from("clinic_staff")
-      .insert({ clinic_id: clinicId, role, display_name: displayName, phone: toE164(phone) })
-      .select("id,clinic_id,role,display_name,phone,revoked_at")
+      .insert({
+        clinic_id: clinicId,
+        role,
+        display_name: displayName,
+        phone: toE164(phone),
+        email_hash: extras?.email_hash || null,
+        auth_user_id: extras?.auth_user_id || null,
+        is_admin: extras?.is_admin === true,
+      })
+      .select(STAFF_COLUMNS)
       .single();
     if (error || !data) throw new Error(error?.message || "staff insert failed");
-    return {
-      id: data.id,
-      clinic_id: data.clinic_id,
-      role: data.role,
-      display_name: data.display_name,
-      phone: data.phone,
-      revoked_at: data.revoked_at,
-    };
+    return staffFrom(data as Row);
   }
 
   async getStaff(staffId: string): Promise<StaffRecord | null> {
     const { data, error } = await this.sb()
       .from("clinic_staff")
-      .select("id,clinic_id,role,display_name,phone,revoked_at")
+      .select(STAFF_COLUMNS)
       .eq("id", staffId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return null;
-    return {
-      id: data.id,
-      clinic_id: data.clinic_id,
-      role: data.role,
-      display_name: data.display_name,
-      phone: data.phone,
-      revoked_at: data.revoked_at,
-    };
+    return staffFrom(data as Row);
   }
 
   async listStaff(clinicId: string): Promise<StaffRecord[]> {
     const { data, error } = await this.sb()
       .from("clinic_staff")
-      .select("id,clinic_id,role,display_name,phone,revoked_at")
+      .select(STAFF_COLUMNS)
       .eq("clinic_id", clinicId);
     if (error) throw new Error(error.message);
-    return (data || []).map((row) => ({
-      id: row.id,
-      clinic_id: row.clinic_id,
-      role: row.role,
-      display_name: row.display_name,
-      phone: row.phone,
-      revoked_at: row.revoked_at,
-    }));
+    return (data || []).map((row) => staffFrom(row as Row));
+  }
+
+  async findStaffByEmailHash(emailHash: string): Promise<StaffRecord | null> {
+    if (!emailHash) return null;
+    const { data, error } = await this.sb()
+      .from("clinic_staff")
+      .select(STAFF_COLUMNS)
+      .eq("email_hash", emailHash)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+    return staffFrom(data as Row);
+  }
+
+  async bindStaffAuth(staffId: string, authUserId: string): Promise<boolean> {
+    const current = await this.getStaff(staffId);
+    if (!current || current.revoked_at) return false;
+    if (current.auth_user_id && current.auth_user_id !== authUserId) return false;
+    if (current.auth_user_id === authUserId) return true;
+    const { data, error } = await this.sb()
+      .from("clinic_staff")
+      .update({ auth_user_id: authUserId })
+      .eq("id", staffId)
+      .is("auth_user_id", null)
+      .select("id");
+    if (error) throw new Error(error.message);
+    return Boolean(data && data.length > 0);
   }
 
   async revokeStaff(staffId: string, at: string): Promise<void> {
