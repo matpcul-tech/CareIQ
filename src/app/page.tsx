@@ -27,8 +27,8 @@ export default function Home() {
             </span>
           </div>
         </div>
-        <div className="zk-shield-pill" aria-label="Zero-knowledge shield active">
-          <span className="zk-shield-dot" aria-hidden /> ZK SHIELD ON
+        <div className="zk-shield-pill" aria-label="Prompt Shield active">
+          <span className="zk-shield-dot" aria-hidden /> SHIELD ON
         </div>
       </header>
 
@@ -49,10 +49,10 @@ export default function Home() {
           Clinical intelligence for the safety net.
         </p>
         <p className="max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
-          Built for community health centers and FQHCs. Every byte
-          encrypted. Every AI query anonymized through the Sovereign Prompt
-          Shield and a HIPAA 18-identifier scanner before any model sees
-          a single line.
+          Built for community health centers and FQHCs. Records are encrypted
+          at rest with AES-256-GCM on the application server. AI insights use
+          a reduced summary, and critical identifier queries are blocked before
+          any model call.
         </p>
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
           <Link href={primaryHref} className="btn-primary no-underline w-56 sm:w-auto">
@@ -66,9 +66,9 @@ export default function Home() {
         {/* Three trust pills */}
         <div className="grid w-full max-w-3xl grid-cols-1 gap-3 pt-6 sm:grid-cols-3">
           {[
-            { label: "AES-256-GCM", sub: "encrypted at rest" },
+            { label: "AES-256-GCM", sub: "encrypted at rest on the server" },
             { label: "Append-only", sub: "audit log" },
-            { label: "Zero-knowledge", sub: "Sovereign Shield" },
+            { label: "Prompt Shield", sub: "blocks critical identifier queries" },
           ].map((p) => (
             <div
               key={p.label}
@@ -87,7 +87,7 @@ export default function Home() {
       <footer className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-8">
         <div className="rounded-xl border border-sov-border bg-sov-card/40 p-4 text-center">
           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-mute">
-            AES-256-GCM encrypted &middot; Append-only audit log &middot; Sovereign infrastructure
+            AES-256-GCM at rest on the server &middot; Append-only audit log &middot; Prompt Shield
           </div>
           <div className="mt-2 text-[11px] text-ink-mute">
             (c) Sovereign Shield Technologies LLC

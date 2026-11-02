@@ -151,15 +151,15 @@ function buildClinicalData(args: {
 
   const bpVital: ClinicalVital = manual.bpSystolic != null && manual.bpDiastolic != null
     ? { icon: "BP", val: `${manual.bpSystolic}/${manual.bpDiastolic}`, unit: "mmHg", name: "Blood Pressure", s: bpStatus(manual.bpSystolic, manual.bpDiastolic) }
-    : { icon: "BP", val: "118/76", unit: "mmHg", name: "Blood Pressure", s: "ok" };
+    : { icon: "BP", val: "-", unit: "mmHg", name: "Blood Pressure", s: "unknown" };
 
   const a1cVital: ClinicalVital = manual.a1c != null
     ? { icon: "A1C", val: manual.a1c.toFixed(1), unit: "A1C %", name: "Glycemic", s: a1cStatus(manual.a1c) }
-    : { icon: "A1C", val: "6.4", unit: "A1C %", name: "Glycemic", s: "warn" };
+    : { icon: "A1C", val: "-", unit: "A1C %", name: "Glycemic", s: "unknown" };
 
   const ldlVital: ClinicalVital = manual.ldl != null
     ? { icon: "LDL", val: String(Math.round(manual.ldl)), unit: "mg/dL", name: "LDL Chol.", s: ldlStatus(manual.ldl) }
-    : { icon: "LDL", val: "212", unit: "mg/dL", name: "LDL Chol.", s: "alert" };
+    : { icon: "LDL", val: "-", unit: "mg/dL", name: "LDL Chol.", s: "unknown" };
 
   const hrVital: ClinicalVital = last?.heartRate != null
     ? { icon: "HR", val: String(last.heartRate), unit: "bpm", name: "Heart Rate", s: hrStatus(last.heartRate) }
@@ -169,11 +169,11 @@ function buildClinicalData(args: {
     ? { icon: "O2", val: String(last.spo2), unit: "SpO2 %", name: "Oxygen Sat", s: spo2Status(last.spo2) }
     : { icon: "O2", val: "-", unit: "SpO2 %", name: "Oxygen Sat", s: "ok" };
 
-  // Glucose tile replaces the previous Body Weight tile when a manually
-  // entered fasting glucose exists. Otherwise we keep the demo weight.
+  // Fasting glucose when the patient entered one. There is no weight field
+  // on the manual lab record, so the tile stays empty instead of a sample weight.
   const sixthVital: ClinicalVital = manual.fastingGlucose != null
     ? { icon: "GLU", val: String(Math.round(manual.fastingGlucose)), unit: "mg/dL", name: "Fasting Glucose", s: glucoseStatus(manual.fastingGlucose) }
-    : { icon: "WT", val: "174", unit: "lbs", name: "Body Weight", s: "warn" };
+    : { icon: "WT", val: "-", unit: "lbs", name: "Body Weight", s: "unknown" };
 
   const vitals: ClinicalVital[] = [bpVital, a1cVital, ldlVital, hrVital, spo2Vital, sixthVital];
 
@@ -194,8 +194,8 @@ function buildClinicalData(args: {
       type: "watch",
       icon: "GLU",
       title: "Glycemic Monitoring Recommended",
-      body: "Diabetes recorded in chronic conditions. Continuous glucose tracking and the metabolic protocol can reduce 10-year complication risk.",
-      cta: "Start Protocol",
+      body: "Diabetes is recorded in chronic conditions. Talk with your FQHC care team about monitoring. CareIQ does not track continuous glucose or RPM time.",
+      cta: "",
       conf: "92%",
     });
   }
@@ -205,7 +205,7 @@ function buildClinicalData(args: {
       icon: "BP",
       title: "Hypertension Follow-Up",
       body: "Blood pressure on file is above target. Regular BP monitoring and FQHC care team review recommended within 30 days.",
-      cta: "Schedule Consult",
+      cta: "",
       conf: "94%",
     });
   }
@@ -215,7 +215,7 @@ function buildClinicalData(args: {
       icon: "LDL",
       title: "Elevated LDL on File",
       body: `LDL of ${Math.round(manual.ldl)} mg/dL elevates 10-year cardiovascular risk. Discuss lipid management with your FQHC care team.`,
-      cta: "Schedule Consult",
+      cta: "",
       conf: "92%",
     });
   }
@@ -225,7 +225,7 @@ function buildClinicalData(args: {
       icon: "ALG",
       title: "Allergy History on File",
       body: "Allergy history is recorded and visible to your FQHC care team during medication review.",
-      cta: "View Allergies",
+      cta: "",
       conf: "100%",
     });
   }
@@ -234,8 +234,8 @@ function buildClinicalData(args: {
       type: "pos",
       icon: "LAB",
       title: `${labFileCount} Lab File${labFileCount === 1 ? "" : "s"} Uploaded`,
-      body: "Encrypted lab results are stored in your sovereign vault. Available to your care team via the audit-logged portal.",
-      cta: "View Files",
+      body: "Lab files are encrypted at rest with AES-256-GCM on the application server.",
+      cta: "",
       conf: "100%",
     });
   }
@@ -244,8 +244,8 @@ function buildClinicalData(args: {
       type: "pos",
       icon: "OK",
       title: "Profile Active, Building Baseline",
-      body: "Your sovereign vault is set up. As wearable, lab, and history data accumulates, AI insights will sharpen.",
-      cta: "Add Data",
+      body: "Your record is set up. Later summaries can include wearable files, labs, and history you add. The model is not trained on your record.",
+      cta: "",
       conf: "100%",
     });
   }
@@ -272,7 +272,7 @@ function buildClinicalData(args: {
       dot: "#d4a843",
       date: "Recent",
       title: `${labFileCount} Lab File${labFileCount === 1 ? "" : "s"} on File`,
-      text: "Encrypted at rest. Visible only to you and your FQHC care team.",
+      text: "Encrypted at rest with AES-256-GCM. The key is in the application server environment.",
     });
   }
   if (history) {
@@ -280,7 +280,7 @@ function buildClinicalData(args: {
       dot: "#8060cc",
       date: "Recorded",
       title: "Health History Captured",
-      text: "Conditions, medications, and family history saved to sovereign vault.",
+      text: "Conditions, medications, and family history saved in the encrypted record.",
     });
   }
   if (enrolledAt) {
@@ -288,7 +288,7 @@ function buildClinicalData(args: {
       dot: "#00d4b8",
       date: friendlyDate(enrolledAt),
       title: "Enrollment",
-      text: "Sovereign vault created on Trace Fiber.",
+      text: "CareIQ record created.",
     });
   }
 
@@ -306,9 +306,10 @@ function buildClinicalData(args: {
       { dot: "#00d4b8", date: "Today", title: "Vault Active", text: "No timeline events yet." },
     ],
     meals: DEFAULT_MEALS,
-    wearHr7Day: wearHr7Day.length >= 3 ? wearHr7Day : DEFAULT_HR_WEEK,
-    wearSteps7Day: wearSteps7Day.some((v) => v > 0) ? wearSteps7Day : DEFAULT_STEPS_WEEK,
-    wearDays: wearDays.length > 0 ? wearDays : DEFAULT_DAYS,
+    wearHr7Day,
+    wearSteps7Day,
+    wearDays,
+    wearableSource: deviceType ? "upload" : "none",
     primaryDeviceLabel: deviceType ? humanDevice(deviceType) : undefined,
   };
   return result;
@@ -412,10 +413,6 @@ function humanDevice(t: string): string {
   };
   return map[t] ?? t;
 }
-
-const DEFAULT_HR_WEEK = [67, 70, 68, 72, 69, 71, 68];
-const DEFAULT_STEPS_WEEK = [6800, 7200, 8100, 5400, 7842, 8500, 6900];
-const DEFAULT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const DEFAULT_MEALS = [
   { time: "Breakfast 7:00 AM", name: "Steel-Cut Oats with Berries", desc: "Steel-cut oatmeal topped with fresh blueberries, walnuts, and a drizzle of olive oil.", tags: ["Heart-Healthy", "High Fiber", "Low Sodium"] },
