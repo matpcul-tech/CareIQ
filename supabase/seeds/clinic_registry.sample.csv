@@ -1,0 +1,6 @@
+external_id,age,has_diabetes,has_hypertension,last_a1c,last_a1c_date,bp_systolic,bp_diastolic,last_bp_date,next_visit_date
+SYN-1001,67,yes,yes,10.2,2025-06-01,152,94,2025-08-01,2026-11-10
+SYN-1002,54,yes,no,7.1,2026-09-01,128,78,2026-10-01,2026-11-20
+SYN-1003,44,no,yes,,,158,96,2026-01-15,2026-11-05
+SYN-1004,80,yes,yes,8.4,2026-10-01,136,84,2026-10-20,2026-12-01
+SYN-1005,30,yes,no,11.0,2024-01-01,118,70,2026-10-01,
