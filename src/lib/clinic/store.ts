@@ -1,5 +1,6 @@
 import type { CircleRole, CsvPatient, HomeReading, StaffRole, Thresholds } from "./logic";
 import { DEFAULT_THRESHOLDS } from "./logic";
+import { toE164 } from "./phone";
 import { DEFAULT_CARE_SETTINGS, type CareSettings } from "./safety";
 
 export interface ClinicRecord {
@@ -39,6 +40,7 @@ export interface PatientRecord {
   wellness_family_phone: string | null;
   wellness_last_ok: string | null;
   wellness_family_notified_at: string | null;
+  wellness_family_delivery: string | null;
   wellness_team_notified_at: string | null;
 }
 
@@ -148,6 +150,7 @@ export interface ClinicStore {
   getSafety(id: string): Promise<SafetyEvent | null>;
   updateSafety(id: string, payload: SafetyEvent["payload"]): Promise<SafetyEvent | null>;
   findByWellnessPhone(phone: string): Promise<PatientRecord | null>;
+  claimInboundSid(sid: string): Promise<boolean>;
   listSafety(clinicPatientId: string): Promise<SafetyEvent[]>;
   getCareSettings(clinicId: string): Promise<CareSettings>;
   setCareSettings(clinicId: string, patch: Partial<CareSettings>): Promise<CareSettings>;
@@ -173,6 +176,7 @@ export class MemoryClinicStore implements ClinicStore {
   measureTargets = new Map<string, Record<string, number>>();
   safety: SafetyEvent[] = [];
   careSettings = new Map<string, CareSettings>();
+  inboundSids = new Set<string>();
 
   async createClinic(name: string): Promise<ClinicRecord> {
     const row = { id: id(), name: name.slice(0, 120) };
@@ -187,7 +191,7 @@ export class MemoryClinicStore implements ClinicStore {
       clinic_id: clinicId,
       role,
       display_name: displayName.slice(0, 80),
-      phone: phone || null,
+      phone: toE164(phone),
       revoked_at: null,
     };
     this.staff.push(row);
@@ -248,6 +252,7 @@ export class MemoryClinicStore implements ClinicStore {
           wellness_family_phone: null,
           wellness_last_ok: null,
           wellness_family_notified_at: null,
+          wellness_family_delivery: null,
           wellness_team_notified_at: null,
         };
         this.patients.push(existing);
@@ -393,7 +398,10 @@ export class MemoryClinicStore implements ClinicStore {
   async updatePatient(patientRowId: string, patch: Partial<PatientRecord>): Promise<PatientRecord | null> {
     const row = this.patients.find((item) => item.id === patientRowId);
     if (!row) return null;
-    Object.assign(row, patch);
+    const next = { ...patch };
+    if ("wellness_phone" in next) next.wellness_phone = toE164(next.wellness_phone);
+    if ("wellness_family_phone" in next) next.wellness_family_phone = toE164(next.wellness_family_phone);
+    Object.assign(row, next);
     return row;
   }
 
@@ -416,7 +424,16 @@ export class MemoryClinicStore implements ClinicStore {
   }
 
   async findByWellnessPhone(phone: string): Promise<PatientRecord | null> {
-    return this.patients.find((item) => item.wellness_phone === phone && item.wellness_opt_in) || null;
+    const normalized = toE164(phone);
+    if (!normalized) return null;
+    return this.patients.find((item) => item.wellness_phone === normalized && item.wellness_opt_in) || null;
+  }
+
+  async claimInboundSid(sid: string): Promise<boolean> {
+    const trimmed = sid.trim();
+    if (!trimmed || this.inboundSids.has(trimmed)) return false;
+    this.inboundSids.add(trimmed);
+    return true;
   }
 
   async updateSafety(eventId: string, payload: SafetyEvent["payload"]): Promise<SafetyEvent | null> {

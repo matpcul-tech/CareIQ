@@ -44,6 +44,8 @@ export interface WellnessState {
   lives_alone: boolean;
   last_ok_at: string | null;
   family_notified_at: string | null;
+  /** "sent" waits out the window. Any other status means the family text did not deliver. */
+  family_delivery?: string | null;
   team_notified_at: string | null;
 }
 
@@ -106,6 +108,7 @@ export function wellnessDecision(
   const last = state.last_ok_at ? Date.parse(state.last_ok_at) : null;
   if (last != null && !Number.isNaN(last) && now - last <= windowMs) return "ok";
   if (!state.family_notified_at) return "escalate_family";
+  if (state.family_delivery && state.family_delivery !== "sent") return "escalate_care_team";
   const familyAt = Date.parse(state.family_notified_at);
   if (!Number.isNaN(familyAt) && now - familyAt <= windowMs) return "waiting_on_family";
   return "escalate_care_team";

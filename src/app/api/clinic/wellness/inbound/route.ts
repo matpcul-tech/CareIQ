@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     const result = await handleWellnessInbound(
       {
         url: req.url,
+        webhookUrl: process.env.TWILIO_WEBHOOK_URL || "",
         signature: req.headers.get("x-twilio-signature") || "",
         rawBody,
         authToken: process.env.TWILIO_AUTH_TOKEN || "",

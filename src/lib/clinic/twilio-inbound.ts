@@ -37,6 +37,7 @@ export function parseTwilioBody(raw: string): Record<string, string> {
 export async function handleWellnessInbound(
   input: {
     url: string;
+    webhookUrl?: string;
     signature: string;
     rawBody: string;
     authToken: string;
@@ -46,9 +47,14 @@ export async function handleWellnessInbound(
 ): Promise<{ status: number; body: string }> {
   if (!input.authToken) return { status: 503, body: "" };
   const params = parseTwilioBody(input.rawBody);
-  if (!validTwilioSignature(input.authToken, input.signature, input.url, params)) {
+  const signedUrl = (input.webhookUrl || "").trim() || input.url;
+  if (!validTwilioSignature(input.authToken, input.signature, signedUrl, params)) {
     return { status: 403, body: "" };
   }
+  const sid = (params.MessageSid || "").trim();
+  if (!sid) return { status: 204, body: "" };
+  const fresh = await store.claimInboundSid(sid);
+  if (!fresh) return { status: 204, body: "" };
   await wellnessSmsReply(store, {
     phone: params.From || "",
     body: params.Body || "",

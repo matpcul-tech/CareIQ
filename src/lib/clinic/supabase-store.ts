@@ -2,6 +2,7 @@ import "server-only";
 
 import { getServiceClient } from "@/lib/supabase-server";
 import { DEFAULT_THRESHOLDS, type StaffRole, type Thresholds } from "./logic";
+import { toE164 } from "./phone";
 import { DEFAULT_CARE_SETTINGS, type CareSettings } from "./safety";
 import type {
   AlertRecord,
@@ -57,6 +58,7 @@ function patientFrom(row: Row): PatientRecord {
     wellness_family_phone: row.wellness_family_phone ? String(row.wellness_family_phone) : null,
     wellness_last_ok: row.wellness_last_ok ? String(row.wellness_last_ok) : null,
     wellness_family_notified_at: row.wellness_family_notified_at ? String(row.wellness_family_notified_at) : null,
+    wellness_family_delivery: row.wellness_family_delivery ? String(row.wellness_family_delivery) : null,
     wellness_team_notified_at: row.wellness_team_notified_at ? String(row.wellness_team_notified_at) : null,
   };
 }
@@ -86,7 +88,7 @@ export class SupabaseClinicStore implements ClinicStore {
   async addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null): Promise<StaffRecord> {
     const { data, error } = await this.sb()
       .from("clinic_staff")
-      .insert({ clinic_id: clinicId, role, display_name: displayName, phone: phone || null })
+      .insert({ clinic_id: clinicId, role, display_name: displayName, phone: toE164(phone) })
       .select("id,clinic_id,role,display_name,phone,revoked_at")
       .single();
     if (error || !data) throw new Error(error?.message || "staff insert failed");
@@ -452,6 +454,8 @@ export class SupabaseClinicStore implements ClinicStore {
 
   async updatePatient(patientRowId: string, patch: Partial<PatientRecord>): Promise<PatientRecord | null> {
     const { id: _id, clinic_id: _clinic, external_id: _external, ...rest } = patch;
+    if ("wellness_phone" in rest) rest.wellness_phone = toE164(rest.wellness_phone);
+    if ("wellness_family_phone" in rest) rest.wellness_family_phone = toE164(rest.wellness_family_phone);
     const { data, error } = await this.sb().from("clinic_patients").update(rest).eq("id", patientRowId).select("*").maybeSingle();
     if (error) throw new Error(error.message);
     return data ? patientFrom(data as Row) : null;
@@ -475,9 +479,21 @@ export class SupabaseClinicStore implements ClinicStore {
   }
 
   async findByWellnessPhone(phone: string): Promise<PatientRecord | null> {
-    const { data, error } = await this.sb().from("clinic_patients").select("*").eq("wellness_phone", phone).eq("wellness_opt_in", true).maybeSingle();
+    const normalized = toE164(phone);
+    if (!normalized) return null;
+    const { data, error } = await this.sb().from("clinic_patients").select("*").eq("wellness_phone", normalized).eq("wellness_opt_in", true).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? patientFrom(data as Row) : null;
+  }
+
+  async claimInboundSid(sid: string): Promise<boolean> {
+    const trimmed = sid.trim();
+    if (!trimmed) return false;
+    const { error } = await this.sb().from("clinic_inbound_messages").insert({ message_sid: trimmed });
+    if (!error) return true;
+    const code = (error as { code?: string }).code;
+    if (code === "23505" || /duplicate key/i.test(error.message)) return false;
+    throw new Error(error.message);
   }
 
   async updateSafety(eventId: string, payload: SafetyEvent["payload"]): Promise<SafetyEvent | null> {

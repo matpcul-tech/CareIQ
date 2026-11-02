@@ -9,6 +9,7 @@ import {
   wellnessSmsReply,
 } from "../src/lib/clinic/actions";
 import { buildScorecard, type ScorecardPatient } from "../src/lib/clinic/scorecard";
+import { wellnessDecision } from "../src/lib/clinic/safety";
 import { MemoryClinicStore } from "../src/lib/clinic/store";
 import type { Actor } from "../src/lib/clinic/logic";
 
@@ -121,42 +122,129 @@ test("missed wellness check-in escalates to family before the care team", async 
     familyPhone: "+15555550133",
   });
   assert.equal(opted.ok, true);
-  const first = await tickWellness(store, staff, { nowIso: "2026-11-02T12:00:00Z", env: {} });
+  const env = { accountSid: "ACexample", authToken: "token-example", from: "+15555550100" };
+  const fetchImpl = async () => new Response("{}", { status: 201 });
+  const first = await tickWellness(store, staff, { nowIso: "2026-11-02T12:00:00Z", env, fetchImpl });
   assert.equal(first.ok, true);
   if (!first.ok) return;
+  assert.equal(first.data.escalations.length, 1);
   assert.equal(first.data.escalations[0].step, "family");
-  assert.equal(first.data.escalations[0].sms, "sms_not_configured");
-  const afterMiss = await store.getPatient(saved[0].id);
-  assert.equal(afterMiss?.wellness_family_notified_at, null);
-  const stillFamily = await tickWellness(store, staff, { nowIso: "2026-11-04T12:00:00Z", env: {} });
-  assert.equal(stillFamily.ok, true);
-  if (!stillFamily.ok) return;
-  assert.equal(stillFamily.data.escalations[0].step, "family");
-  const sent = await tickWellness(store, staff, {
-    nowIso: "2026-11-02T12:00:00Z",
-    env: { accountSid: "ACexample", authToken: "token-example", from: "+15555550100" },
-    fetchImpl: async () => new Response("{}", { status: 201 }),
-  });
-  assert.equal(sent.ok, true);
-  if (!sent.ok) return;
-  assert.equal(sent.data.escalations[0].sms, "sent");
+  assert.equal(first.data.escalations[0].sms, "sent");
   const marked = await store.getPatient(saved[0].id);
   assert.equal(marked?.wellness_family_notified_at, "2026-11-02T12:00:00Z");
-  const second = await tickWellness(store, staff, {
-    nowIso: "2026-11-04T12:00:00Z",
-    env: { accountSid: "ACexample", authToken: "token-example", from: "+15555550100" },
-    fetchImpl: async () => new Response("{}", { status: 201 }),
-  });
+  assert.equal(marked?.wellness_family_delivery, "sent");
+  assert.equal(marked?.wellness_team_notified_at, null);
+  const waiting = await tickWellness(store, staff, { nowIso: "2026-11-03T13:00:00Z", env, fetchImpl });
+  assert.equal(waiting.ok, true);
+  if (!waiting.ok) return;
+  assert.equal(waiting.data.escalations.length, 0);
+  const second = await tickWellness(store, staff, { nowIso: "2026-11-03T15:00:00Z", env, fetchImpl });
   assert.equal(second.ok, true);
   if (!second.ok) return;
   assert.equal(second.data.escalations[0].step, "care_team");
-  const reply = await wellnessSmsReply(store, { phone: "+15555550122", body: "OK", at: "2026-11-04T13:00:00Z" });
+  const reply = await wellnessSmsReply(store, { phone: "+15555550122", body: "OK", at: "2026-11-03T16:00:00Z" });
   assert.equal(reply.data.matched, true);
   assert.equal("external_id" in reply.data, false);
-  const quiet = await tickWellness(store, staff, { nowIso: "2026-11-04T18:00:00Z", env: {} });
+  const quiet = await tickWellness(store, staff, { nowIso: "2026-11-03T18:00:00Z", env: {} });
   assert.equal(quiet.ok, true);
   if (!quiet.ok) return;
   assert.equal(quiet.data.escalations.length, 0);
+});
+
+async function missedAlone(familyPhone: string | null) {
+  const store = new MemoryClinicStore();
+  const clinic = await store.createClinic("Synthetic FQHC");
+  const provider = await store.addStaff(clinic.id, "provider", "Provider Synthetic", "+15555550111");
+  const staff: Actor = { kind: "staff", clinicId: clinic.id, staffId: provider.id, role: "provider" };
+  const saved = await store.upsertPatients(clinic.id, [{
+    external_id: "SYN-MISS",
+    age: 78,
+    has_diabetes: false,
+    has_hypertension: false,
+    last_a1c: null,
+    last_a1c_date: null,
+    bp_systolic: null,
+    bp_diastolic: null,
+    last_bp_date: null,
+    next_visit_date: null,
+    patient_id: "patient-miss",
+  }]);
+  await optInWellness(store, { kind: "patient", patientId: "patient-miss" }, {
+    clinicPatientId: saved[0].id,
+    optedIn: true,
+    livesAlone: true,
+    phone: "+15555550122",
+    familyPhone,
+  });
+  return { store, staff, id: saved[0].id };
+}
+
+test("no family phone records the attempt and alerts the care team", async () => {
+  const { store, staff, id } = await missedAlone(null);
+  const env = { accountSid: "ACexample", authToken: "token-example", from: "+15555550100" };
+  const tick = await tickWellness(store, staff, {
+    nowIso: "2026-11-02T12:00:00Z",
+    env,
+    fetchImpl: async () => new Response("{}", { status: 201 }),
+  });
+  assert.equal(tick.ok, true);
+  if (!tick.ok) return;
+  assert.equal(tick.data.escalations[0].step, "family");
+  assert.equal(tick.data.escalations[0].sms, "no_destination");
+  assert.equal(tick.data.escalations[1].step, "care_team");
+  assert.equal(tick.data.escalations[1].sms, "sent");
+  const row = await store.getPatient(id);
+  assert.equal(row?.wellness_family_notified_at, "2026-11-02T12:00:00Z");
+  assert.equal(row?.wellness_family_delivery, "no_destination");
+  assert.equal(row?.wellness_team_notified_at, "2026-11-02T12:00:00Z");
+  const again = await tickWellness(store, staff, { nowIso: "2026-11-02T13:00:00Z", env, fetchImpl: async () => new Response("{}", { status: 201 }) });
+  assert.equal(again.ok, true);
+  if (!again.ok) return;
+  assert.equal(again.data.escalations.length, 0);
+});
+
+test("sms_not_configured still records the family attempt and alerts the care team", async () => {
+  const { store, staff, id } = await missedAlone("+15555550133");
+  const tick = await tickWellness(store, staff, { nowIso: "2026-11-02T12:00:00Z", env: {} });
+  assert.equal(tick.ok, true);
+  if (!tick.ok) return;
+  assert.equal(tick.data.escalations[0].sms, "sms_not_configured");
+  assert.equal(tick.data.escalations[1].step, "care_team");
+  const row = await store.getPatient(id);
+  assert.equal(row?.wellness_family_delivery, "sms_not_configured");
+  assert.ok(row?.wellness_team_notified_at);
+  const again = await tickWellness(store, staff, { nowIso: "2026-11-02T18:00:00Z", env: {} });
+  assert.equal(again.ok, true);
+  if (!again.ok) return;
+  assert.equal(again.data.escalations.some((item) => item.step === "family"), false);
+});
+
+test("a Twilio error records the family attempt and alerts the care team", async () => {
+  const { store, staff, id } = await missedAlone("+15555550133");
+  const env = { accountSid: "ACexample", authToken: "token-example", from: "+15555550100" };
+  const failing = async () => new Response("nope", { status: 500 });
+  const tick = await tickWellness(store, staff, { nowIso: "2026-11-02T12:00:00Z", env, fetchImpl: failing });
+  assert.equal(tick.ok, true);
+  if (!tick.ok) return;
+  assert.equal(tick.data.escalations[0].step, "family");
+  assert.equal(tick.data.escalations[0].sms, "sms_failed");
+  const row = await store.getPatient(id);
+  assert.equal(row?.wellness_family_delivery, "sms_failed");
+  assert.equal(row?.wellness_team_notified_at, "2026-11-02T12:00:00Z");
+  assert.equal(tick.data.escalations.some((item) => item.step === "care_team"), true);
+  const again = await tickWellness(store, staff, { nowIso: "2026-11-02T12:05:00Z", env, fetchImpl: failing });
+  assert.equal(again.ok, true);
+  if (!again.ok) return;
+  assert.equal(again.data.escalations.length, 0);
+  const nextTick = wellnessDecision({
+    opted_in: true,
+    lives_alone: true,
+    last_ok_at: null,
+    family_notified_at: "2026-11-02T12:00:00Z",
+    family_delivery: "sms_failed",
+    team_notified_at: null,
+  }, "2026-11-02T12:05:00Z", 26);
+  assert.equal(nextTick, "escalate_care_team");
 });
 
 test("cognitive concern links to CMS139 and high strain opens a task", async () => {

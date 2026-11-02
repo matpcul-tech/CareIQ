@@ -249,6 +249,7 @@ async function scorecardRows(store: ClinicStore, clinicId: string, month: string
         lives_alone: patient.lives_alone,
         last_ok_at: patient.wellness_last_ok,
         family_notified_at: patient.wellness_family_notified_at,
+        family_delivery: patient.wellness_family_delivery,
         team_notified_at: patient.wellness_team_notified_at,
       },
     });
@@ -639,6 +640,7 @@ export async function markWellnessOk(
   await store.updatePatient(patient.id, {
     wellness_last_ok: input.at,
     wellness_family_notified_at: null,
+    wellness_family_delivery: null,
     wellness_team_notified_at: null,
   });
   return { ok: true as const, data: { ok: true } };
@@ -660,19 +662,27 @@ export async function tickWellness(
       lives_alone: patient.lives_alone,
       last_ok_at: patient.wellness_last_ok,
       family_notified_at: patient.wellness_family_notified_at,
+      family_delivery: patient.wellness_family_delivery,
       team_notified_at: patient.wellness_team_notified_at,
     }, input.nowIso, settings.wellness_window_hours);
-    if (decision === "escalate_family") {
-      const sms = await deliverSms(input.env, patient.wellness_family_phone, input.fetchImpl);
-      if (sms.delivered) {
-        await store.updatePatient(patient.id, { wellness_family_notified_at: input.nowIso });
-      }
-      escalations.push({ external_id: patient.external_id, step: "family", sms: sms.reason });
-    } else if (decision === "escalate_care_team" && !patient.wellness_team_notified_at) {
+    const alertCareTeam = async () => {
+      const current = await store.getPatient(patient.id);
+      if (!current || current.wellness_team_notified_at) return;
       const staff = await store.getStaff(actor.staffId);
       const sms = await deliverSms(input.env, staff?.phone, input.fetchImpl);
       await store.updatePatient(patient.id, { wellness_team_notified_at: input.nowIso });
       escalations.push({ external_id: patient.external_id, step: "care_team", sms: sms.reason });
+    };
+    if (decision === "escalate_family") {
+      const sms = await deliverSms(input.env, patient.wellness_family_phone, input.fetchImpl);
+      await store.updatePatient(patient.id, {
+        wellness_family_notified_at: input.nowIso,
+        wellness_family_delivery: sms.reason,
+      });
+      escalations.push({ external_id: patient.external_id, step: "family", sms: sms.reason });
+      if (!sms.delivered) await alertCareTeam();
+    } else if (decision === "escalate_care_team") {
+      await alertCareTeam();
     }
   }
   return { ok: true as const, data: { escalations, sms_body: WELLNESS_SMS } };
@@ -688,6 +698,7 @@ export async function wellnessSmsReply(
   await store.updatePatient(patient.id, {
     wellness_last_ok: input.at,
     wellness_family_notified_at: null,
+    wellness_family_delivery: null,
     wellness_team_notified_at: null,
   });
   return { ok: true as const, data: { matched: true } };

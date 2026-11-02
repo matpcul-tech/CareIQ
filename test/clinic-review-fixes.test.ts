@@ -5,6 +5,7 @@ import { addCareTeamStaff, markWellnessOk, recordCancerFollowUp } from "../src/l
 import { clinicCsrfFailure } from "../src/lib/clinic/csrf";
 import { handleClinicHttp } from "../src/lib/clinic/http";
 import { MemoryClinicStore } from "../src/lib/clinic/store";
+import { INBOUND_RATE_LIMIT_MAX, INBOUND_WELLNESS_PATH, rateLimitBucket } from "../src/lib/clinic/inbound-limit";
 import { handleWellnessInbound, twilioSignature } from "../src/lib/clinic/twilio-inbound";
 import type { Actor } from "../src/lib/clinic/logic";
 
@@ -102,8 +103,8 @@ test("inbound wellness SMS requires a Twilio signature and returns no patient id
     wellness_family_notified_at: "2026-11-02T12:00:00Z",
   });
   const url = "https://example.test/api/clinic/wellness/inbound";
-  const raw = "Body=OK&From=%2B15555550122";
-  const params = { Body: "OK", From: "+15555550122" };
+  const raw = "Body=OK&From=%2B15555550122&MessageSid=SM111";
+  const params = { Body: "OK", From: "+15555550122", MessageSid: "SM111" };
   const token = "twilio-test-token";
   const bad = await handleWellnessInbound({
     url,
@@ -117,7 +118,7 @@ test("inbound wellness SMS requires a Twilio signature and returns no patient id
   const untouched = await store.getPatient(saved[0].id);
   assert.equal(untouched?.wellness_family_notified_at, "2026-11-02T12:00:00Z");
   const signature = twilioSignature(token, url, params);
-  const independent = createHmac("sha1", token).update(url + "BodyOK" + "From+15555550122", "utf8").digest("base64");
+  const independent = createHmac("sha1", token).update(url + "BodyOK" + "From+15555550122" + "MessageSidSM111", "utf8").digest("base64");
   assert.equal(signature, independent);
   const good = await handleWellnessInbound({
     url,
@@ -131,6 +132,16 @@ test("inbound wellness SMS requires a Twilio signature and returns no patient id
   const cleared = await store.getPatient(saved[0].id);
   assert.equal(cleared?.wellness_last_ok, "2026-11-02T13:00:00Z");
   assert.equal(cleared?.wellness_family_notified_at, null);
+  const replay = await handleWellnessInbound({
+    url,
+    signature,
+    rawBody: raw,
+    authToken: token,
+    at: "2026-11-02T20:00:00Z",
+  }, store);
+  assert.equal(replay.status, 204);
+  const still = await store.getPatient(saved[0].id);
+  assert.equal(still?.wellness_last_ok, "2026-11-02T13:00:00Z");
   const missing = await handleWellnessInbound({
     url,
     signature,
@@ -240,4 +251,63 @@ test("clinic POST CSRF helper rejects a missing or mismatched token", () => {
   assert.equal(clinicCsrfFailure("abc", ""), "missing");
   assert.equal(clinicCsrfFailure("nope", "abc.sig"), "mismatch");
   assert.equal(clinicCsrfFailure("abc", "abc.sig"), null);
+});
+
+test("inbound signature uses TWILIO_WEBHOOK_URL when set", async () => {
+  const store = new MemoryClinicStore();
+  const clinic = await store.createClinic("Synthetic FQHC");
+  const saved = await store.upsertPatients(clinic.id, [{
+    external_id: "SYN-URL",
+    age: 70,
+    has_diabetes: false,
+    has_hypertension: false,
+    last_a1c: null,
+    last_a1c_date: null,
+    bp_systolic: null,
+    bp_diastolic: null,
+    last_bp_date: null,
+    next_visit_date: null,
+    patient_id: "patient-url",
+  }]);
+  await store.updatePatient(saved[0].id, {
+    wellness_opt_in: true,
+    wellness_phone: "(555) 555-0122",
+  });
+  const stored = await store.getPatient(saved[0].id);
+  assert.equal(stored?.wellness_phone, "+15555550122");
+  const publicUrl = "https://clinic.example/api/clinic/wellness/inbound";
+  const requestUrl = "http://127.0.0.1:3000/api/clinic/wellness/inbound";
+  const params = { Body: "OK", From: "+1 (555) 555-0122", MessageSid: "SMURL1" };
+  const raw = "Body=OK&From=%2B1+%28555%29+555-0122&MessageSid=SMURL1";
+  const token = "twilio-test-token";
+  const signedForRequest = await handleWellnessInbound({
+    url: requestUrl,
+    webhookUrl: publicUrl,
+    signature: twilioSignature(token, requestUrl, params),
+    rawBody: raw,
+    authToken: token,
+    at: "2026-11-02T13:00:00Z",
+  }, store);
+  assert.equal(signedForRequest.status, 403);
+  const signedForPublic = await handleWellnessInbound({
+    url: requestUrl,
+    webhookUrl: publicUrl,
+    signature: twilioSignature(token, publicUrl, params),
+    rawBody: raw,
+    authToken: token,
+    at: "2026-11-02T13:00:00Z",
+  }, store);
+  assert.equal(signedForPublic.status, 204);
+  const matched = await store.getPatient(saved[0].id);
+  assert.equal(matched?.wellness_last_ok, "2026-11-02T13:00:00Z");
+  const found = await store.findByWellnessPhone("555.555.0122");
+  assert.equal(found?.id, saved[0].id);
+});
+
+test("inbound wellness uses its own higher rate limit bucket", () => {
+  const inbound = rateLimitBucket(INBOUND_WELLNESS_PATH, "203.0.113.5");
+  const general = rateLimitBucket("/api/clinic", "203.0.113.5");
+  assert.equal(inbound.max, INBOUND_RATE_LIMIT_MAX);
+  assert.equal(inbound.max > general.max, true);
+  assert.notEqual(inbound.key, general.key);
 });
