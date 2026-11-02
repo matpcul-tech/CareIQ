@@ -275,8 +275,10 @@ export default async function DashboardPage() {
         <div className="card md:col-span-2">
           <h2 className="mb-3 text-base font-bold">AI Health Insight</h2>
           <p className="text-sm text-ink-mute">
-            Generate a private, anonymized summary using the Sovereign Shield. Your data is
-            anonymized and HIPAA-scanned before any model sees it; we never share identifying information.
+            The Prompt Shield builds a reduced summary for the model. Your typed question is not sent.
+            The stored name is replaced, conditions and vital names come from a fixed list, and detected
+            identifiers are replaced. This reduces identifiers. It does not certify that every possible
+            identifier is gone.
           </p>
           <InsightButton />
         </div>

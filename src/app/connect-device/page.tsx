@@ -73,11 +73,11 @@ export default function ConnectDevicePage() {
         <div className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-mute">
           CareIQ
         </div>
-        <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Connect a wearable device</h1>
+        <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Upload a wearable export</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft sm:text-base">
-          We do not connect to your device account. There is no OAuth here, no third-party
-          tracking, and no external API call. You export the data yourself and upload the file
-          you choose.
+          CareIQ does not connect to a device account and does not track remote patient monitoring time.
+          You export a file and upload it. The server keeps daily metrics and discards the original file after parsing.
+          Those metrics can later be included, with dates shifted, in an AI summary sent to the model provider.
         </p>
       </header>
 
@@ -108,11 +108,11 @@ export default function ConnectDevicePage() {
       <section className="card mx-auto mt-6 max-w-3xl">
         <h2 className="mb-2 text-lg font-bold">What happens to my file?</h2>
         <ul className="list-disc space-y-1 pl-6 text-sm leading-relaxed text-ink">
-          <li>The raw file is parsed in memory on a sovereign server.</li>
+          <li>The raw file is parsed in memory on the application server.</li>
           <li>Only standard daily metrics (heart rate, steps, sleep, SpO2, calories) are kept.</li>
-          <li>The metrics are encrypted with AES-256-GCM before being written to the database.</li>
-          <li>The original file is discarded immediately after parsing.</li>
-          <li>No third-party service ever sees your file or its contents.</li>
+          <li>The metrics are encrypted with AES-256-GCM before being written to the database. The key is in the server environment.</li>
+          <li>The original file is discarded after parsing and is not sent to the model provider.</li>
+          <li>Reduced daily metrics can be included in a later AI summary.</li>
         </ul>
       </section>
 

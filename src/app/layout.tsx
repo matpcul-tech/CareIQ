@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "CareIQ",
   description:
-    "Clinical intelligence for the safety net. Encrypted, anonymized, audited care for community health centers and FQHCs. Built by Sovereign Shield Technologies LLC.",
+    "Clinical intelligence for the safety net. Records are encrypted at rest on the application server. Built by Sovereign Shield Technologies LLC.",
   robots: { index: false, follow: false },
 };
 

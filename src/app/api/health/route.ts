@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-// Demo patient data structured for future FHIR R4 integration
+// Hardcoded demo patients. This route is not a FHIR or EHR integration.
 const DEMO_PATIENTS = [
   { id:'CIQ-00124', name:'Maria T.', age:58, conditions:['T2 Diabetes','Hypertension'], risk:'high', riskScore:87, healthScore:54, gaps:4 },
   { id:'CIQ-00512', name:'James R.', age:44, conditions:['Pre-Diabetes','Obesity'], risk:'medium', riskScore:61, healthScore:63, gaps:4 },

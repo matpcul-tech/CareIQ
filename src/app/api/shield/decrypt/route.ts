@@ -664,19 +664,19 @@ function generateHealthNarrative(
   const leverages: string[] = [];
   if (ldl !== null && ldl >= 130) {
     leverages.push(
-      `Your biggest leverage point is LDL (${Math.round(ldl)} mg/dL) — the optimal target is under 100. A Mediterranean pattern plus 5x/week aerobic should bring it down meaningfully in 8-12 weeks.`,
+      `Your biggest leverage point is LDL (${Math.round(ldl)} mg/dL), the optimal target is under 100. A Mediterranean pattern plus 5x/week aerobic should bring it down meaningfully in 8-12 weeks.`,
     );
   } else if (a1c !== null && a1c >= 5.7) {
     leverages.push(
-      `A1C is ${a1c.toFixed(1)}% — that's prediabetic territory. A 10-minute walk after each main meal plus reduced refined carbs is the highest-leverage move you can make this quarter.`,
+      `A1C is ${a1c.toFixed(1)}%, that's prediabetic territory. A 10-minute walk after each main meal plus reduced refined carbs is the highest-leverage move you can make this quarter.`,
     );
   } else if (fg !== null && fg >= 100) {
     leverages.push(
-      `Fasting glucose is ${Math.round(fg)} mg/dL — slightly impaired. Time-restricted eating (12-hour window) and a post-dinner walk usually move this within a month.`,
+      `Fasting glucose is ${Math.round(fg)} mg/dL, slightly impaired. Time-restricted eating (12-hour window) and a post-dinner walk usually move this within a month.`,
     );
   } else if (tg !== null && tg >= 150) {
     leverages.push(
-      `Triglycerides are ${Math.round(tg)} mg/dL — cutting alcohol and refined carbs while adding omega-3s (salmon, sardines, walnuts) is the most direct lever.`,
+      `Triglycerides are ${Math.round(tg)} mg/dL, cutting alcohol and refined carbs while adding omega-3s (salmon, sardines, walnuts) is the most direct lever.`,
     );
   } else if (hsCrp !== null && hsCrp >= 3) {
     leverages.push(
@@ -684,7 +684,7 @@ function generateHealthNarrative(
     );
   } else if (vitD !== null && vitD < 30) {
     leverages.push(
-      `Vitamin D is ${Math.round(vitD)} ng/mL — below the 30 ng/mL floor. 2,000 IU daily plus 15 minutes of midday sun is the simplest correction.`,
+      `Vitamin D is ${Math.round(vitD)} ng/mL, below the 30 ng/mL floor. 2,000 IU daily plus 15 minutes of midday sun is the simplest correction.`,
     );
   }
 
@@ -773,7 +773,7 @@ function generateClinicalInsights(
   if (tg !== null && tg >= 200) {
     insights.push({
       title: "Triglycerides elevated",
-      body: `Triglycerides ${Math.round(tg)} mg/dL — high. Reduce alcohol and refined carbs; add omega-3s (salmon, sardines, walnuts). Often responds within 6-8 weeks.`,
+      body: `Triglycerides ${Math.round(tg)} mg/dL, high. Reduce alcohol and refined carbs; add omega-3s (salmon, sardines, walnuts). Often responds within 6-8 weeks.`,
       severity: "warn",
       is_demo: true,
     });
@@ -793,14 +793,14 @@ function generateClinicalInsights(
   if (vitD !== null && vitD < 20) {
     insights.push({
       title: "Vitamin D deficient",
-      body: `Vitamin D ${Math.round(vitD)} ng/mL — deficient. 2,000-4,000 IU daily with K2 plus midday sun exposure. Recheck in 8-12 weeks.`,
+      body: `Vitamin D ${Math.round(vitD)} ng/mL, deficient. 2,000-4,000 IU daily with K2 plus midday sun exposure. Recheck in 8-12 weeks.`,
       severity: "warn",
       is_demo: true,
     });
   } else if (vitD !== null && vitD < 30) {
     insights.push({
       title: "Vitamin D below floor",
-      body: `Vitamin D ${Math.round(vitD)} ng/mL — below the 30 ng/mL floor. 2,000 IU daily plus 15 minutes of midday sun is the simplest correction.`,
+      body: `Vitamin D ${Math.round(vitD)} ng/mL, below the 30 ng/mL floor. 2,000 IU daily plus 15 minutes of midday sun is the simplest correction.`,
       severity: "info",
       is_demo: true,
     });
@@ -885,7 +885,7 @@ function generateHealthTimeline(
     events.push({
       date: fmt(minus(1)),
       label: "Wearable sync",
-      body: `Latest sync: HR ${latestWearable.heartRate ?? "—"} bpm, ${latestWearable.steps?.toLocaleString() ?? "—"} steps, ${(latestWearable.sleepHours ?? 0).toFixed(1)}h sleep.`,
+      body: `Latest sync: HR ${latestWearable.heartRate ?? "-"} bpm, ${latestWearable.steps?.toLocaleString() ?? "-"} steps, ${(latestWearable.sleepHours ?? 0).toFixed(1)}h sleep.`,
       is_demo: true,
     });
   }

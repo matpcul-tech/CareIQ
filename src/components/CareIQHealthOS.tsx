@@ -243,15 +243,15 @@ const DEMO_DOMAINS = [
   {name:"Renal",score:79},{name:"Mental Health",score:72},
 ];
 const DEMO_INSIGHTS = [
-  {type:"crit",icon:"!",title:"Elevated LDL, Action Required",body:"LDL of 212 mg/dL significantly elevates 10-year cardiovascular risk. Statin evaluation recommended within 14 days.",cta:"Schedule Consult",conf:"94%"},
-  {type:"watch",icon:"^",title:"Prediabetes Progression Risk",body:"A1C at 6.4%. Community health programs show 51% of patients return to normal blood sugar in 14 months with metabolic protocol.",cta:"Start Protocol",conf:"89%"},
-  {type:"pos",icon:"+",title:"Cognitive Biomarkers Stable",body:"Cerebrovascular flow and inflammatory markers within optimal range.",cta:"View Report",conf:"97%"},
+  {type:"crit",icon:"!",title:"Sample LDL note",body:"Sample chart only. The 212 mg/dL figure is not a measured result and not this patient's lab.",cta:"",conf:""},
+  {type:"watch",icon:"^",title:"Prediabetes Progression Risk",body:"Sample chart only. A1C at 6.4% is in the prediabetes range on this example. It is not a measured CareIQ outcome.",cta:"Example",conf:""},
+  {type:"pos",icon:"+",title:"Sample note",body:"Sample chart only. CareIQ does not score cerebrovascular flow.",cta:"",conf:""},
 ];
 const DEMO_TIMELINE = [
-  {dot:"#00d4b8",date:"Apr 10, 2026",title:"AI Full-Body Scan",text:"Whole-body MRI plus liquid biopsy. No oncological signals."},
-  {dot:"#d4a843",date:"Mar 3, 2026",title:"Metabolic Panel, Flag",text:"LDL 198 to 212. A1C 6.1% to 6.4%. Protocol upgraded."},
-  {dot:"#8060cc",date:"Jan 28, 2026",title:"Cognitive Assessment",text:"MOCA 27/30. Brain aging markers stable."},
-  {dot:"#00d4b8",date:"Dec 15, 2025",title:"Enrollment",text:"Health score: 68. CareIQ vault created on Trace Fiber."},
+  {dot:"#00d4b8",date:"Apr 10, 2026",title:"Sample event",text:"Example timeline entry. CareIQ does not perform imaging or liquid biopsy."},
+  {dot:"#d4a843",date:"Mar 3, 2026",title:"Sample lab note",text:"Example numbers only. Not this patient's labs."},
+  {dot:"#8060cc",date:"Jan 28, 2026",title:"Sample assessment",text:"Example note. Not a scored cognitive test from this app."},
+  {dot:"#00d4b8",date:"Dec 15, 2025",title:"Sample enrollment",text:"Example enrollment event for the demo chart."},
 ];
 const DEMO_MEALS = [
   {time:"Breakfast 7:00 AM",name:"Steel-Cut Oats with Berries",desc:"Steel-cut oatmeal topped with fresh blueberries, walnuts, and a drizzle of olive oil.",tags:["Heart-Healthy","High Fiber","Low Sodium"]},
@@ -281,6 +281,7 @@ export interface ClinicalData {
   wearHr7Day: number[];
   wearSteps7Day: number[];
   wearDays: string[];
+  wearableSource: "demo" | "upload" | "none";
   primaryDeviceLabel?: string;
 }
 
@@ -294,6 +295,7 @@ const DEMO_DATA: ClinicalData = {
   wearHr7Day: DEMO_WEAR_HR_7DAY,
   wearSteps7Day: DEMO_WEAR_STEPS_7DAY,
   wearDays: DEMO_WEAR_DAYS,
+  wearableSource: "demo",
 };
 
 const ClinicalDataContext = createContext<ClinicalData>(DEMO_DATA);
@@ -344,7 +346,7 @@ function useShieldGenerate(mode: "workout" | "meal_plan" | "narrative"): ShieldG
         } else if (typeof body?.insight === "string" && body.insight.length > 0) {
           setState({ loading: false, text: body.insight, error: "", blocked: false });
         } else {
-          setState({ loading: false, text: "", error: "ZK Shield returned no content.", blocked: false });
+          setState({ loading: false, text: "", error: "Prompt Shield returned no content.", blocked: false });
         }
       } catch {
         if (!cancelled) setState({ loading: false, text: "", error: "Shield offline. Try again.", blocked: false });
@@ -372,7 +374,7 @@ function GeneratedCard({
         </div>
       ) : blocked ? (
         <div style={{ fontSize: 11, color: "#e8526e", lineHeight: 1.5 }}>
-          Blocked: PII detected in patient context. Care team notified via audit log.
+          Blocked: identifying information detected. The block is written to the audit log.
         </div>
       ) : error ? (
         <div style={{ fontSize: 11, color: "#e8526e", lineHeight: 1.5 }}>{error}</div>
@@ -381,7 +383,7 @@ function GeneratedCard({
       )}
       <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: "#7a9bbf", letterSpacing: ".12em" }}>
-          via /api/shield, anonymized
+          via Prompt Shield, identifiers reduced
         </span>
         <button
           type="button"
@@ -405,17 +407,6 @@ function MealPlan()       { return <GeneratedCard title="Today's Meal Plan"     
 function dc(s:number){return s>=80?"#00d4b8":s>=60?"#d4a843":"#e8526e"}
 function rc(level:string){return level==="CRITICAL"?"#e8526e":level==="HIGH"?"#f97316":level==="MEDIUM"?"#d4a843":level==="UNKNOWN"?"#7a9bbf":"#00d4b8"}
 
-function ABar({label,pct,color,delay=0,right}:{label:string;pct:number;color:string;delay?:number;right?:string}){
-  const [w,setW]=useState(0);
-  useEffect(()=>{const t=setTimeout(()=>setW(pct),300+delay);return()=>clearTimeout(t)},[pct,delay]);
-  return(
-    <div className="abar-wrap">
-      <div className="abar-top"><span className="abar-lbl">{label}</span><span style={{color,fontFamily:"'DM Mono',monospace"}}>{right||`${pct}%`}</span></div>
-      <div className="abar-bg"><div className="abar-fill" style={{width:`${w}%`,background:`linear-gradient(90deg,${color},${color}88)`}}/></div>
-    </div>
-  );
-}
-
 interface SLog {
   timestamp: string;
   riskLevel: string;
@@ -436,7 +427,7 @@ class TabErrorBoundary extends Component<{children:ReactNode},{hasError:boolean}
     if(this.state.hasError){
       return(
         <div className="err-card">
-          This tab could not load. Other tabs and the ZK Shield are unaffected. Try switching tabs and returning.
+          This tab could not load. Other tabs and the Prompt Shield are unaffected. Try switching tabs and returning.
         </div>
       );
     }
@@ -460,28 +451,18 @@ function Overview(){
           </div>
         ))}
       </div>
-      <div className="sec">Platform Intelligence</div>
-      <div className="stat-grid">
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>15B+</div><div className="stat-lbl">Clinical Data Points</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#d4a843"}}>96%</div><div className="stat-lbl">Pre-Symptom Detection</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#8060cc"}}>13:1</div><div className="stat-lbl">Prevention ROI</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#4ade80"}}>$20M+</div><div className="stat-lbl">Annual/1K Members</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>51%</div><div className="stat-lbl">Prediabetes Reversed</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#e8526e"}}>4x</div><div className="stat-lbl">Cancer Detection</div></div>
-      </div>
-      <div className="sec">Active Protocols</div>
-      {[
-        {label:"Metabolic Reversal",pct:34,color:"#d4a843",detail:"Week 5 of 18 . A1C target: 5.7%"},
-        {label:"Cardiovascular Defense",pct:20,color:"#e8526e",detail:"LDL target: under 170 mg/dL"},
-        {label:"Longevity Optimization",pct:61,color:"#00d4b8",detail:"Supplement plus sleep plus exercise"},
-        {label:"Cognitive Protection",pct:78,color:"#8060cc",detail:"Brain health markers stable"},
-      ].map((p,i)=>(
-        <div className="card" key={i}>
-          <div className="card-hdr"><span className="card-title">{p.label}</span><span className="badge b-violet">{p.pct}%</span></div>
-          <div className="prog-bg"><div className="prog-fill" style={{width:`${p.pct}%`,background:`linear-gradient(90deg,${p.color},${p.color}88)`}}/></div>
-          <div style={{fontSize:10,color:"#7a9bbf",marginTop:6}}>{p.detail}</div>
+      <div className="sec">What this screen is</div>
+      <div className="card">
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          This view summarizes data on file for one patient. CareIQ does not compute population outcomes, UDS or CMS measures, RPM time, or a multi-patient panel.
         </div>
-      ))}
+      </div>
+      <div className="sec">Protocols</div>
+      <div className="card">
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          CareIQ does not enroll care protocols or track protocol progress.
+        </div>
+      </div>
     </div>
   );
 }
@@ -497,7 +478,6 @@ function Insights(){
         <div key={i} className={`insight ${ins.type}`}>
           <div className="insight-hdr"><span style={{fontSize:14}}>{ins.icon}</span><span className="insight-title">{ins.title}</span></div>
           <div className="insight-body">{ins.body}</div>
-          <div className="insight-foot"><button className="insight-cta">{ins.cta}</button><span className="insight-conf">AI Confidence: {ins.conf}</span></div>
         </div>
       ))}
       <div className="sec">Health Timeline</div>
@@ -524,11 +504,9 @@ function Nutrition(){
     <div className="pad">
       <div className="sec">Today's Meal Plan, AI Generated</div>
       <MealPlan/>
-      <div className="sec">Personalized Nutrition Plan</div>
-      <div className="stat-grid" style={{marginBottom:10}}>
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>1,820</div><div className="stat-lbl">Calories</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#d4a843"}}>118g</div><div className="stat-lbl">Protein</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#8060cc"}}>28g</div><div className="stat-lbl">Fiber</div></div>
+      <div className="sec">Example meals, not your log</div>
+      <div style={{fontSize:11,color:"#d4a843",lineHeight:1.5,margin:"-4px 0 8px"}}>
+        Sample dishes only. CareIQ does not calculate calories or record what you ate.
       </div>
       {meals.map((m,i)=>(
         <div className="meal-card" key={i}>
@@ -543,34 +521,13 @@ function Nutrition(){
 }
 
 function BloodPanel(){
-  const p=[
-    {name:"LDL Cholesterol",val:"212",unit:"mg/dL",pct:92,c:"#e8526e"},
-    {name:"Total Cholesterol",val:"238",unit:"mg/dL",pct:79,c:"#d4a843"},
-    {name:"HDL Cholesterol",val:"52",unit:"mg/dL",pct:60,c:"#00d4b8"},
-    {name:"A1C (Glycemic)",val:"6.4",unit:"%",pct:80,c:"#d4a843"},
-    {name:"Fasting Glucose",val:"114",unit:"mg/dL",pct:75,c:"#d4a843"},
-    {name:"eGFR (Kidney)",val:"74",unit:"mL/min",pct:55,c:"#00d4b8"},
-    {name:"CRP (Inflammation)",val:"2.1",unit:"mg/L",pct:70,c:"#d4a843"},
-    {name:"Triglycerides",val:"148",unit:"mg/dL",pct:65,c:"#00d4b8"},
-  ];
   return(
     <div className="pad">
-      <div className="sec">Comprehensive Blood Analysis</div>
+      <div className="sec">Biomarker panel</div>
       <div className="card">
-        {p.map((b,i)=>(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:i<p.length-1?"1px solid rgba(255,255,255,.06)":"none"}}>
-            <div style={{fontSize:10,color:"#7a9bbf",width:110,flexShrink:0}}>{b.name}</div>
-            <div style={{flex:1,height:4,background:"rgba(255,255,255,.06)",borderRadius:2,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${b.pct}%`,background:`linear-gradient(90deg,${b.c},${b.c}88)`,borderRadius:2}}/>
-            </div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:b.c,width:55,textAlign:"right",flexShrink:0}}>{b.val}<span style={{fontSize:8,color:"#7a9bbf"}}> {b.unit}</span></div>
-          </div>
-        ))}
-      </div>
-      <div className="stat-grid">
-        <div className="stat-item"><div className="stat-val" style={{color:"#d4a843"}}>B-</div><div className="stat-lbl">Panel Grade</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#e8526e"}}>2</div><div className="stat-lbl">Flagged</div></div>
-        <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>6</div><div className="stat-lbl">In Range</div></div>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          This tab does not read an EHR and it does not invent a panel grade. Lab values you type in appear on the health view. There is no UDS or CMS measure score here.
+        </div>
       </div>
     </div>
   );
@@ -579,32 +536,16 @@ function BloodPanel(){
 function Telehealth(){
   return(
     <div className="pad">
-      <div className="sec">Upcoming Appointments</div>
+      <div className="sec">Appointments</div>
       <div className="card">
-        {[
-          {icon:"MD",title:"Dr. J. Rivera, MD",body:"Metabolic review . Apr 28 . 10:30 AM"},
-          {icon:"CV",title:"Cardiology, Dr. K. Nguyen",body:"LDL management . May 12 . 2:00 PM"},
-          {icon:"LB",title:"Lab Draw, Fasting Panel",body:"A1C, lipids . Apr 22 . 7:00 AM"},
-        ].map((r,i)=>(
-          <div key={i} style={{display:"flex",gap:12,padding:"10px 0",borderBottom:i<2?"1px solid rgba(255,255,255,.06)":"none"}}>
-            <span style={{fontSize:14,flexShrink:0,fontFamily:"'DM Mono',monospace",color:"#00d4b8"}}>{r.icon}</span>
-            <div><div style={{fontSize:12,fontWeight:600,marginBottom:3}}>{r.title}</div><div style={{fontSize:11,color:"#7a9bbf"}}>{r.body}</div></div>
-          </div>
-        ))}
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          CareIQ does not book visits and does not connect to an EHR. There is no appointment list in this app.
+        </div>
       </div>
-      <div className="sec">Cost Savings</div>
+      <div className="sec">Cost figures</div>
       <div className="card">
-        <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-          <span style={{fontSize:11,color:"#7a9bbf"}}>ER Visit (avoided)</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:"#4ade80"}}>$3,200 saved</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-          <span style={{fontSize:11,color:"#7a9bbf"}}>Annual Per-Capita</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:"#4ade80"}}>$12,500 to $1,800</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0 0"}}>
-          <span style={{fontSize:11,color:"#7a9bbf"}}>Annual ER diversion savings</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:"#4ade80",fontWeight:600}}>$9.4M</span>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          CareIQ does not calculate savings, ER diversion, or a per-member cost. No dollar figure on this screen is a measured result.
         </div>
       </div>
     </div>
@@ -614,28 +555,20 @@ function Telehealth(){
 function Sovereignty(){
   return(
     <div className="pad">
-      <div className="sec">Data Privacy Status</div>
+      <div className="sec">How records are protected</div>
       <div className="card">
-        <div className="stat-grid">
-          <div className="stat-item"><div className="stat-val" style={{color:"#4ade80"}}>100%</div><div className="stat-lbl">Encrypted Vault</div></div>
-          <div className="stat-item"><div className="stat-val" style={{color:"#00d4b8"}}>AES-256</div><div className="stat-lbl">Encryption</div></div>
-          <div className="stat-item"><div className="stat-val" style={{color:"#8060cc"}}>50yr</div><div className="stat-lbl">Retention</div></div>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          PHI fields and uploaded files are encrypted at rest with AES-256-GCM. The key lives in the application server environment. Encryption is not on the device, and the key is not held by the community. The operator of the server can decrypt.
         </div>
       </div>
-      <div className="sec">Vault Activity, Last 24h</div>
-      <ABar label="Data Operations" pct={87} color="#00d4b8" right="2,847"/>
-      <ABar label="Shield Queries" pct={62} color="#4ade80" right="1,203" delay={120}/>
-      <ABar label="Cross-Domain Sync" pct={94} color="#8060cc" right="98.7%" delay={240}/>
-      <div className="sec">Trace Fiber Network</div>
       <div className="card">
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
-          <span style={{fontSize:11,fontWeight:600}}>Network Status</span>
-          <span style={{display:"inline-flex",alignItems:"center",gap:5,fontFamily:"'DM Mono',monospace",fontSize:9,color:"#4ade80"}}>
-            <div style={{width:6,height:6,borderRadius:"50%",background:"#4ade80",animation:"pulse 2s infinite"}}/>OPERATIONAL
-          </span>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          AI insights are an Anthropic inference call. The app does not train a model on patient data. The typed question is not sent. Detected identifiers are replaced in the reduced summary. That is not a promise that every possible identifier is removed.
         </div>
-        <div style={{display:"flex",gap:15,fontSize:10,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>
-          <span>Latency: 12ms</span><span>Uptime: 99.997%</span>
+      </div>
+      <div className="card">
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          There is an audit log of shield events. This screen does not show live network uptime, latency, or a private network.
         </div>
       </div>
     </div>
@@ -645,26 +578,10 @@ function Sovereignty(){
 function Impact(){
   return(
     <div className="pad">
-      <div className="sec">Cost Per Member Per Year</div>
+      <div className="sec">Impact figures</div>
       <div className="card">
-        <div style={{textAlign:"center",padding:"6px 0"}}>
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:32,fontWeight:700,color:"#4ade80"}}>$1,800</div>
-          <div style={{fontSize:10,color:"#7a9bbf",marginTop:3}}>versus $12,500 traditional model</div>
-          <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:9,padding:"4px 10px",background:"rgba(74,222,128,.1)",borderRadius:20,fontSize:11,color:"#4ade80"}}>86% reduction</div>
-        </div>
-      </div>
-      <div className="sec">Per 1K Members Per Year</div>
-      <ABar label="ER Visits Avoided" pct={78} color="#4ade80" right="$3.2M"/>
-      <ABar label="Hospitalizations Prevented" pct={62} color="#00d4b8" right="$5.8M" delay={120}/>
-      <ABar label="Chronic Disease Reversal" pct={51} color="#d4a843" right="$2.4M" delay={240}/>
-      <ABar label="Early Cancer Detection" pct={87} color="#8060cc" right="$8.6M" delay={360}/>
-      <div className="card" style={{marginTop:12}}>
-        <div className="card-hdr">
-          <span className="card-title">Total Annual Savings</span>
-          <span className="badge b-green">$20M+</span>
-        </div>
-        <div style={{fontSize:11,color:"#a3b5cc",lineHeight:1.5}}>
-          Per 1,000 enrolled members. Compared to traditional reactive care models.
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          CareIQ does not calculate cost per member, ER diversion, hospitalizations prevented, or annual savings. This tab does not show measured results.
         </div>
       </div>
     </div>
@@ -699,7 +616,7 @@ function ShieldDash({logs}:{logs:SLog[]}){
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <span style={{display:"inline-flex",alignItems:"center",gap:7}}>
             <div style={{width:8,height:8,borderRadius:"50%",background:"#4ade80",animation:"pulse 2s infinite"}}/>
-            <span style={{fontSize:13,fontWeight:600}}>ZK Shield, Production</span>
+            <span style={{fontSize:13,fontWeight:600}}>Prompt Shield</span>
           </span>
           <span className="badge b-green">ACTIVE</span>
         </div>
@@ -712,9 +629,9 @@ function ShieldDash({logs}:{logs:SLog[]}){
           <div className="stat-item"><div className="stat-val" style={{color:"#d4a843"}}>{ms}</div><div className="stat-lbl">Medium</div></div>
         </div>
       </div>
-      <div className="sec">Recent Queries (Anonymized)</div>
+      <div className="sec">Recent queries (hash only)</div>
       <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf",margin:"-4px 0 8px",letterSpacing:".04em"}}>
-        Raw query content is never displayed, only its SHA-256 hash.
+        The typed question is not shown here, only a SHA-256 hash.
       </div>
       {logs.length===0?(
         <div className="card">
@@ -731,7 +648,7 @@ function ShieldDash({logs}:{logs:SLog[]}){
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{display:"flex",gap:6,fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf"}}>
-              <span>{log.queryChars} chars</span><span>ZK: {log.zkCount}</span><span>Flags: {log.flagCount}</span><span>{log.action}</span>
+              <span>{log.queryChars} chars</span><span>Terms: {log.zkCount}</span><span>Flags: {log.flagCount}</span><span>{log.action}</span>
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:rc(log.riskLevel)}}>Risk: {log.riskScore}/100</div>
           </div>
@@ -747,7 +664,7 @@ function ShieldDash({logs}:{logs:SLog[]}){
 function AIChat({onLog}:{onLog:(log:SLog)=>void}){
   const { patient } = useContext(ClinicalDataContext);
   const firstName = patient.name.split(" ")[0] || "friend";
-  const [msgs,setMsgs]=useState([{role:"ai",text:`Hello, ${firstName}. Every message is protected by the ZK Shield.`,zkCount:0,flagCount:0}]);
+  const [msgs,setMsgs]=useState([{role:"ai",text:`Hello, ${firstName}. Critical identifier queries are blocked. The typed question is not sent to the model.`,zkCount:0,flagCount:0}]);
   const [input,setInput]=useState("");
   const [sending,setSending]=useState(false);
   const scrollRef=useRef<HTMLDivElement>(null);
@@ -807,7 +724,7 @@ function AIChat({onLog}:{onLog:(log:SLog)=>void}){
             <div className={`chat-msg ${m.role==="user"?"chat-user":"chat-ai"}`}>{m.text}</div>
             {(m.zkCount>0||m.flagCount>0)&&(
               <div className="chat-meta" style={{textAlign:m.role==="user"?"right":"left",marginTop:3}}>
-                {m.zkCount>0&&<span style={{color:"#00d4b8",marginRight:7}}>ZK: {m.zkCount}</span>}
+                {m.zkCount>0&&<span style={{color:"#00d4b8",marginRight:7}}>Terms: {m.zkCount}</span>}
                 {m.flagCount>0&&<span style={{color:"#d4a843"}}>Flags: {m.flagCount}</span>}
               </div>
             )}
@@ -841,15 +758,17 @@ function Profile(){
         <div style={{fontSize:11,color:"#d4a843",marginTop:5}}>Enrolled Patient . Age {patient.age}</div>
         <div style={{display:"inline-flex",alignItems:"center",gap:5,fontFamily:"'DM Mono',monospace",fontSize:8,color:"#4ade80",background:"rgba(74,222,128,.08)",border:"1px solid rgba(74,222,128,.2)",padding:"3px 10px",borderRadius:20,marginTop:10}}>
           <div style={{width:5,height:5,borderRadius:"50%",background:"#4ade80",animation:"pulse 2s infinite"}}/>
-          ZK Shield Active . Trace Fiber
+          Prompt Shield on
         </div>
       </div>
       <div className="sec">Profile</div>
       {([
-        ["Enrollment","December 15, 2025"],["Program","CareIQ, Full"],
-        ["Physician","Dr. J. Rivera, MD"],["Next Scan","July 2, 2026"],
-        ["Data Vault","Trace Fiber . AES-256"],["Shield","v5.0 + HIPAA"],
-        ["AI Model","CIQ v1.2 . AILT Governed"],["Protocols","4 of 4 Active"],
+        ["Storage","AES-256-GCM at rest on the server"],
+        ["Key","Application server environment"],
+        ["Shield","Prompt Shield blocks critical identifier queries"],
+        ["AI","Anthropic inference. No training on patient data"],
+        ["Wearables","Uploaded files. No live device or RPM time tracking"],
+        ["Records","No FHIR or EHR connection"],
       ] as const).map(([k,v],i)=>(
         <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,.06)",gap:12}}>
           <span style={{fontSize:11,color:"#7a9bbf"}}>{k}</span>
@@ -861,124 +780,72 @@ function Profile(){
 }
 
 function Wearable(){
-  const { wearHr7Day, wearSteps7Day, wearDays, primaryDeviceLabel } = useContext(ClinicalDataContext);
-  const [now,setNow]=useState(()=>Date.now());
-  const [appleStart]=useState(()=>Date.now()-14000);
-  const [fitbitStart]=useState(()=>Date.now()-52000);
-  useEffect(()=>{
-    const t=setInterval(()=>setNow(Date.now()),1000);
-    return()=>clearInterval(t);
-  },[]);
-  const fmtAgo=(start:number)=>{
-    const s=Math.max(0,Math.floor((now-start)/1000));
-    if(s<60)return `${s}s ago`;
-    const m=Math.floor(s/60);
-    const sr=s%60;
-    if(m<60)return `${m}m ${sr}s ago`;
-    const h=Math.floor(m/60);
-    return `${h}h ${m%60}m ago`;
-  };
-  const apple=[
-    {icon:"HR",val:String(wearHr7Day[wearHr7Day.length-1] ?? 68),unit:"bpm",name:"Resting HR"},
-    {icon:"ST",val:(wearSteps7Day[wearSteps7Day.length-1] ?? 7842).toLocaleString(),unit:"today",name:"Steps"},
-    {icon:"AC",val:"340",unit:"kcal",name:"Active Cal"},
-    {icon:"SL",val:"6h 20m",unit:"last night",name:"Sleep"},
-    {icon:"O2",val:"97",unit:"%",name:"SpO2"},
-    {icon:"HV",val:"42",unit:"ms",name:"HRV"},
-  ];
-  const fitbit=[
-    {icon:"HR",val:"71",unit:"bpm",name:"Resting HR"},
-    {icon:"ST",val:"6,210",unit:"today",name:"Steps"},
-    {icon:"AC",val:"285",unit:"kcal",name:"Active Cal"},
-    {icon:"SL",val:"6h 50m",unit:"last night",name:"Sleep"},
-    {icon:"O2",val:"96",unit:"%",name:"SpO2"},
-    {icon:"HV",val:"38",unit:"ms",name:"HRV"},
-  ];
-  const hrMax=Math.max(...wearHr7Day);
-  const hrMin=Math.min(...wearHr7Day);
-  const stepsMax=Math.max(...wearSteps7Day);
-  const renderCard=(title:string,start:number,metrics:typeof apple)=>(
-    <div className="card">
-      <div className="card-hdr">
-        <span className="card-title">{title}</span>
-        <span className="badge b-green">SYNCED</span>
-      </div>
-      <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#7a9bbf",marginBottom:10}}>
-        Last sync: {fmtAgo(start)}
-      </div>
-      <div className="stat-grid" style={{gridTemplateColumns:"repeat(3,1fr)",gap:7}}>
-        {metrics.map((m,i)=>(
-          <div className="stat-item" key={i}>
-            <div style={{fontSize:10,marginBottom:3,fontFamily:"'DM Mono',monospace",color:"#7a9bbf"}}>{m.icon}</div>
-            <div className="stat-val" style={{color:"#00d4b8",fontSize:14}}>{m.val}</div>
-            <div className="stat-lbl">{m.name}</div>
-            <div style={{fontSize:8,color:"#7a9bbf",fontFamily:"'DM Mono',monospace",marginTop:2}}>{m.unit}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{marginTop:11,display:"flex",justifyContent:"flex-end"}}>
-        <button className="insight-cta">Resync Now</button>
-      </div>
-    </div>
-  );
-  const primaryLabel = primaryDeviceLabel ?? "Apple Watch Series 9";
+  const { wearHr7Day, wearSteps7Day, wearDays, wearableSource, primaryDeviceLabel } = useContext(ClinicalDataContext);
+  const hasSeries = wearHr7Day.length > 0 || wearSteps7Day.length > 0;
+  const hrMax = wearHr7Day.length ? Math.max(...wearHr7Day) : 0;
+  const hrMin = wearHr7Day.length ? Math.min(...wearHr7Day) : 0;
+  const stepsMax = wearSteps7Day.length ? Math.max(...wearSteps7Day) : 0;
+  const note = wearableSource === "demo"
+    ? "Sample chart only. CareIQ does not connect to Apple Watch, Fitbit, or Withings, and it does not track RPM time."
+    : wearableSource === "upload"
+      ? `From the last uploaded file${primaryDeviceLabel ? ` (${primaryDeviceLabel})` : ""}. This is not a live device connection.`
+      : "No wearable file uploaded. CareIQ does not connect to a device account and does not track RPM time.";
   return(
     <div className="pad">
-      <div className="sec">Connected Devices</div>
-      {renderCard(primaryLabel,appleStart,apple)}
-      {renderCard("Fitbit Charge 6",fitbitStart,fitbit)}
-      <div className="sec">Sync Status</div>
+      <div className="sec">Wearable file</div>
       <div className="card">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-          <div style={{display:"inline-flex",alignItems:"center",gap:8}}>
-            <div style={{width:8,height:8,borderRadius:"50%",background:"#4ade80",animation:"pulse 2s infinite"}}/>
-            <span style={{fontSize:13,fontWeight:600,color:"#4ade80"}}>All Synced</span>
-          </div>
-          <button className="insight-cta">Sync All</button>
-        </div>
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>{note}</div>
       </div>
-      <div className="sec">7 Day Trends</div>
-      <div className="card">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-          <span style={{fontSize:11,fontWeight:600}}>Heart Rate (bpm)</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf"}}>{hrMin} to {hrMax}</span>
-        </div>
-        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:74,marginBottom:6}}>
-          {wearHr7Day.map((v,i)=>{
-            const range=Math.max(1,hrMax-hrMin+4);
-            const pct=Math.max(22,((v-hrMin+2)/range)*100);
-            return(
-              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"#00d4b8"}}>{v}</div>
-                <div style={{width:"100%",height:`${pct}%`,background:"linear-gradient(180deg,#00d4b8,#00b89e)",borderRadius:4,minHeight:8}}/>
+      {hasSeries && (
+        <>
+          <div className="sec">Heart rate and steps on file</div>
+          {wearHr7Day.length > 0 && (
+            <div className="card">
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <span style={{fontSize:11,fontWeight:600}}>Heart rate (bpm)</span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf"}}>{hrMin} to {hrMax}</span>
               </div>
-            );
-          })}
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          {wearDays.map((d,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>{d}</div>))}
-        </div>
-      </div>
-      <div className="card">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-          <span style={{fontSize:11,fontWeight:600}}>Steps</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf"}}>peak {stepsMax.toLocaleString()}</span>
-        </div>
-        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:74,marginBottom:6}}>
-          {wearSteps7Day.map((v,i)=>{
-            const pct=(v/stepsMax)*100;
-            return(
-              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"#d4a843"}}>{(v/1000).toFixed(1)}k</div>
-                <div style={{width:"100%",height:`${pct}%`,background:"linear-gradient(180deg,#d4a843,#b8902f)",borderRadius:4,minHeight:8}}/>
+              <div style={{display:"flex",alignItems:"flex-end",gap:6,height:74,marginBottom:6}}>
+                {wearHr7Day.map((v,i)=>{
+                  const range=Math.max(1,hrMax-hrMin+4);
+                  const pct=Math.max(22,((v-hrMin+2)/range)*100);
+                  return(
+                    <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"#00d4b8"}}>{v}</div>
+                      <div style={{width:"100%",height:`${pct}%`,background:"linear-gradient(180deg,#00d4b8,#00b89e)",borderRadius:4,minHeight:8}}/>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          {wearDays.map((d,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>{d}</div>))}
-        </div>
-      </div>
+              <div style={{display:"flex",gap:6}}>
+                {wearDays.map((d,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>{d}</div>))}
+              </div>
+            </div>
+          )}
+          {wearSteps7Day.length > 0 && stepsMax > 0 && (
+            <div className="card">
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <span style={{fontSize:11,fontWeight:600}}>Steps</span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a9bbf"}}>peak {stepsMax.toLocaleString()}</span>
+              </div>
+              <div style={{display:"flex",alignItems:"flex-end",gap:6,height:74,marginBottom:6}}>
+                {wearSteps7Day.map((v,i)=>{
+                  const pct=Math.max(8,(v/stepsMax)*100);
+                  return(
+                    <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"#d4a843"}}>{(v/1000).toFixed(1)}k</div>
+                      <div style={{width:"100%",height:`${pct}%`,background:"linear-gradient(180deg,#d4a843,#b8902f)",borderRadius:4,minHeight:8}}/>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                {wearDays.map((d,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:"#7a9bbf",fontFamily:"'DM Mono',monospace"}}>{d}</div>))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -1069,7 +936,7 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
             <div className="hdr-right">
               <div className="hdr-patient">{patient.name}</div>
               <div className="hdr-id">{patient.id}</div>
-              <div className="shield-on"><div className="pulse"/>ZK SHIELD ON</div>
+              <div className="shield-on"><div className="pulse"/>SHIELD ON</div>
             </div>
           </div>
         </div>
@@ -1096,9 +963,8 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
                 </div>
               </div>
               <div className="score-info">
-                <div className="score-title">Moderate Risk</div>
-                <div className="score-sub">2 active alerts . Next scan 83 days</div>
-                <div className="trend">+8.8% since last scan</div>
+                <div className="score-title">Health score</div>
+                <div className="score-sub">A local summary of data on file. Not a diagnosis, and not a UDS or CMS measure.</div>
               </div>
             </div>
             <div className="vitals-row">

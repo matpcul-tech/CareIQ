@@ -153,8 +153,8 @@ export default function OnboardClient(props: {
             </span>
           </div>
         </div>
-        <div className="zk-shield-pill" aria-label="Zero-knowledge shield active">
-          <span className="zk-shield-dot" aria-hidden /> ZK SHIELD ON
+        <div className="zk-shield-pill" aria-label="Prompt Shield active">
+          <span className="zk-shield-dot" aria-hidden /> SHIELD ON
         </div>
       </header>
 
@@ -895,7 +895,7 @@ function Step4Upload({
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold">Upload your data (optional)</h1>
       <p className="text-ink-soft">
-        Files are scanned, stripped of metadata, encrypted, and stored on sovereign infrastructure.
+        Files are scanned, stripped of metadata, and encrypted on the application server before storage. The original file is not sent to the model provider.
         You can skip this step now and upload later from the dashboard.
       </p>
 

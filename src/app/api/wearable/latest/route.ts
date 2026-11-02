@@ -75,10 +75,8 @@ export async function GET() {
     .limit(1)
     .maybeSingle();
 
-  // Hardcoded device label until a real Withings (or other) integration
-  // is wired up. Falls back to whatever the wearable_data payload
-  // self-reports if present.
-  let device = "Withings ScanWatch";
+  // No live device integration. The label comes from the uploaded file.
+  let device: string | null = null;
   let latest: WearableMetric | null = null;
   let updatedAt: string | null = null;
   if (wd?.data_encrypted) {
@@ -88,7 +86,7 @@ export async function GET() {
         wd.data_encrypted,
         `wearable:${session.patientId}`,
       );
-      device = parsed.device || device;
+      device = parsed.device || "Uploaded file";
       const metrics = parsed.metrics || [];
       latest = metrics[metrics.length - 1] || null;
     } catch {

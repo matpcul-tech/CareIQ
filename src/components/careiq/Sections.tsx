@@ -8,9 +8,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  * CareIQ for non-native healthcare systems. Each export is a
  * self-contained slot:
  *
- *   LiveWearable         4x2 live wearable grid, polls /api/wearable/latest
- *                        every 5s, LIVE badge, Withings ScanWatch label.
- *   ZKShieldBanner       HIPAA + AES-256-GCM attestation.
+ *   LiveWearable         4x2 wearable grid, polls /api/wearable/latest
+ *                        every 5s. Shows the last uploaded file, not a live device.
+ *   ZKShieldBanner       Server-side AES-256-GCM and HIPAA-aligned architecture.
  *   PatientCard          Teal initials avatar, name, CHK-YYYY-XXXXX,
  *                        big risk score, alert count + next-scan,
  *                        3x2 clinical vitals grid.
@@ -115,7 +115,7 @@ function initialsFor(name: string): string {
 // ======================================================================
 
 interface LiveMetrics {
-  device: string;
+  device: string | null;
   heart_rate: number | null;
   spo2: number | null;
   bp_systolic: number | null;
@@ -226,7 +226,7 @@ function sleepTone(v: number | null): string {
 export function LiveWearable() {
   const { m, err } = useLiveMetrics();
   const fmtSleep = (h: number | null) => {
-    if (h == null) return '–';
+    if (h == null) return '-';
     const hh = Math.floor(h);
     const mm = Math.round((h - hh) * 60);
     return `${hh}h ${mm}m`;
@@ -275,9 +275,9 @@ export function LiveWearable() {
             </svg>
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Live Wearable</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Wearable file</div>
             <div style={{ fontFamily: T, fontSize: 9, color: MUTED, marginTop: 1 }}>
-              {m?.device || 'Withings ScanWatch'} · Syncing every 5s
+              {m?.device || 'No file uploaded'} · Last upload, not a live device
             </div>
           </div>
         </div>
@@ -308,7 +308,7 @@ export function LiveWearable() {
               animation: 'pulse 1.5s infinite',
             }}
           />
-          LIVE
+          {m?.device ? 'FILE' : 'NONE'}
         </div>
       </div>
       {err && (
@@ -335,12 +335,12 @@ export function LiveWearable() {
         }}
       >
         <Cell
-          value={m?.heart_rate != null ? String(Math.round(m.heart_rate)) : '–'}
+          value={m?.heart_rate != null ? String(Math.round(m.heart_rate)) : '-'}
           label="HR"
           tone={hrTone(m?.heart_rate ?? null)}
         />
         <Cell
-          value={m?.spo2 != null ? m.spo2.toFixed(1) : '–'}
+          value={m?.spo2 != null ? m.spo2.toFixed(1) : '-'}
           label="SpO2"
           tone={INK}
         />
@@ -348,28 +348,28 @@ export function LiveWearable() {
           value={
             m?.bp_systolic != null && m?.bp_diastolic != null
               ? `${m.bp_systolic}/${m.bp_diastolic}`
-              : '–'
+              : '-'
           }
           label="BP"
           tone={INK}
         />
         <Cell
-          value={m?.glucose != null ? String(Math.round(m.glucose)) : '–'}
+          value={m?.glucose != null ? String(Math.round(m.glucose)) : '-'}
           label="Glucose"
           tone={INK}
         />
         <Cell
-          value={m?.temperature != null ? m.temperature.toFixed(1) : '–'}
+          value={m?.temperature != null ? m.temperature.toFixed(1) : '-'}
           label="Temp"
           tone={INK}
         />
         <Cell
-          value={m?.hrv != null ? String(Math.round(m.hrv)) : '–'}
+          value={m?.hrv != null ? String(Math.round(m.hrv)) : '-'}
           label="HRV"
           tone={INK}
         />
         <Cell
-          value={m?.steps != null ? m.steps.toLocaleString() : '–'}
+          value={m?.steps != null ? m.steps.toLocaleString() : '-'}
           label="Steps"
           tone={stepsTone(m?.steps ?? null)}
         />
@@ -420,8 +420,8 @@ export function ZKShieldBanner() {
         />
       </svg>
       <div style={{ fontSize: 11, lineHeight: 1.55, color: SUB }}>
-        <span style={{ color: OK, fontWeight: 700 }}>ZK Shield Active.</span>{' '}
-        AES-256-GCM at rest, HIPAA-compliant infrastructure, audit logged.
+        <span style={{ color: OK, fontWeight: 700 }}>Prompt Shield active.</span>{' '}
+        AES-256-GCM at rest on the server, HIPAA-aligned architecture, audit logged.
       </div>
     </div>
   );
@@ -456,7 +456,7 @@ export function PatientCard({
   const bp =
     shield?.bp_systolic != null && shield?.bp_diastolic != null
       ? `${shield.bp_systolic}/${shield.bp_diastolic}`
-      : '–';
+      : '-';
   const hr = shield?.hr ?? null;
   const spo2 = shield?.spo2 ?? null;
   const hrv = shield?.hrv ?? null;
@@ -544,24 +544,24 @@ export function PatientCard({
         }}
       >
         <Cell value={bp} label="BP mmHg" tone={INK} />
-        <Cell value={a1c != null ? `${a1c.toFixed(1)}%` : '–'} label="A1C" tone={INK} />
+        <Cell value={a1c != null ? `${a1c.toFixed(1)}%` : '-'} label="A1C" tone={INK} />
         <Cell
-          value={hr != null ? String(Math.round(hr)) : '–'}
+          value={hr != null ? String(Math.round(hr)) : '-'}
           label="HR bpm"
           tone={hrTone(hr)}
         />
         <Cell
-          value={spo2 != null ? `${spo2.toFixed(1)}%` : '–'}
+          value={spo2 != null ? `${spo2.toFixed(1)}%` : '-'}
           label="SpO2"
           tone={INK}
         />
         <Cell
-          value={temp != null ? temp.toFixed(1) : '–'}
+          value={temp != null ? temp.toFixed(1) : '-'}
           label="Temp °F"
           tone={INK}
         />
         <Cell
-          value={hrv != null ? `${Math.round(hrv)} ms` : '–'}
+          value={hrv != null ? `${Math.round(hrv)} ms` : '-'}
           label="HRV"
           tone={INK}
         />
@@ -657,7 +657,7 @@ export function ActiveProtocols({ shield }: { shield: SectionsShieldPayload | nu
               >
                 <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>{p.name}</span>
                 <span style={{ fontFamily: T, fontSize: 14, fontWeight: 700, color: pctColor }}>
-                  {stats.total > 0 ? `${stats.pct}%` : '–'}
+                  {stats.total > 0 ? `${stats.pct}%` : '-'}
                 </span>
               </div>
               <div style={{ fontSize: 11, color: SUB, marginBottom: 8 }}>{subtitle}</div>
@@ -827,7 +827,7 @@ export function RiskDomains({ shield }: { shield: SectionsShieldPayload | null }
                   textAlign: 'right',
                 }}
               >
-                {score == null ? '–' : score}
+                {score == null ? '-' : score}
               </div>
             </div>
           );
@@ -1584,8 +1584,8 @@ export function HealthIntelTab() {
               CareIQ AI
             </div>
             <div style={{ fontSize: 11, color: SUB, lineHeight: 1.5 }}>
-              Live wearable data plus your clinical panel. Every answer
-              grounded in your real numbers.
+              Answers use a reduced summary of data on file. The typed question
+              is checked for identifiers and is not sent to the model.
             </div>
             <div
               style={{
@@ -1614,7 +1614,7 @@ export function HealthIntelTab() {
                   animation: 'pulse 1.5s infinite',
                 }}
               />
-              Live Wearable Connected
+              Summary uses data on file
             </div>
           </div>
         </div>
