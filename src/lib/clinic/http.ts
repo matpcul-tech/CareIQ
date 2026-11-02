@@ -16,11 +16,21 @@ import {
   listConcerns,
   logMinutes,
   logOutreach,
+  markWellnessOk,
   maskedInsight,
   notifySms,
   openClinic,
+  optInWellness,
+  recordCancerFollowUp,
+  recordCancerResult,
+  recordCognitive,
+  recordFalls,
+  recordStrain,
   revokeCircleMember,
+  setBarriers,
   setClinicThresholds,
+  tickWellness,
+  wellnessSmsReply,
 } from "./actions";
 import type { Actor, CircleRole, StaffRole } from "./logic";
 import type { SmsEnv } from "./sms";
@@ -191,6 +201,51 @@ async function dispatch(
       }
     }
     return setMeasureTargets(deps.store, actor, patch, deps.asOf);
+  }
+  if (action === "cancer_result") {
+    const kind = body.kind === "breast" || body.kind === "cervical" ? body.kind : body.kind === "colorectal" ? "colorectal" : null;
+    const result = body.result === "abnormal" ? "abnormal" : body.result === "normal" ? "normal" : null;
+    if (!kind || !result) return { ok: false as const, status: 400, error: "kind and result are required" };
+    return recordCancerResult(deps.store, actor, {
+      clinicPatientId: id,
+      kind,
+      method: String(body.method || "fit"),
+      result,
+      on: String(body.on || deps.asOf),
+    });
+  }
+  if (action === "cancer_followup") {
+    return recordCancerFollowUp(deps.store, actor, { eventId: String(body.eventId || ""), on: String(body.on || deps.asOf) });
+  }
+  if (action === "barriers") {
+    return setBarriers(deps.store, actor, { clinicPatientId: id, cost: body.cost === true, transport: body.transport === true });
+  }
+  if (action === "wellness_opt_in") {
+    return optInWellness(deps.store, actor, {
+      clinicPatientId: id,
+      optedIn: body.opted_in === true,
+      livesAlone: body.lives_alone === true,
+      phone: typeof body.phone === "string" ? body.phone : null,
+      familyPhone: typeof body.family_phone === "string" ? body.family_phone : null,
+    });
+  }
+  if (action === "wellness_ok") {
+    return markWellnessOk(deps.store, actor, { clinicPatientId: id, at: String(body.at || `${deps.asOf}T12:00:00Z`) });
+  }
+  if (action === "wellness_tick") {
+    return tickWellness(deps.store, actor, { nowIso: String(body.at || `${deps.asOf}T12:00:00Z`), env: deps.smsEnv, fetchImpl: deps.fetchImpl });
+  }
+  if (action === "wellness_sms") {
+    return wellnessSmsReply(deps.store, { phone: String(body.phone || ""), body: String(body.body || ""), at: String(body.at || `${deps.asOf}T12:00:00Z`) });
+  }
+  if (action === "cognitive") {
+    return recordCognitive(deps.store, actor, { clinicPatientId: id, score: num(body.score) || 0, on: String(body.on || deps.asOf) });
+  }
+  if (action === "falls") {
+    return recordFalls(deps.store, actor, { clinicPatientId: id, atRisk: body.at_risk === true, on: String(body.on || deps.asOf) });
+  }
+  if (action === "strain") {
+    return recordStrain(deps.store, actor, { clinicPatientId: id, score: num(body.score) || 0, on: String(body.on || deps.asOf) });
   }
   if (action === "insight") return maskedInsight(deps.store, actor, id);
   if (action === "sms") {

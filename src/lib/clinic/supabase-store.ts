@@ -2,6 +2,7 @@ import "server-only";
 
 import { getServiceClient } from "@/lib/supabase-server";
 import { DEFAULT_THRESHOLDS, type StaffRole, type Thresholds } from "./logic";
+import { DEFAULT_CARE_SETTINGS, type CareSettings } from "./safety";
 import type {
   AlertRecord,
   CheckinRecord,
@@ -13,6 +14,7 @@ import type {
   OutreachRecord,
   PatientRecord,
   ReadingRecord,
+  SafetyEvent,
   ScreenRecord,
   StaffRecord,
 } from "./store";
@@ -46,6 +48,16 @@ function patientFrom(row: Row): PatientRecord {
     bp_diastolic: num(row.bp_diastolic),
     last_bp_date: day(row.last_bp_date),
     next_visit_date: day(row.next_visit_date),
+    sex: row.sex === "female" || row.sex === "male" ? row.sex : null,
+    cost_barrier: Boolean(row.cost_barrier),
+    transport_barrier: Boolean(row.transport_barrier),
+    lives_alone: Boolean(row.lives_alone),
+    wellness_opt_in: Boolean(row.wellness_opt_in),
+    wellness_phone: row.wellness_phone ? String(row.wellness_phone) : null,
+    wellness_family_phone: row.wellness_family_phone ? String(row.wellness_family_phone) : null,
+    wellness_last_ok: row.wellness_last_ok ? String(row.wellness_last_ok) : null,
+    wellness_family_notified_at: row.wellness_family_notified_at ? String(row.wellness_family_notified_at) : null,
+    wellness_team_notified_at: row.wellness_team_notified_at ? String(row.wellness_team_notified_at) : null,
   };
 }
 
@@ -437,6 +449,84 @@ export class SupabaseClinicStore implements ClinicStore {
       .upsert({ clinic_id: clinicId, measure_id: measureId, target }, { onConflict: "clinic_id,measure_id" });
     if (error) throw new Error(error.message);
   }
+
+  async updatePatient(patientRowId: string, patch: Partial<PatientRecord>): Promise<PatientRecord | null> {
+    const { id: _id, clinic_id: _clinic, external_id: _external, ...rest } = patch;
+    const { data, error } = await this.sb().from("clinic_patients").update(rest).eq("id", patientRowId).select("*").maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? patientFrom(data as Row) : null;
+  }
+
+  async addSafety(input: Omit<SafetyEvent, "id">): Promise<SafetyEvent> {
+    const { data, error } = await this.sb().from("circle_safety_events").insert({
+      clinic_patient_id: input.clinic_patient_id,
+      kind: input.kind,
+      recorded_on: input.recorded_on,
+      payload: input.payload,
+    }).select("*").single();
+    if (error || !data) throw new Error(error?.message || "safety insert failed");
+    return safetyFrom(data as Row);
+  }
+
+  async getSafety(eventId: string): Promise<SafetyEvent | null> {
+    const { data, error } = await this.sb().from("circle_safety_events").select("*").eq("id", eventId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? safetyFrom(data as Row) : null;
+  }
+
+  async findByWellnessPhone(phone: string): Promise<PatientRecord | null> {
+    const { data, error } = await this.sb().from("clinic_patients").select("*").eq("wellness_phone", phone).eq("wellness_opt_in", true).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? patientFrom(data as Row) : null;
+  }
+
+  async updateSafety(eventId: string, payload: SafetyEvent["payload"]): Promise<SafetyEvent | null> {
+    const existing = await this.sb().from("circle_safety_events").select("payload").eq("id", eventId).maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
+    if (!existing.data) return null;
+    const merged = { ...(existing.data.payload as SafetyEvent["payload"]), ...payload };
+    const { data, error } = await this.sb().from("circle_safety_events").update({ payload: merged }).eq("id", eventId).select("*").maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? safetyFrom(data as Row) : null;
+  }
+
+  async listSafety(clinicPatientId: string): Promise<SafetyEvent[]> {
+    const { data, error } = await this.sb().from("circle_safety_events").select("*").eq("clinic_patient_id", clinicPatientId);
+    if (error) throw new Error(error.message);
+    return (data || []).map((row) => safetyFrom(row as Row));
+  }
+
+  async getCareSettings(clinicId: string): Promise<CareSettings> {
+    const { data, error } = await this.sb().from("clinic_care_settings").select("*").eq("clinic_id", clinicId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return { ...DEFAULT_CARE_SETTINGS };
+    return {
+      wellness_window_hours: Number(data.wellness_window_hours),
+      cancer_followup_days: Number(data.cancer_followup_days),
+      cognitive_interval_days: Number(data.cognitive_interval_days),
+      cognitive_concern_at: Number(data.cognitive_concern_at),
+      strain_high_at: Number(data.strain_high_at),
+    };
+  }
+
+  async setCareSettings(clinicId: string, patch: Partial<CareSettings>): Promise<CareSettings> {
+    const next = { ...(await this.getCareSettings(clinicId)), ...patch, clinic_id: clinicId };
+    const { error } = await this.sb().from("clinic_care_settings").upsert(next, { onConflict: "clinic_id" });
+    if (error) throw new Error(error.message);
+    return this.getCareSettings(clinicId);
+  }
+}
+
+function safetyFrom(row: Row): SafetyEvent {
+  const payload = (row.payload && typeof row.payload === "object" ? row.payload : {}) as Record<string, string | number | boolean | null>;
+  const kind = row.kind === "cognitive" || row.kind === "falls" || row.kind === "strain" ? row.kind : "cancer";
+  return {
+    id: String(row.id),
+    clinic_patient_id: String(row.clinic_patient_id),
+    kind,
+    recorded_on: day(row.recorded_on) || "",
+    payload,
+  };
 }
 
 function screenFrom(row: Row): ScreenRecord {

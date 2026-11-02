@@ -1,5 +1,6 @@
 import type { CircleRole, CsvPatient, HomeReading, StaffRole, Thresholds } from "./logic";
 import { DEFAULT_THRESHOLDS } from "./logic";
+import { DEFAULT_CARE_SETTINGS, type CareSettings } from "./safety";
 
 export interface ClinicRecord {
   id: string;
@@ -29,6 +30,24 @@ export interface PatientRecord {
   bp_diastolic: number | null;
   last_bp_date: string | null;
   next_visit_date: string | null;
+  sex: "female" | "male" | null;
+  cost_barrier: boolean;
+  transport_barrier: boolean;
+  lives_alone: boolean;
+  wellness_opt_in: boolean;
+  wellness_phone: string | null;
+  wellness_family_phone: string | null;
+  wellness_last_ok: string | null;
+  wellness_family_notified_at: string | null;
+  wellness_team_notified_at: string | null;
+}
+
+export interface SafetyEvent {
+  id: string;
+  clinic_patient_id: string;
+  kind: "cancer" | "cognitive" | "falls" | "strain";
+  recorded_on: string;
+  payload: Record<string, string | number | boolean | null>;
 }
 
 export interface MemberRecord {
@@ -124,6 +143,14 @@ export interface ClinicStore {
   listScreens(clinicPatientId: string): Promise<ScreenRecord[]>;
   getMeasureTargets(clinicId: string): Promise<Record<string, number>>;
   setMeasureTarget(clinicId: string, measureId: string, target: number): Promise<void>;
+  updatePatient(id: string, patch: Partial<PatientRecord>): Promise<PatientRecord | null>;
+  addSafety(input: Omit<SafetyEvent, "id">): Promise<SafetyEvent>;
+  getSafety(id: string): Promise<SafetyEvent | null>;
+  updateSafety(id: string, payload: SafetyEvent["payload"]): Promise<SafetyEvent | null>;
+  findByWellnessPhone(phone: string): Promise<PatientRecord | null>;
+  listSafety(clinicPatientId: string): Promise<SafetyEvent[]>;
+  getCareSettings(clinicId: string): Promise<CareSettings>;
+  setCareSettings(clinicId: string, patch: Partial<CareSettings>): Promise<CareSettings>;
 }
 
 function id(): string {
@@ -144,6 +171,8 @@ export class MemoryClinicStore implements ClinicStore {
   minutes: MinuteRecord[] = [];
   screens: ScreenRecord[] = [];
   measureTargets = new Map<string, Record<string, number>>();
+  safety: SafetyEvent[] = [];
+  careSettings = new Map<string, CareSettings>();
 
   async createClinic(name: string): Promise<ClinicRecord> {
     const row = { id: id(), name: name.slice(0, 120) };
@@ -210,6 +239,16 @@ export class MemoryClinicStore implements ClinicStore {
           bp_diastolic: row.bp_diastolic,
           last_bp_date: row.last_bp_date,
           next_visit_date: row.next_visit_date,
+          sex: row.sex || null,
+          cost_barrier: false,
+          transport_barrier: false,
+          lives_alone: false,
+          wellness_opt_in: false,
+          wellness_phone: null,
+          wellness_family_phone: null,
+          wellness_last_ok: null,
+          wellness_family_notified_at: null,
+          wellness_team_notified_at: null,
         };
         this.patients.push(existing);
       } else {
@@ -223,6 +262,7 @@ export class MemoryClinicStore implements ClinicStore {
         existing.last_bp_date = row.last_bp_date;
         existing.next_visit_date = row.next_visit_date;
         if (row.patient_id) existing.patient_id = row.patient_id;
+        if (row.sex) existing.sex = row.sex;
       }
       saved.push(existing);
     }
@@ -348,5 +388,55 @@ export class MemoryClinicStore implements ClinicStore {
     const current = await this.getMeasureTargets(clinicId);
     current[measureId] = target;
     this.measureTargets.set(clinicId, current);
+  }
+
+  async updatePatient(patientRowId: string, patch: Partial<PatientRecord>): Promise<PatientRecord | null> {
+    const row = this.patients.find((item) => item.id === patientRowId);
+    if (!row) return null;
+    Object.assign(row, patch);
+    return row;
+  }
+
+  async addSafety(input: Omit<SafetyEvent, "id">): Promise<SafetyEvent> {
+    const same = this.safety.find((row) =>
+      row.clinic_patient_id === input.clinic_patient_id &&
+      row.kind === input.kind &&
+      row.recorded_on === input.recorded_on &&
+      row.payload.method === input.payload.method &&
+      row.payload.result === input.payload.result,
+    );
+    if (same && input.kind === "cancer") return same;
+    const row = { ...input, id: id() };
+    this.safety.push(row);
+    return row;
+  }
+
+  async getSafety(eventId: string): Promise<SafetyEvent | null> {
+    return this.safety.find((item) => item.id === eventId) || null;
+  }
+
+  async findByWellnessPhone(phone: string): Promise<PatientRecord | null> {
+    return this.patients.find((item) => item.wellness_phone === phone && item.wellness_opt_in) || null;
+  }
+
+  async updateSafety(eventId: string, payload: SafetyEvent["payload"]): Promise<SafetyEvent | null> {
+    const row = this.safety.find((item) => item.id === eventId);
+    if (!row) return null;
+    row.payload = { ...row.payload, ...payload };
+    return row;
+  }
+
+  async listSafety(clinicPatientId: string): Promise<SafetyEvent[]> {
+    return this.safety.filter((row) => row.clinic_patient_id === clinicPatientId);
+  }
+
+  async getCareSettings(clinicId: string): Promise<CareSettings> {
+    return { ...(this.careSettings.get(clinicId) || DEFAULT_CARE_SETTINGS) };
+  }
+
+  async setCareSettings(clinicId: string, patch: Partial<CareSettings>): Promise<CareSettings> {
+    const next = { ...(await this.getCareSettings(clinicId)), ...patch };
+    this.careSettings.set(clinicId, next);
+    return next;
   }
 }

@@ -17,6 +17,7 @@ import {
 } from "./logic";
 import type { ClinicStore, PatientRecord } from "./store";
 import { deliverSms, type SmsEnv, type SmsResult } from "./sms";
+import { isWellnessOkReply, WELLNESS_SMS, wellnessDecision } from "./safety";
 
 export interface ActionFailure {
   ok: false;
@@ -134,7 +135,26 @@ export async function importRegistry(
   if ("error" in parsed) return fail(400, parsed.error);
   const saved = await store.upsertPatients(clinicId, parsed.rows);
   await attachCareTeam(store, clinicId, saved.map((row) => row.id));
+  for (let i = 0; i < saved.length; i++) {
+    await importCancerDates(store, saved[i].id, parsed.rows[i]);
+  }
   return { ok: true, data: { imported: saved.length } };
+}
+
+async function importCancerDates(store: ClinicStore, clinicPatientId: string, row: { last_fit_date?: string | null; last_colonoscopy_date?: string | null; last_mammogram_date?: string | null; last_pap_date?: string | null; cervical_hpv?: boolean }) {
+  const add = async (kind: "colorectal" | "breast" | "cervical", method: string, date: string | null | undefined) => {
+    if (!date) return;
+    await store.addSafety({
+      clinic_patient_id: clinicPatientId,
+      kind: "cancer",
+      recorded_on: date,
+      payload: { kind, method, result: "normal", screened_on: date, follow_up_on: null },
+    });
+  };
+  await add("colorectal", "fit", row.last_fit_date);
+  await add("colorectal", "colonoscopy", row.last_colonoscopy_date);
+  await add("breast", "mammogram", row.last_mammogram_date);
+  await add("cervical", row.cervical_hpv ? "pap_hpv" : "pap", row.last_pap_date);
 }
 
 export async function setClinicThresholds(
@@ -183,6 +203,7 @@ async function scorecardRows(store: ClinicStore, clinicId: string, month: string
       readings,
     );
     const screens = await store.listScreens(patient.id);
+    const safety = await store.listSafety(patient.id);
     rows.push({
       external_id: patient.external_id,
       age: patient.age,
@@ -201,6 +222,35 @@ async function scorecardRows(store: ClinicStore, clinicId: string, month: string
       })),
       reading_dates: readings.map((reading) => reading.recorded_on),
       minutes: await store.getMinutes(patient.id, month),
+      sex: patient.sex,
+      cost_barrier: patient.cost_barrier,
+      transport_barrier: patient.transport_barrier,
+      cancer: safety.filter((event) => event.kind === "cancer").map((event) => ({
+        kind: event.payload.kind === "breast" || event.payload.kind === "cervical" ? event.payload.kind : "colorectal",
+        method: String(event.payload.method || ""),
+        result: event.payload.result === "abnormal" ? "abnormal" as const : "normal" as const,
+        screened_on: String(event.payload.screened_on || event.recorded_on),
+        follow_up_on: event.payload.follow_up_on ? String(event.payload.follow_up_on) : null,
+      })),
+      cognitive: safety.filter((event) => event.kind === "cognitive").map((event) => ({
+        score: Number(event.payload.score || 0),
+        recorded_on: event.recorded_on,
+      })),
+      falls: safety.filter((event) => event.kind === "falls").map((event) => ({
+        at_risk: Boolean(event.payload.at_risk),
+        recorded_on: event.recorded_on,
+      })),
+      strain: safety.filter((event) => event.kind === "strain").map((event) => ({
+        score: Number(event.payload.score || 0),
+        recorded_on: event.recorded_on,
+      })),
+      wellness: {
+        opted_in: patient.wellness_opt_in,
+        lives_alone: patient.lives_alone,
+        last_ok_at: patient.wellness_last_ok,
+        family_notified_at: patient.wellness_family_notified_at,
+        team_notified_at: patient.wellness_team_notified_at,
+      },
     });
   }
   return rows;
@@ -211,7 +261,14 @@ export async function clinicScorecard(store: ClinicStore, actor: Actor, asOf: st
   if (typeof clinicId !== "string") return clinicId;
   const month = asOf.slice(0, 7);
   const overrides = await store.getMeasureTargets(clinicId);
-  const data = buildScorecard(await scorecardRows(store, clinicId, month), overrides as Partial<Record<MeasureId, number>>, asOf, month);
+  const settings = await store.getCareSettings(clinicId);
+  const data = buildScorecard(
+    await scorecardRows(store, clinicId, month),
+    overrides as Partial<Record<MeasureId, number>>,
+    asOf,
+    month,
+    settings,
+  );
   return { ok: true as const, data };
 }
 
@@ -501,6 +558,193 @@ export async function notifySms(
   const staff = await store.getStaff(actor.staffId);
   const result = await deliverSms(input.env, staff?.phone, input.fetchImpl);
   return { ok: true, data: result };
+}
+
+export async function recordCancerResult(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; kind: "colorectal" | "breast" | "cervical"; method: string; result: "normal" | "abnormal"; on: string },
+) {
+  const patient = await store.getPatient(input.clinicPatientId);
+  if (!patient) return fail(404, "patient not found");
+  const allowed = actor.kind === "patient"
+    ? patient.patient_id === actor.patientId
+    : isActiveStaff(actor) && actor.clinicId === patient.clinic_id && await detailAllowed(store, actor, patient);
+  if (!allowed && !(actor.kind === "circle" && canPostConcern(actor) && actor.clinicPatientId === patient.id)) {
+    return fail(403, "not allowed to record this screening");
+  }
+  const saved = await store.addSafety({
+    clinic_patient_id: patient.id,
+    kind: "cancer",
+    recorded_on: input.on,
+    payload: { kind: input.kind, method: input.method, result: input.result, screened_on: input.on, follow_up_on: null },
+  });
+  return { ok: true as const, data: { id: saved.id, result: input.result } };
+}
+
+export async function recordCancerFollowUp(
+  store: ClinicStore,
+  actor: Actor,
+  input: { eventId: string; on: string },
+) {
+  if (!isActiveStaff(actor)) return fail(403, "clinic staff only");
+  const existing = await store.getSafety(input.eventId);
+  if (!existing) return fail(404, "screening not found");
+  const updated = await store.updateSafety(input.eventId, { follow_up_on: input.on });
+  if (!updated) return fail(404, "screening not found");
+  const patient = await store.getPatient(updated.clinic_patient_id);
+  if (!patient || patient.clinic_id !== actor.clinicId) return fail(403, "clinic access revoked");
+  return { ok: true as const, data: { id: updated.id, follow_up_on: input.on } };
+}
+
+export async function setBarriers(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; cost: boolean; transport: boolean },
+) {
+  if (!isActiveStaff(actor)) return fail(403, "clinic staff only");
+  const patient = await store.getPatient(input.clinicPatientId);
+  if (!patient || patient.clinic_id !== actor.clinicId) return fail(404, "patient not found");
+  if (!(await detailAllowed(store, actor, patient))) return fail(403, "circle access revoked");
+  await store.updatePatient(patient.id, { cost_barrier: input.cost, transport_barrier: input.transport });
+  return { ok: true as const, data: { cost_barrier: input.cost, transport_barrier: input.transport } };
+}
+
+export async function optInWellness(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; optedIn: boolean; livesAlone: boolean; phone?: string | null; familyPhone?: string | null },
+) {
+  if (actor.kind !== "patient") return fail(403, "patient opt in only");
+  const patient = await patientForActor(store, actor, input.clinicPatientId);
+  if ("ok" in patient) return patient;
+  const saved = await store.updatePatient(patient.id, {
+    wellness_opt_in: input.optedIn,
+    lives_alone: input.livesAlone,
+    wellness_phone: input.phone || null,
+    wellness_family_phone: input.familyPhone || null,
+  });
+  return { ok: true as const, data: { opted_in: saved?.wellness_opt_in === true, lives_alone: saved?.lives_alone === true } };
+}
+
+export async function markWellnessOk(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; at: string },
+) {
+  const patient = await patientForActor(store, actor, input.clinicPatientId);
+  if ("ok" in patient) return patient;
+  if (actor.kind === "staff") return fail(403, "patient or caregiver only");
+  await store.updatePatient(patient.id, {
+    wellness_last_ok: input.at,
+    wellness_family_notified_at: null,
+    wellness_team_notified_at: null,
+  });
+  return { ok: true as const, data: { ok: true } };
+}
+
+export async function tickWellness(
+  store: ClinicStore,
+  actor: Actor,
+  input: { nowIso: string; env: SmsEnv; fetchImpl?: typeof fetch },
+) {
+  if (!isActiveStaff(actor)) return fail(403, "clinic staff only");
+  const clinicId = actor.clinicId;
+  const settings = await store.getCareSettings(clinicId);
+  const patients = (await store.listPatients(clinicId)).filter((row) => row.wellness_opt_in && row.lives_alone);
+  const escalations: Array<{ external_id: string; step: string; sms: string }> = [];
+  for (const patient of patients) {
+    const decision = wellnessDecision({
+      opted_in: patient.wellness_opt_in,
+      lives_alone: patient.lives_alone,
+      last_ok_at: patient.wellness_last_ok,
+      family_notified_at: patient.wellness_family_notified_at,
+      team_notified_at: patient.wellness_team_notified_at,
+    }, input.nowIso, settings.wellness_window_hours);
+    if (decision === "escalate_family") {
+      const sms = await deliverSms(input.env, patient.wellness_family_phone, input.fetchImpl);
+      await store.updatePatient(patient.id, { wellness_family_notified_at: input.nowIso });
+      escalations.push({ external_id: patient.external_id, step: "family", sms: sms.reason });
+    } else if (decision === "escalate_care_team" && !patient.wellness_team_notified_at) {
+      const staff = await store.getStaff(actor.staffId);
+      const sms = await deliverSms(input.env, staff?.phone, input.fetchImpl);
+      await store.updatePatient(patient.id, { wellness_team_notified_at: input.nowIso });
+      escalations.push({ external_id: patient.external_id, step: "care_team", sms: sms.reason });
+    }
+  }
+  return { ok: true as const, data: { escalations, sms_body: WELLNESS_SMS } };
+}
+
+export async function wellnessSmsReply(
+  store: ClinicStore,
+  input: { phone: string; body: string; at: string },
+) {
+  if (!isWellnessOkReply(input.body)) return { ok: true as const, data: { matched: false } };
+  const patient = await store.findByWellnessPhone(input.phone);
+  if (!patient) return { ok: true as const, data: { matched: false } };
+  await store.updatePatient(patient.id, {
+    wellness_last_ok: input.at,
+    wellness_family_notified_at: null,
+    wellness_team_notified_at: null,
+  });
+  return { ok: true as const, data: { matched: true, external_id: patient.external_id } };
+}
+
+export async function recordCognitive(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; score: number; on: string },
+) {
+  if (!Number.isInteger(input.score) || input.score < 0 || input.score > 5) return fail(400, "brief cognitive score is 0 to 5");
+  const patient = await store.getPatient(input.clinicPatientId);
+  if (!patient) return fail(404, "patient not found");
+  const allowed = (actor.kind === "patient" && patient.patient_id === actor.patientId) || (isActiveStaff(actor) && actor.clinicId === patient.clinic_id);
+  if (!allowed) return fail(403, "not allowed");
+  const saved = await store.addSafety({
+    clinic_patient_id: patient.id,
+    kind: "cognitive",
+    recorded_on: input.on,
+    payload: { score: input.score },
+  });
+  return { ok: true as const, data: { id: saved.id, score: input.score } };
+}
+
+export async function recordFalls(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; atRisk: boolean; on: string },
+) {
+  if (!isActiveStaff(actor)) return fail(403, "clinic staff only");
+  const patient = await store.getPatient(input.clinicPatientId);
+  if (!patient || patient.clinic_id !== actor.clinicId) return fail(404, "patient not found");
+  const saved = await store.addSafety({
+    clinic_patient_id: patient.id,
+    kind: "falls",
+    recorded_on: input.on,
+    payload: { at_risk: input.atRisk },
+  });
+  return { ok: true as const, data: { id: saved.id, at_risk: input.atRisk } };
+}
+
+export async function recordStrain(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; score: number; on: string },
+) {
+  if (!(actor.kind === "circle" && !actor.revoked && (actor.role === "caregiver" || actor.role === "admin"))) {
+    return fail(403, "family caregiver only");
+  }
+  if (!Number.isInteger(input.score) || input.score < 0 || input.score > 10) return fail(400, "strain score is 0 to 10");
+  const patient = await patientForActor(store, actor, input.clinicPatientId);
+  if ("ok" in patient) return patient;
+  const settings = await store.getCareSettings(patient.clinic_id);
+  const saved = await store.addSafety({
+    clinic_patient_id: patient.id,
+    kind: "strain",
+    recorded_on: input.on,
+    payload: { score: input.score, task_open: input.score >= settings.strain_high_at },
+  });
+  return { ok: true as const, data: { id: saved.id, task_open: input.score >= settings.strain_high_at } };
 }
 
 export async function listConcerns(store: ClinicStore, actor: Actor, clinicPatientId: string) {

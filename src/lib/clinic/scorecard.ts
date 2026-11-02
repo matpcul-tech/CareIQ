@@ -5,6 +5,21 @@
  */
 
 import { daysBetween, MEASUREMENT_DAYS } from "./logic";
+import {
+  breastMet,
+  cervicalMet,
+  cognitiveConcern,
+  cognitiveDue,
+  colorectalMet,
+  DEFAULT_CARE_SETTINGS,
+  fallsState,
+  followUpState,
+  latestStrain,
+  wellnessDecision,
+  type CancerEvent,
+  type CareSettings,
+  type WellnessState,
+} from "./safety";
 
 export const SCORECARD_LABEL =
   "Estimate only. Not a validated CMS, HEDIS, UDS, or IHS GPRA measure.";
@@ -28,6 +43,10 @@ export const MEASURE_IDS = [
   "gpra_a1c",
   "gpra_bp",
   "gpra_depression",
+  "cms130",
+  "cms125",
+  "cms124",
+  "cms139",
 ] as const;
 
 export type MeasureId = (typeof MEASURE_IDS)[number];
@@ -43,6 +62,10 @@ export const SCORECARD_DEFAULT_TARGETS: Record<MeasureId, number | null> = {
   gpra_a1c: 0.121,
   gpra_bp: 0.575,
   gpra_depression: 0.396,
+  cms130: null,
+  cms125: null,
+  cms124: null,
+  cms139: null,
 };
 
 const MEASURE_META: Record<MeasureId, { name: string; direction: "higher" | "lower" }> = {
@@ -55,6 +78,10 @@ const MEASURE_META: Record<MeasureId, { name: string; direction: "higher" | "low
   gpra_a1c: { name: "IHS GPRA A1c over 9", direction: "lower" },
   gpra_bp: { name: "IHS GPRA diabetes blood pressure control", direction: "higher" },
   gpra_depression: { name: "IHS GPRA adult depression screening", direction: "higher" },
+  cms130: { name: "CMS130 colorectal screening", direction: "higher" },
+  cms125: { name: "CMS125 breast screening", direction: "higher" },
+  cms124: { name: "CMS124 cervical screening", direction: "higher" },
+  cms139: { name: "CMS139 falls screening", direction: "higher" },
 };
 
 export interface ScreenPoint {
@@ -77,6 +104,14 @@ export interface ScorecardPatient {
   screens: ScreenPoint[];
   reading_dates: string[];
   minutes: number;
+  sex?: "female" | "male" | "unknown" | null;
+  cancer?: CancerEvent[];
+  cost_barrier?: boolean;
+  transport_barrier?: boolean;
+  cognitive?: Array<{ score: number; recorded_on: string }>;
+  falls?: Array<{ at_risk: boolean; recorded_on: string }>;
+  strain?: Array<{ score: number; recorded_on: string }>;
+  wellness?: WellnessState | null;
 }
 
 export interface MeasureCard {
@@ -230,7 +265,7 @@ function card(id: MeasureId, bucket: Bucket, targets: ReturnType<typeof resolveT
   if (id === "cms159") {
     note = "12 month PHQ-9 reminder. The list starts about 10 months after an index score over 9. " + SCORECARD_LABEL;
   }
-  if (id === "cms2" || id === "cms159") {
+  if (id === "cms2" || id === "cms159" || id === "cms130" || id === "cms125" || id === "cms124" || id === "cms139") {
     if (target == null) note = "No default percent in the scorecard. Set a clinic target. " + note;
   }
   if (id === "gpra_a1c" || id === "gpra_bp" || id === "gpra_depression") {
@@ -315,6 +350,7 @@ export function buildScorecard(
   overrides: Partial<Record<MeasureId, number>>,
   asOf: string,
   month: string,
+  settings: CareSettings = DEFAULT_CARE_SETTINGS,
 ) {
   const targets = resolveTargets(overrides);
   const buckets = Object.fromEntries(MEASURE_IDS.map((id) => [id, emptyBucket()])) as Record<MeasureId, Bucket>;
@@ -347,6 +383,19 @@ export function buildScorecard(
     const remission = cms159State(row, asOf);
     if (remission === "met") add(buckets.cms159, row.external_id, true, false);
     if (remission === "gap") add(buckets.cms159, row.external_id, false, true);
+    if (ageOk(row.age, 45, 75)) {
+      const met = colorectalMet(row.cancer || [], asOf);
+      add(buckets.cms130, row.external_id, met, !met);
+    }
+    const breast = breastMet(row.sex || null, row.age, row.cancer || [], asOf);
+    if (breast === "met") add(buckets.cms125, row.external_id, true, false);
+    if (breast === "gap") add(buckets.cms125, row.external_id, false, true);
+    const cervical = cervicalMet(row.sex || null, row.age, row.cancer || [], asOf);
+    if (cervical === "met") add(buckets.cms124, row.external_id, true, false);
+    if (cervical === "gap") add(buckets.cms124, row.external_id, false, true);
+    const falls = fallsState(row.age, row.falls || [], asOf);
+    if (falls === "met") add(buckets.cms139, row.external_id, true, false);
+    if (falls === "gap") add(buckets.cms139, row.external_id, false, true);
   }
   const measures = MEASURE_IDS.map((id) => card(id, buckets[id], targets));
   const cbp = buckets.hedis_cbp.numerator;
@@ -360,6 +409,16 @@ export function buildScorecard(
       list.push(measure.id);
       work.set(externalId, list);
     }
+  }
+  const nowIso = asOf.length === 10 ? `${asOf}T12:00:00Z` : asOf;
+  for (const row of rows) {
+    const tags = operationalTags(row, asOf, nowIso, settings, work.get(row.external_id) || []);
+    if (tags.length === 0) continue;
+    const list = work.get(row.external_id) || [];
+    for (const tag of tags) {
+      if (!list.includes(tag)) list.push(tag);
+    }
+    work.set(row.external_id, list);
   }
   const worklist = [...work.entries()]
     .map(([external_id, measuresForPatient]) => ({ external_id, measures: measuresForPatient, gaps: measuresForPatient.length }))
@@ -383,6 +442,47 @@ export function buildScorecard(
     },
     care_management: estimateCareManagement(rows, month),
   };
+}
+
+function operationalTags(
+  row: ScorecardPatient,
+  asOf: string,
+  nowIso: string,
+  settings: CareSettings,
+  already: string[],
+): string[] {
+  const tags: string[] = [];
+  const cancer = row.cancer || [];
+  let cancerOpen = false;
+  for (const event of cancer) {
+    const state = followUpState(event, asOf, settings.cancer_followup_days);
+    if (state === "open") {
+      tags.push("cancer_followup_open");
+      cancerOpen = true;
+    }
+    if (state === "overdue") {
+      tags.push("cancer_followup_overdue");
+      cancerOpen = true;
+    }
+  }
+  const cancerGap = already.some((id) => id === "cms130" || id === "cms125" || id === "cms124");
+  if (cancerOpen || cancerGap) {
+    if (row.cost_barrier) tags.push("cost_barrier");
+    if (row.transport_barrier) tags.push("transport_barrier");
+  }
+  if (row.wellness) {
+    const decision = wellnessDecision(row.wellness, nowIso, settings.wellness_window_hours);
+    if (decision === "escalate_family" || decision === "waiting_on_family") tags.push("wellness_family");
+    if (decision === "escalate_care_team") tags.push("wellness_care_team");
+  }
+  if (cognitiveDue(row.age, row.cognitive || [], asOf, settings.cognitive_interval_days)) tags.push("cognitive_due");
+  const concern = cognitiveConcern(row.cognitive || [], settings.cognitive_concern_at);
+  const falls = fallsState(row.age, row.falls || [], asOf);
+  const atRisk = (row.falls || []).some((item) => item.at_risk);
+  if (concern && (falls === "gap" || atRisk)) tags.push("falls_risk_cms139");
+  const strain = latestStrain(row.strain || []);
+  if (strain != null && strain >= settings.strain_high_at) tags.push("caregiver_strain");
+  return tags;
 }
 
 export function validScreen(instrument: string, score: number): instrument is "phq2" | "phq9" {

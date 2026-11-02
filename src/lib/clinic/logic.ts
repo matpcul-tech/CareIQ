@@ -319,6 +319,12 @@ const CSV_COLUMNS = [
   "last_bp_date",
   "next_visit_date",
   "patient_id",
+  "sex",
+  "last_fit_date",
+  "last_colonoscopy_date",
+  "last_mammogram_date",
+  "last_pap_date",
+  "cervical_hpv",
 ] as const;
 
 export interface CsvPatient {
@@ -333,6 +339,12 @@ export interface CsvPatient {
   last_bp_date: string | null;
   next_visit_date: string | null;
   patient_id: string | null;
+  sex?: "female" | "male" | null;
+  last_fit_date?: string | null;
+  last_colonoscopy_date?: string | null;
+  last_mammogram_date?: string | null;
+  last_pap_date?: string | null;
+  cervical_hpv?: boolean;
 }
 
 function parseBool(value: string): boolean {
@@ -416,6 +428,12 @@ export function parseRegistryCsv(text: string): { rows: CsvPatient[] } | { error
       last_bp_date: parseDate(rec.last_bp_date || ""),
       next_visit_date: parseDate(rec.next_visit_date || ""),
       patient_id: rec.patient_id ? rec.patient_id : null,
+      sex: rec.sex === "female" || rec.sex === "male" ? rec.sex : null,
+      last_fit_date: parseDate(rec.last_fit_date || ""),
+      last_colonoscopy_date: parseDate(rec.last_colonoscopy_date || ""),
+      last_mammogram_date: parseDate(rec.last_mammogram_date || ""),
+      last_pap_date: parseDate(rec.last_pap_date || ""),
+      cervical_hpv: parseBool(rec.cervical_hpv || ""),
     });
   }
   return { rows };

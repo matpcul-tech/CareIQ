@@ -11,7 +11,7 @@ export default function ClinicPage() {
         Patients and caregivers send home blood pressure, glucose, missed medication or appointment check-ins, and short concerns to this clinic. Provider, MA, and CHW roles share that circle. Only the patient or an admin can add or revoke members.
       </p>
       <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-        The scorecard shows an estimated rate, the gap to the clinic target, and the patients who would close that gap. Defaults come from the public scorecard. CMS2 and CMS159 have no default percent there, so those targets stay blank until a provider sets them. P4P dollars and RPM dollars are estimates. CCM and APCM time is tracked only, with no dollar estimate. Nothing here is a validated measure or a claim.
+        The scorecard shows an estimated rate, the gap to the clinic target, and the patients who would close that gap. Cancer screening, falls screening, a missed wellness check-in, and high caregiver strain show up on that same list. Defaults come from the public scorecard. Measures without a published percent stay blank until a provider sets a target. P4P dollars and RPM dollars are estimates. CCM and APCM time is tracked only, with no dollar estimate. Nothing here is a validated measure or a claim.
       </p>
       <ClinicPanel />
     </main>
