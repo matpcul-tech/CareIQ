@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimitBucket } from "./src/lib/clinic/inbound-limit";
 
 /**
  * The /auth/callback route is excluded at the matcher level so middleware
@@ -13,7 +14,6 @@ export const config = {
   ],
 };
 
-const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 // Pilot-friendly idle window. The previous 30-minute timeout was kicking
 // users out on every refresh once a demo crossed the half-hour mark; the
@@ -33,6 +33,8 @@ const PUBLIC_API_PATHS = new Set<string>([
   "/api/auth/magic-link",
   "/api/csrf",
   "/api/shield/decrypt",
+  // Twilio cannot send the app CSRF cookie. The route checks X-Twilio-Signature.
+  "/api/clinic/wellness/inbound",
 ]);
 
 function getClientIp(req: NextRequest): string {
@@ -43,19 +45,19 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
-function rateLimit(ip: string): { ok: boolean; remaining: number; resetAt: number } {
+function rateLimit(key: string, max: number): { ok: boolean; remaining: number; resetAt: number } {
   const now = Date.now();
-  const existing = rateBuckets.get(ip);
+  const existing = rateBuckets.get(key);
   if (!existing || existing.resetAt <= now) {
     const bucket: Bucket = { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS };
-    rateBuckets.set(ip, bucket);
-    return { ok: true, remaining: RATE_LIMIT_MAX - 1, resetAt: bucket.resetAt };
+    rateBuckets.set(key, bucket);
+    return { ok: true, remaining: max - 1, resetAt: bucket.resetAt };
   }
   existing.count += 1;
-  if (existing.count > RATE_LIMIT_MAX) {
+  if (existing.count > max) {
     return { ok: false, remaining: 0, resetAt: existing.resetAt };
   }
-  return { ok: true, remaining: RATE_LIMIT_MAX - existing.count, resetAt: existing.resetAt };
+  return { ok: true, remaining: max - existing.count, resetAt: existing.resetAt };
 }
 
 function pruneRateBuckets() {
@@ -156,7 +158,8 @@ export async function middleware(req: NextRequest) {
   const ip = getClientIp(req);
 
   pruneRateBuckets();
-  const rl = rateLimit(ip);
+  const bucket = rateLimitBucket(pathname, ip);
+  const rl = rateLimit(bucket.key, bucket.max);
   if (!rl.ok) {
     return new NextResponse(
       JSON.stringify({ error: "Too many requests" }),
@@ -310,7 +313,7 @@ export async function middleware(req: NextRequest) {
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "no-referrer");
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.headers.set("X-RateLimit-Limit", RATE_LIMIT_MAX.toString());
+  res.headers.set("X-RateLimit-Limit", bucket.max.toString());
   res.headers.set("X-RateLimit-Remaining", rl.remaining.toString());
 
   return res;

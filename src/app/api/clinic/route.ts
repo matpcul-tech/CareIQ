@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from "next/server";
+import { clinicCsrfFailure } from "@/lib/clinic/csrf";
+import { handleClinicHttp } from "@/lib/clinic/http";
+import { smsEnvFromProcess } from "@/lib/clinic/sms";
+import { SupabaseClinicStore } from "@/lib/clinic/supabase-store";
+import { readClinicActor } from "@/lib/clinic/token";
+import type { Actor } from "@/lib/clinic/logic";
+import { readSession } from "@/lib/session";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+async function respond(req: NextRequest) {
+  const secret = process.env.CSRF_SECRET || "";
+  const header = req.headers.get("x-care-circle-token") || "";
+  const cookie = req.cookies.get("sov_clinic")?.value || "";
+  let actor: Actor | null = readClinicActor(header || cookie, secret, Date.now());
+  if (!actor) {
+    const session = readSession();
+    if (session.patientId) actor = { kind: "patient", patientId: session.patientId };
+  }
+  try {
+    const store = new SupabaseClinicStore();
+    if (actor?.kind === "staff") {
+      const staff = await store.getStaff(actor.staffId);
+      if (!staff || staff.revoked_at || staff.clinic_id !== actor.clinicId) {
+        actor = { ...actor, revoked: true };
+      }
+    }
+    const response = await handleClinicHttp(req, {
+      store,
+      actor,
+      smsEnv: smsEnvFromProcess(),
+      asOf: new Date().toISOString().slice(0, 10),
+    });
+    const payload = await response.json() as Record<string, unknown>;
+    delete payload.staff_token;
+    delete payload.sign_in;
+    return NextResponse.json(payload, {
+      status: response.status,
+      headers: { "cache-control": "private, no-store" },
+    });
+  } catch (err) {
+    const message = (err as Error)?.message || "clinic store unavailable";
+    const missing = /not configured/i.test(message);
+    return NextResponse.json(
+      { error: missing ? "clinic store is not configured" : "clinic store unavailable" },
+      { status: 503 },
+    );
+  }
+}
+
+export async function GET(req: NextRequest) {
+  return respond(req);
+}
+
+export async function POST(req: NextRequest) {
+  const failure = clinicCsrfFailure(
+    req.headers.get("x-csrf-token") || "",
+    req.cookies.get("sov_csrf")?.value || "",
+  );
+  if (failure === "missing") {
+    return NextResponse.json({ error: "CSRF token missing" }, { status: 403 });
+  }
+  if (failure === "mismatch") {
+    return NextResponse.json({ error: "CSRF token mismatch" }, { status: 403 });
+  }
+  return respond(req);
+}
