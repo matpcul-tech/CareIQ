@@ -62,6 +62,9 @@ export default function Home() {
             Sign In
           </Link>
         </div>
+        <Link href="/demo" className="text-sm text-sov-link">
+          Clinic demo with fictional patients
+        </Link>
 
         {/* Three trust pills */}
         <div className="grid w-full max-w-3xl grid-cols-1 gap-3 pt-6 sm:grid-cols-3">
