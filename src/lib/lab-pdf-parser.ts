@@ -2,31 +2,36 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
+import { assertTextOnlyModelPayload } from "@/lib/model-outbound";
+import { detectPii, redactIdentifiers, replaceKnownNames } from "@/lib/shield-redact";
 
 /**
  * Lab PDF parser.
  *
- * Two-stage extraction with NO native dependencies (Vercel-safe):
- *   1. Text extraction via unpdf (pure JS / WASM). Fast, free.
- *      Line-by-line synonym matcher converts recognizable lab rows
- *      into canonical biomarker key + value pairs.
- *   2. Claude vision fallback. Triggered when stage 1 yields
- *      < 100 chars of text OR matches zero biomarkers. The raw PDF
- *      bytes are base64-encoded and sent directly to Claude as a
- *      document-type content block; Anthropic's API accepts PDFs
- *      natively, no client-side image conversion required.
+ * Text extraction uses unpdf (pure JS / WASM, no native dependencies).
+ * Recognizable lab rows become canonical biomarker keys on the server.
+ *
+ * If that match finds nothing and the PDF has enough real text, a model
+ * fallback may run on Shield-redacted text only. The fallback is off
+ * unless LAB_PDF_MODEL_FALLBACK_ENABLED is the exact string "true".
+ * Unset, empty, and any other value keep it off.
+ *
+ * Scanned or image-only PDFs are never sent to a model, even when the
+ * flag is on. Those pages cannot be redacted reliably. Raw PDF bytes,
+ * base64 documents, and page images are never attached.
  *
  * Output (back-compat with /api/onboard/upload):
  *   biomarkers       Record<key, number>
  *   confidence       Record<key, "high"|"medium"|"low">
  *   details          ExtractedBiomarker[]
  *   text_chars       number
- *   extraction_mode  "text" | "vision" | "none"
+ *   extraction_mode  "text" | "redacted_text" | "none"
  *   reason?          string
+ *   user_message?    string
  */
 
 export type Confidence = "high" | "medium" | "low";
-export type ExtractionMode = "text" | "vision" | "none";
+export type ExtractionMode = "text" | "redacted_text" | "none";
 
 export interface ExtractedBiomarker {
   key: string;
@@ -35,7 +40,7 @@ export interface ExtractedBiomarker {
   raw_name: string;
   raw_line: string;
   confidence: Confidence;
-  tier: "primary" | "alias" | "vision";
+  tier: "primary" | "alias" | "model";
 }
 
 interface Spec {
@@ -386,10 +391,50 @@ export function extractBiomarkersFromText(text: string): ExtractedBiomarker[] {
   return Array.from(best.values());
 }
 
-const VISION_MODEL = "claude-sonnet-4-20250514";
+const LAB_TEXT_MODEL = "claude-sonnet-4-20250514";
 
-const VISION_PROMPT =
-  "Extract all lab results from this document. Return ONLY a JSON object with biomarker names as keys and numeric values as values. Use these exact key names where applicable: cortisol_am, dhea_s, testosterone_total, testosterone_free, estradiol, estrone, estriol, ldl, hdl, total_cholesterol, triglycerides, a1c, fasting_glucose, tsh, vitamin_d, cortisol, creatinine, egfr, wbc, rbc, hemoglobin, ferritin, vitamin_b12, hs_crp, homocysteine, apob, lpa, fasting_insulin, igf1, omega3_index. Skip values marked Below Detection Limit or Unable to Calculate. Return only the JSON, no other text.";
+export const LAB_PDF_MODEL_FALLBACK_FLAG = "LAB_PDF_MODEL_FALLBACK_ENABLED";
+
+export const LAB_PDF_MANUAL_ENTRY_MESSAGE =
+  "We could not read lab values from this PDF automatically. Enter your results manually. The file was not sent to a model.";
+
+const MIN_TEXT_CHARS_FOR_REGEX = 100;
+
+const REDACTED_TEXT_PROMPT =
+  "Extract lab results from the redacted text below. Return ONLY a JSON object with biomarker names as keys and numeric values as values. Use these exact key names where applicable: cortisol_am, dhea_s, testosterone_total, testosterone_free, estradiol, estrone, estriol, ldl, hdl, total_cholesterol, triglycerides, a1c, fasting_glucose, tsh, vitamin_d, cortisol, creatinine, egfr, wbc, rbc, hemoglobin, ferritin, vitamin_b12, hs_crp, homocysteine, apob, lpa, fasting_insulin, igf1, omega3_index. Skip values marked Below Detection Limit or Unable to Calculate. Return only the JSON, no other text.\n\nRedacted lab text:\n";
+
+/**
+ * Fail closed. Only the exact string "true" enables the redacted-text
+ * model fallback. Unset, empty, "false", "1", "yes", and any other value
+ * are off.
+ */
+export function labPdfModelFallbackEnabled(
+  env: Record<string, string | undefined>,
+): boolean {
+  return env[LAB_PDF_MODEL_FALLBACK_FLAG] === "true";
+}
+
+export function redactLabTextForModel(text: string, knownNames: string[] = []): string {
+  return redactIdentifiers(replaceKnownNames(text, knownNames));
+}
+
+export interface LabModelTextRequest {
+  model: string;
+  max_tokens: number;
+  messages: Array<{ role: "user"; content: string }>;
+}
+
+export interface LabModelClient {
+  createMessage(body: LabModelTextRequest): Promise<{
+    content: Array<{ type: string; text?: string }>;
+  }>;
+}
+
+export interface ParsePdfOptions {
+  env?: Record<string, string | undefined>;
+  knownNames?: string[];
+  modelClient?: LabModelClient;
+}
 
 function extractFirstJsonObject(text: string): string | null {
   const start = text.indexOf("{");
@@ -433,71 +478,12 @@ function coerceNumeric(v: unknown): number | null {
   return null;
 }
 
-async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiomarker[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    // eslint-disable-next-line no-console
-    console.warn("[lab-pdf-parser] vision skipped: ANTHROPIC_API_KEY not configured");
-    return [];
-  }
-  if (!bytes || bytes.length === 0) {
-    // eslint-disable-next-line no-console
-    console.warn("[lab-pdf-parser] vision skipped: pdf bytes empty");
-    return [];
-  }
-  if (bytes.length > 30 * 1024 * 1024) {
-    // eslint-disable-next-line no-console
-    console.warn(`[lab-pdf-parser] vision skipped: pdf too large (${bytes.length} bytes)`);
-    return [];
-  }
-
-  let raw = "";
-  try {
-    const client = new Anthropic({ apiKey });
-    const base64 = Buffer.from(bytes).toString("base64");
-    if (!base64) {
-      // eslint-disable-next-line no-console
-      console.warn("[lab-pdf-parser] vision skipped: base64 empty after encode");
-      return [];
-    }
-    // eslint-disable-next-line no-console
-    console.log(`[lab-pdf-parser] vision: sending ${bytes.length} bytes (base64=${base64.length} chars) to ${VISION_MODEL}`);
-    const message = await client.messages.create({
-      model: VISION_MODEL,
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: base64 },
-            },
-            { type: "text", text: VISION_PROMPT },
-          ],
-        },
-      ],
-    });
-    for (const block of message.content) {
-      if (block.type === "text") raw += block.text;
-    }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error("[lab-pdf-parser] vision call failed:", (err as Error)?.message || "unknown");
-    return [];
-  }
-
+function biomarkersFromModelJson(raw: string): ExtractedBiomarker[] {
   const trimmed = raw.trim();
-  // eslint-disable-next-line no-console
-  console.log(
-    `[lab-pdf-parser] vision raw response (${trimmed.length} chars):`,
-    trimmed.length > 800 ? trimmed.slice(0, 800) + "...[truncated]" : trimmed,
-  );
-
   const objText = extractFirstJsonObject(trimmed);
   if (!objText) {
     // eslint-disable-next-line no-console
-    console.warn("[lab-pdf-parser] vision response did not contain a JSON object");
+    console.warn("[lab-pdf-parser] model response did not contain a JSON object");
     return [];
   }
 
@@ -506,24 +492,27 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
     parsed = JSON.parse(objText);
   } catch {
     // eslint-disable-next-line no-console
-    console.warn("[lab-pdf-parser] vision response JSON was malformed");
+    console.warn("[lab-pdf-parser] model response JSON was malformed");
     return [];
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     // eslint-disable-next-line no-console
-    console.warn("[lab-pdf-parser] vision response was not a flat object");
+    console.warn("[lab-pdf-parser] model response was not a flat object");
     return [];
   }
 
+  const knownKeys = new Set<string>(BIOMARKER_KEYS);
   const out: ExtractedBiomarker[] = [];
   const dropped: string[] = [];
   for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
     const key = k.toLowerCase().trim();
-    if (!key) continue;
+    if (!key || !knownKeys.has(key)) {
+      if (key) dropped.push("unknown");
+      continue;
+    }
     const num = coerceNumeric(v);
     if (num === null) {
-      const tag = typeof v === "string" ? `"${(v as string).slice(0, 24)}"` : typeof v;
-      dropped.push(`${key}=${tag}`);
+      dropped.push("non-numeric");
       continue;
     }
     out.push({
@@ -533,17 +522,52 @@ async function claudeExtractBiomarkers(bytes: Uint8Array): Promise<ExtractedBiom
       raw_name: k,
       raw_line: "",
       confidence: "medium",
-      tier: "vision",
+      tier: "model",
     });
   }
 
   // eslint-disable-next-line no-console
   console.log(
-    `[lab-pdf-parser] vision: matched ${out.length} biomarkers; dropped ${dropped.length}`,
+    `[lab-pdf-parser] model: matched ${out.length} biomarkers; dropped ${dropped.length}`,
     out.length > 0 ? `kept=${out.map((o) => o.key).join(",")}` : "",
-    dropped.length > 0 ? `dropped=${dropped.slice(0, 12).join(";")}` : "",
+    dropped.length > 0 ? `dropped=${dropped.length}` : "",
   );
   return out;
+}
+
+function textCouldContainPdfPayload(text: string, bytes: Uint8Array): boolean {
+  if (text.includes("%PDF-")) return true;
+  if (!bytes || bytes.length === 0) return false;
+  const encodedLength = Math.ceil(bytes.length / 3) * 4;
+  if (text.length < encodedLength) return false;
+  return text.includes(Buffer.from(bytes).toString("base64"));
+}
+
+function defaultModelClient(apiKey: string): LabModelClient {
+  const client = new Anthropic({ apiKey });
+  return {
+    async createMessage(body) {
+      assertTextOnlyModelPayload(body);
+      for (const message of body.messages) {
+        if (typeof message.content !== "string") {
+          throw new Error("refusing non-text model content");
+        }
+      }
+      const message = await client.messages.create({
+        model: body.model,
+        max_tokens: body.max_tokens,
+        messages: body.messages.map((item) => ({
+          role: item.role,
+          content: item.content,
+        })),
+      });
+      return {
+        content: message.content.map((block) =>
+          block.type === "text" ? { type: block.type, text: block.text } : { type: block.type },
+        ),
+      };
+    },
+  };
 }
 
 export interface ParsePdfResult {
@@ -554,54 +578,127 @@ export interface ParsePdfResult {
   text_chars: number;
   extraction_mode: ExtractionMode;
   reason?: string;
+  user_message?: string;
 }
 
-const MIN_TEXT_CHARS_FOR_REGEX = 100;
-
-export async function parsePdfBiomarkers(bytes: Uint8Array): Promise<ParsePdfResult> {
-  // Defensive copy: unpdf transfers the underlying ArrayBuffer to a
-  // pdfjs-dist worker, leaving the caller's Uint8Array detached. Copy
-  // BEFORE running unpdf so the vision fallback still has the bytes.
-  const visionBytes = new Uint8Array(bytes.byteLength);
-  visionBytes.set(bytes);
-
-  const text = await extractTextFromPdf(bytes);
-  let details: ExtractedBiomarker[] = [];
-  let mode: ExtractionMode = "none";
-
-  if (text && text.length >= MIN_TEXT_CHARS_FOR_REGEX) {
-    details = extractBiomarkersFromText(text);
-    if (details.length > 0) mode = "text";
-  }
-
-  if (details.length === 0) {
-    // eslint-disable-next-line no-console
-    console.log(
-      `[lab-pdf-parser] text stage matched 0; falling back to vision (text_chars=${text.length}, vision_bytes=${visionBytes.length})`,
-    );
-    const visionDetails = await claudeExtractBiomarkers(visionBytes);
-    if (visionDetails.length > 0) {
-      details = visionDetails;
-      mode = "vision";
-    }
-  }
-
+function resultFromDetails(
+  details: ExtractedBiomarker[],
+  textChars: number,
+  mode: ExtractionMode,
+): ParsePdfResult {
   const biomarkers: Record<string, number> = {};
   const confidence: Record<string, Confidence> = {};
   for (const d of details) {
     biomarkers[d.key] = d.value;
     confidence[d.key] = d.confidence;
   }
-
   return {
     ok: details.length > 0,
     biomarkers,
     confidence,
     details,
-    text_chars: text.length,
+    text_chars: textChars,
     extraction_mode: mode,
-    ...(details.length === 0 ? { reason: "no_patterns_matched" } : {}),
   };
+}
+
+function manualEntryResult(textChars: number, reason: string): ParsePdfResult {
+  // eslint-disable-next-line no-console
+  console.log(`[lab-pdf-parser] model fallback skipped (${reason}, text_chars=${textChars})`);
+  return {
+    ok: false,
+    biomarkers: {},
+    confidence: {},
+    details: [],
+    text_chars: textChars,
+    extraction_mode: "none",
+    reason,
+    user_message: LAB_PDF_MANUAL_ENTRY_MESSAGE,
+  };
+}
+
+export async function parsePdfBiomarkers(
+  bytes: Uint8Array,
+  options: ParsePdfOptions = {},
+): Promise<ParsePdfResult> {
+  // unpdf transfers the underlying ArrayBuffer to a worker and detaches it.
+  // Extract from a copy so the caller can still encrypt the original file.
+  // The copy is never attached to a model request.
+  const extractBytes = new Uint8Array(bytes.byteLength);
+  extractBytes.set(bytes);
+
+  const text = await extractTextFromPdf(extractBytes);
+  const textChars = text.length;
+
+  if (textChars >= MIN_TEXT_CHARS_FOR_REGEX) {
+    const details = extractBiomarkersFromText(text);
+    if (details.length > 0) {
+      return resultFromDetails(details, textChars, "text");
+    }
+  }
+
+  // Not enough text to redact reliably. Do not call a model, even when
+  // the fallback flag is on. Page images are not rendered or uploaded.
+  if (textChars < MIN_TEXT_CHARS_FOR_REGEX) {
+    return manualEntryResult(textChars, "image_only_manual_entry");
+  }
+
+  const env = options.env ?? process.env;
+  if (!labPdfModelFallbackEnabled(env)) {
+    return manualEntryResult(textChars, "model_fallback_disabled");
+  }
+
+  const redacted = redactLabTextForModel(text, options.knownNames ?? []);
+  if (!redacted.trim() || detectPii(redacted).severity === "CRITICAL") {
+    return manualEntryResult(textChars, "redaction_incomplete");
+  }
+  if (textCouldContainPdfPayload(redacted, bytes)) {
+    return manualEntryResult(textChars, "redaction_incomplete");
+  }
+
+  const request: LabModelTextRequest = {
+    model: LAB_TEXT_MODEL,
+    max_tokens: 4096,
+    messages: [{ role: "user", content: REDACTED_TEXT_PROMPT + redacted }],
+  };
+  try {
+    assertTextOnlyModelPayload(request);
+  } catch {
+    return manualEntryResult(textChars, "redaction_incomplete");
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!options.modelClient && !apiKey) {
+    // eslint-disable-next-line no-console
+    console.warn("[lab-pdf-parser] model fallback skipped: ANTHROPIC_API_KEY not configured");
+    return manualEntryResult(textChars, "model_fallback_unavailable");
+  }
+
+  let raw = "";
+  try {
+    const client = options.modelClient ?? defaultModelClient(apiKey as string);
+    // eslint-disable-next-line no-console
+    console.log(
+      `[lab-pdf-parser] model fallback: sending redacted text (${redacted.length} chars) to ${LAB_TEXT_MODEL}`,
+    );
+    const message = await client.createMessage(request);
+    for (const block of message.content) {
+      if (block.type === "text" && typeof block.text === "string") raw += block.text;
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(
+      "[lab-pdf-parser] model fallback failed:",
+      ((err as Error)?.message || "unknown").slice(0, 180),
+    );
+    return manualEntryResult(textChars, "model_fallback_unavailable");
+  }
+
+  const details = biomarkersFromModelJson(raw);
+  if (details.length === 0) {
+    return manualEntryResult(textChars, "no_patterns_matched");
+  }
+  return resultFromDetails(details, textChars, "redacted_text");
 }
 
 export function parseBiomarkers(text: string): Record<string, number> {

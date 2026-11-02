@@ -9,8 +9,9 @@ import {
   type LabFileType,
   type WearableFileType,
 } from "@/lib/validate";
-import { encryptBuffer, encryptJson } from "@/lib/crypto";
+import { decryptJson, encryptBuffer, encryptJson } from "@/lib/crypto";
 import { parseWearable } from "@/lib/parse-wearable";
+import { namesFromProfile } from "@/lib/shield-redact";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
@@ -77,6 +78,31 @@ export async function POST(req: NextRequest) {
   return handleWearable(sessionId, session.patientId, validated.bytes, validated.type as WearableFileType);
 }
 
+async function knownNamesForPatient(patientId: string): Promise<string[]> {
+  try {
+    const sb = getServiceClient();
+    const { data } = await sb
+      .from("patients")
+      .select("profile_encrypted")
+      .eq("id", patientId)
+      .maybeSingle();
+    const encrypted = data?.profile_encrypted;
+    if (typeof encrypted !== "string" || encrypted.length === 0) return [];
+    const profile = decryptJson<{ firstName?: string; lastName?: string }>(
+      encrypted,
+      `profile:${patientId}`,
+    );
+    return namesFromProfile(profile);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(
+      "[upload] profile name list unavailable:",
+      ((err as Error)?.message || "unknown").slice(0, 120),
+    );
+    return [];
+  }
+}
+
 async function handleLab(
   sessionId: string,
   patientId: string,
@@ -88,10 +114,17 @@ async function handleLab(
 
   let parsedBiomarkers: Record<string, number> | null = null;
   let parseStats: { text_chars: number; matched: number; reason?: string } | null = null;
+  let labUserMessage: string | null = null;
+  let extractionMode: string | null = null;
   if (type === "pdf") {
     try {
       const mod = await import("@/lib/lab-pdf-parser");
-      const r = await mod.parsePdfBiomarkers(stripped);
+      const knownNames = await knownNamesForPatient(patientId);
+      const r = await mod.parsePdfBiomarkers(stripped, { knownNames });
+      extractionMode = r.extraction_mode;
+      if (typeof r.user_message === "string" && r.user_message.trim()) {
+        labUserMessage = r.user_message.trim();
+      }
       parseStats = {
         text_chars: r.text_chars,
         matched: Object.keys(r.biomarkers).length,
@@ -191,6 +224,9 @@ async function handleLab(
     responsePayload.parsed_biomarkers = parsedBiomarkers;
     responsePayload.parsed_count = Object.keys(parsedBiomarkers).length;
   }
+  if (parseStats) responsePayload.text_chars = parseStats.text_chars;
+  if (extractionMode) responsePayload.extraction_mode = extractionMode;
+  if (labUserMessage) responsePayload.user_message = labUserMessage;
   // eslint-disable-next-line no-console
   console.log(
     `[upload] lab response: id=${responsePayload.id} parsed_count=${responsePayload.parsed_count ?? 0}`,

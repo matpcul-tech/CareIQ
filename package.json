@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
+    "test": "tsx --import ./test/register-server-only.mjs --test test/*.test.ts",
     "bootstrap:clinic-admin": "tsx scripts/bootstrap-clinic-admin.ts"
   },
   "dependencies": {

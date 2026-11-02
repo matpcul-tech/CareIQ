@@ -704,16 +704,12 @@ function Step4Upload({
           // id, file_type, uploaded_at, optional parsed_biomarkers, parsed_count,
           // extraction_mode, text_chars (when available).
           const parsedCount = typeof data.parsed_count === "number" ? data.parsed_count : 0;
-          const textChars = typeof data.text_chars === "number" ? data.text_chars : null;
+          const serverMessage = typeof data.user_message === "string" ? data.user_message.trim() : "";
           const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
-          if (
-            isPdf &&
-            parsedCount === 0 &&
-            (textChars === null || textChars < 100)
-          ) {
+          if (isPdf && parsedCount === 0) {
             setUnreadableStatus({
               ok: false,
-              message:
+              message: serverMessage ||
                 "We could not read values from this PDF automatically. It may be a scan or use non-standard encoding. To try again: open the PDF, tap Print, then Save as PDF, and re-upload. Or enter your values manually below.",
             });
           } else {

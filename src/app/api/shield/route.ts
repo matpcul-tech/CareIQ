@@ -5,6 +5,7 @@ import { getServiceClient } from "@/lib/supabase-server";
 import { decryptJson } from "@/lib/crypto";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
+import { assertTextOnlyModelPayload } from "@/lib/model-outbound";
 import {
   handleShieldPost,
   type ShieldModelRequest,
@@ -60,6 +61,9 @@ export async function POST(req: NextRequest) {
     logAudit,
     getApiKey: () => process.env.ANTHROPIC_API_KEY || "",
     createMessage: async (body: ShieldModelRequest) => {
+      // handleShieldPost already built this from Shield redaction.
+      // Refuse document, image, and base64 attachments at the network edge.
+      assertTextOnlyModelPayload(body);
       const client = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY || "").trim() });
       const result = await client.messages.create({
         model: body.model,
