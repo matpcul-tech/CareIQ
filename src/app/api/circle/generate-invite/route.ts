@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { getServiceClient } from "@/lib/supabase-server";
+import { resolveServiceRoleKey } from "@/lib/supabase-env";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 
@@ -190,7 +191,7 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!resolveServiceRoleKey()) {
     console.error("[generate-invite]", tag, "SUPABASE_SERVICE_ROLE_KEY not set");
     return NextResponse.json(
       { error: "server misconfigured: SUPABASE_SERVICE_ROLE_KEY" },

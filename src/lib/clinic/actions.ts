@@ -477,6 +477,36 @@ export async function addCareTeamStaff(
   return { ok: true as const, data: { role: staff.role } };
 }
 
+export async function inviteClinicStaff(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicId: string; role: StaffRole; displayName: string; emailHash: string },
+) {
+  if (!isActiveStaff(actor) || actor.clinicId !== input.clinicId) {
+    return fail(403, "clinic admin only");
+  }
+  const current = await store.getStaff(actor.staffId);
+  if (!current || current.revoked_at || !current.is_admin || current.clinic_id !== input.clinicId) {
+    return fail(403, "clinic admin only");
+  }
+  if (!input.emailHash) return fail(400, "email is required");
+  const existing = await store.findStaffByEmailHash(input.emailHash);
+  if (existing) {
+    if (existing.revoked_at || existing.clinic_id !== input.clinicId) {
+      return fail(403, "clinic access revoked");
+    }
+    if (existing.role !== input.role) return fail(409, "staff email is already on this clinic");
+    return { ok: true as const, data: { role: existing.role, invited: true as const } };
+  }
+  const staff = await store.addStaff(input.clinicId, input.role, input.displayName, null, {
+    email_hash: input.emailHash,
+    is_admin: false,
+  });
+  const patients = await store.listPatients(input.clinicId);
+  await attachCareTeam(store, input.clinicId, patients.map((row) => row.id));
+  return { ok: true as const, data: { role: staff.role, invited: true as const } };
+}
+
 export async function listCircle(store: ClinicStore, actor: Actor, clinicPatientId: string) {
   const patient = await patientForActor(store, actor, clinicPatientId);
   if ("ok" in patient) return patient;

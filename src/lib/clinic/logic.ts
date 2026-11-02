@@ -17,7 +17,7 @@ export const ESTIMATE_LABEL =
 export const TRACKING_LABEL =
   "Tracking only. Not claims submission. Reference lines are not a billing decision.";
 
-export type StaffRole = "provider" | "ma" | "chw";
+export type StaffRole = "provider" | "ma" | "chw" | "care_manager" | "front_desk";
 export type CircleRole = "admin" | "caregiver" | "viewer" | StaffRole;
 
 export interface Thresholds {

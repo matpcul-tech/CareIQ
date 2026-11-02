@@ -19,6 +19,7 @@ import {
   markWellnessOk,
   maskedInsight,
   notifySms,
+  inviteClinicStaff,
   openClinic,
   optInWellness,
   recordCancerFollowUp,
@@ -32,6 +33,8 @@ import {
   tickWellness,
 } from "./actions";
 import type { Actor, CircleRole, StaffRole } from "./logic";
+import { parseInviteRole } from "./staff-auth";
+import type { StaffInviteDelivery } from "./staff-mail";
 import type { SmsEnv } from "./sms";
 import type { ClinicStore } from "./store";
 
@@ -41,6 +44,8 @@ export interface ClinicHttpDeps {
   smsEnv: SmsEnv;
   fetchImpl?: typeof fetch;
   asOf: string;
+  hashStaffEmail?: (email: string) => string;
+  sendStaffInvite?: (email: string) => Promise<{ ok: true; delivery: StaffInviteDelivery } | { ok: false; error: string }>;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -130,6 +135,36 @@ async function dispatch(
       displayName: String(body.displayName || "Clinic staff"),
       phone: typeof body.phone === "string" ? body.phone : null,
     });
+  }
+  if (action === "invite_staff") {
+    if (!deps.hashStaffEmail || !deps.sendStaffInvite) {
+      return { ok: false as const, status: 503, error: "staff invite is not configured" };
+    }
+    const role = parseInviteRole(body.role);
+    if (!role) return { ok: false as const, status: 400, error: "role must be provider, care manager, or front desk" };
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      return { ok: false as const, status: 400, error: "email is required" };
+    }
+    let emailHash = "";
+    try {
+      emailHash = deps.hashStaffEmail(email);
+    } catch {
+      return { ok: false as const, status: 503, error: "staff invite is not configured" };
+    }
+    const clinicId = typeof body.clinicId === "string" && body.clinicId
+      ? body.clinicId
+      : actor.kind === "staff" ? actor.clinicId : "";
+    const invited = await inviteClinicStaff(deps.store, actor, {
+      clinicId,
+      role,
+      displayName: String(body.displayName || "Clinic staff"),
+      emailHash,
+    });
+    if (!invited.ok) return invited;
+    const sent = await deps.sendStaffInvite(email);
+    if (!sent.ok) return { ok: false as const, status: 502, error: "invite email was not sent" };
+    return { ok: true as const, data: { invited: true, role: invited.data.role, delivery: sent.delivery } };
   }
   if (action === "import") return importRegistry(deps.store, actor, String(body.csv || ""));
   if (action === "thresholds") {

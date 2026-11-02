@@ -15,6 +15,15 @@ export interface StaffRecord {
   display_name: string;
   phone: string | null;
   revoked_at: string | null;
+  email_hash: string | null;
+  auth_user_id: string | null;
+  is_admin: boolean;
+}
+
+export interface StaffInsertExtras {
+  email_hash?: string | null;
+  auth_user_id?: string | null;
+  is_admin?: boolean;
 }
 
 export interface PatientRecord {
@@ -116,9 +125,11 @@ export interface ScreenRecord {
 
 export interface ClinicStore {
   createClinic(name: string): Promise<ClinicRecord>;
-  addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null): Promise<StaffRecord>;
+  addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null, extras?: StaffInsertExtras): Promise<StaffRecord>;
   getStaff(staffId: string): Promise<StaffRecord | null>;
   listStaff(clinicId: string): Promise<StaffRecord[]>;
+  findStaffByEmailHash(emailHash: string): Promise<StaffRecord | null>;
+  bindStaffAuth(staffId: string, authUserId: string): Promise<boolean>;
   revokeStaff(staffId: string, at: string): Promise<void>;
   getThresholds(clinicId: string): Promise<Thresholds>;
   setThresholds(clinicId: string, patch: Partial<Thresholds>): Promise<Thresholds>;
@@ -185,7 +196,7 @@ export class MemoryClinicStore implements ClinicStore {
     return row;
   }
 
-  async addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null): Promise<StaffRecord> {
+  async addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null, extras?: StaffInsertExtras): Promise<StaffRecord> {
     const row: StaffRecord = {
       id: id(),
       clinic_id: clinicId,
@@ -193,6 +204,9 @@ export class MemoryClinicStore implements ClinicStore {
       display_name: displayName.slice(0, 80),
       phone: toE164(phone),
       revoked_at: null,
+      email_hash: extras?.email_hash || null,
+      auth_user_id: extras?.auth_user_id || null,
+      is_admin: extras?.is_admin === true,
     };
     this.staff.push(row);
     return row;
@@ -204,6 +218,19 @@ export class MemoryClinicStore implements ClinicStore {
 
   async listStaff(clinicId: string): Promise<StaffRecord[]> {
     return this.staff.filter((row) => row.clinic_id === clinicId);
+  }
+
+  async findStaffByEmailHash(emailHash: string): Promise<StaffRecord | null> {
+    if (!emailHash) return null;
+    return this.staff.find((row) => row.email_hash === emailHash) || null;
+  }
+
+  async bindStaffAuth(staffId: string, authUserId: string): Promise<boolean> {
+    const row = this.staff.find((item) => item.id === staffId);
+    if (!row || row.revoked_at) return false;
+    if (row.auth_user_id && row.auth_user_id !== authUserId) return false;
+    row.auth_user_id = authUserId;
+    return true;
   }
 
   async revokeStaff(staffId: string, at: string): Promise<void> {

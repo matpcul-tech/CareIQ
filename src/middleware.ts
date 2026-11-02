@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitBucket } from "./src/lib/clinic/inbound-limit";
+import { rateLimitBucket } from "./lib/clinic/inbound-limit";
 
 /**
  * The /auth/callback route is excluded at the matcher level so middleware
@@ -29,12 +29,22 @@ const AUTH_COOKIE = "sov_auth";
 type Bucket = { count: number; resetAt: number };
 const rateBuckets = new Map<string, Bucket>();
 
-const PUBLIC_API_PATHS = new Set<string>([
+const STAFF_COOKIE = "sov_clinic";
+
+// These routes skip the CSRF check. Clinic staff sign-in is not in this set.
+const CSRF_EXEMPT_API_PATHS = new Set<string>([
   "/api/auth/magic-link",
   "/api/csrf",
   "/api/shield/decrypt",
   // Twilio cannot send the app CSRF cookie. The route checks X-Twilio-Signature.
   "/api/clinic/wellness/inbound",
+]);
+
+// These routes do not require the patient sov_auth cookie.
+// /api/clinic/sign-in still requires the CSRF header.
+const NO_PATIENT_SESSION_API_PATHS = new Set<string>([
+  ...CSRF_EXEMPT_API_PATHS,
+  "/api/clinic/sign-in",
 ]);
 
 function getClientIp(req: NextRequest): string {
@@ -147,7 +157,7 @@ function isClinicalPath(pathname: string): boolean {
 
 function isProtectedApi(pathname: string): boolean {
   if (!pathname.startsWith("/api/")) return false;
-  if (PUBLIC_API_PATHS.has(pathname)) return false;
+  if (NO_PATIENT_SESSION_API_PATHS.has(pathname)) return false;
   return true;
 }
 
@@ -178,6 +188,7 @@ export async function middleware(req: NextRequest) {
   const existingCsrf = req.cookies.get(CSRF_COOKIE)?.value || "";
   const existingTs = req.cookies.get(SESSION_TS_COOKIE)?.value || "";
   const existingAuth = req.cookies.get(AUTH_COOKIE)?.value || "";
+  const existingStaff = req.cookies.get(STAFF_COOKIE)?.value || "";
 
   // Idle-timeout check. Rotating-session expiry NEVER deletes sov_auth on
   // its own; if the rotating session is stale we just rotate it on the
@@ -210,8 +221,8 @@ export async function middleware(req: NextRequest) {
 
   const isApi = pathname.startsWith("/api/");
   const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
-  const isPublicApi = isApi && PUBLIC_API_PATHS.has(pathname);
-  if (isApi && isMutating && !isPublicApi) {
+  const isCsrfExempt = isApi && CSRF_EXEMPT_API_PATHS.has(pathname);
+  if (isApi && isMutating && !isCsrfExempt) {
     const headerToken = req.headers.get("x-csrf-token") || "";
     const cookieToken = existingCsrf;
     if (!headerToken || !cookieToken) {
@@ -252,8 +263,10 @@ export async function middleware(req: NextRequest) {
   }
 
   const needsIdentity = isDashboardPath(pathname) || isClinicalPath(pathname) || isProtectedApi(pathname);
+  // The staff cookie authorizes only /api/clinic. It does not open patient routes.
+  const staffClinicApi = pathname === "/api/clinic" && Boolean(existingStaff);
   if (needsIdentity) {
-    if (!existingAuth) {
+    if (!existingAuth && !staffClinicApi) {
       if (isApi) {
         return new NextResponse(
           JSON.stringify({ error: "Authentication required" }),

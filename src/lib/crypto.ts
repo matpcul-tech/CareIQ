@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "crypto";
+import { hashEmailWithKey } from "@/lib/email-hash";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12; // 96 bits, recommended for GCM
@@ -124,12 +125,7 @@ export function sha256Hex(input: string): string {
  * rainbow-table style lookups. Deterministic for equality checks.
  */
 export function hashEmail(email: string): string {
-  const normalized = email.trim().toLowerCase();
-  return createHash("sha256")
-    .update(getKey())
-    .update(":")
-    .update(normalized, "utf8")
-    .digest("hex");
+  return hashEmailWithKey(email, getKey());
 }
 
 export function safeEqual(a: string, b: string): boolean {
