@@ -214,7 +214,7 @@ const SPECS: Spec[] = [
 ];
 
 function normalize(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, " ").trim();
+  return s.toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ").trim();
 }
 
 interface FlatSyn {
@@ -254,8 +254,18 @@ const SKIP_LINE_PATTERNS: RegExp[] = [
 ];
 const NAME_REJECT = /\b(reference|range|ratio|interval|interpretation|comment)\b/i;
 const DATE_RE = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/g;
-const NUM_RE = /(?:^|[^\d.\-])(\d{1,5}(?:\.\d{1,3})?)\b/;
 const CODE_PREFIX = /^\s*\d{1,4}\s+(?=[A-Za-z])/;
+
+// A value token: a plain number, optionally with a comparator (<, >, <=, >=)
+// and optionally glued to a flag (92H, 5.9*). Tokens like "25-Hydroxy" or
+// "A1c" are part of the test name, not values.
+const VALUE_TOKEN = /^([<>]=?)?(\d{1,5}(?:\.\d{1,3})?)(H|L|HH|LL|A|\*)?$/;
+// Abnormal flags that sit between the value and the unit or range.
+const FLAG_TOKEN = /^(?:\(?(?:H|L|HH|LL|A|N|\*|\*H|\*L|High|Low|Abnormal|Abn|Critical)\)?)$/i;
+// A reference range or bound, such as 70-99, 4.0-5.6, >39, <100, 0.45 - 4.5.
+const RANGE_TOKEN = /^[<>]?=?\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?$|^-$/;
+const UNIT_TOKEN = /^(?:%|[a-zA-Zµμ][\w%\/.\-µμ^]{0,30})$/;
+const UNIT_HINT = /[\/%]|^(?:mg|g|ng|pg|ug|mcg|µg|u|iu|miu|uiu|µiu|mmol|umol|µmol|nmol|ml|k|m|thou|x10e\d|10\^\d)/i;
 
 interface LineParse {
   name: string;
@@ -264,24 +274,58 @@ interface LineParse {
   raw_line: string;
 }
 
+function isValueToken(tok: string): RegExpExecArray | null {
+  return VALUE_TOKEN.exec(tok);
+}
+
+function findUnit(rest: string[]): string {
+  // Unit right after the value (after any flags), or later on the line
+  // after the reference range (Quest style: 102 H 65-99 mg/dL).
+  for (const tok of rest) {
+    if (FLAG_TOKEN.test(tok) || RANGE_TOKEN.test(tok)) continue;
+    if (UNIT_TOKEN.test(tok) && UNIT_HINT.test(tok)) return tok;
+    // Any other word means we left the value, flag, unit, range columns.
+    break;
+  }
+  for (const tok of rest) {
+    if (UNIT_TOKEN.test(tok) && UNIT_HINT.test(tok) && /[\/%]/.test(tok)) return tok;
+  }
+  return "";
+}
+
 function parseLine(originalLine: string): LineParse | null {
   const line = originalLine.trim();
   if (!line) return null;
   for (const re of SKIP_LINE_PATTERNS) if (re.test(line)) return null;
   let body = line.replace(CODE_PREFIX, "");
   body = body.replace(DATE_RE, " ");
-  const m = NUM_RE.exec(body);
-  if (!m) return null;
-  const valueText = m[1];
-  const value = Number(valueText);
+  // Column layouts often separate fields with tabs or runs of spaces, and
+  // some reports put the range in "70 - 99" form. Normalize both.
+  body = body.replace(/(\d)\s+-\s+(\d)/g, "$1-$2");
+  const tokens = body.split(/\s+/).filter(Boolean);
+  let idx = -1;
+  for (let i = 1; i < tokens.length; i++) {
+    if (isValueToken(tokens[i])) { idx = i; break; }
+  }
+  if (idx < 1) return null;
+  // Names that end in a number (IGF 1, TSH 3rd gen handled by synonyms):
+  // if the next token is also a value and the longer name is a known
+  // synonym, take the longer name.
+  // Labcorp style test codes ("Glucose 01 92 mg/dL") are zero padded.
+  if (/^0\d$/.test(tokens[idx]) && idx + 1 < tokens.length && isValueToken(tokens[idx + 1])) {
+    tokens.splice(idx, 1);
+  } else if (idx + 1 < tokens.length && isValueToken(tokens[idx + 1])) {
+    const longer = tokens.slice(0, idx + 1).join(" ").replace(/:$/, "");
+    const norm = normalizeForMatch(longer);
+    if (SYNONYMS.some((syn) => syn.pattern === norm)) idx += 1;
+  }
+  const m = isValueToken(tokens[idx])!;
+  const value = Number(m[2]);
   if (!Number.isFinite(value)) return null;
-  const digitStart = m.index + (m[0].length - valueText.length);
-  const nameRaw = body.slice(0, digitStart).trim();
+  const nameRaw = tokens.slice(0, idx).join(" ").replace(/[:\s]+$/, "").trim();
   if (!nameRaw || nameRaw.length < 2) return null;
   if (NAME_REJECT.test(nameRaw)) return null;
-  const after = body.slice(digitStart + valueText.length).trim();
-  const unitMatch = after.match(/^([a-zA-Z%\/µμ][\w%\/.\-µμ]{0,30})/);
-  const unit = unitMatch ? unitMatch[1] : "";
+  const unit = findUnit(tokens.slice(idx + 1));
   return { name: nameRaw, value, unit, raw_line: line };
 }
 
@@ -290,6 +334,7 @@ function normalizeForMatch(name: string): string {
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
     .replace(/,\s*(serum|plasma|whole blood|blood)\b.*$/i, "")
+    .replace(/,/g, " ")
     .replace(/[ \s]+/g, " ")
     .trim();
 }
@@ -334,7 +379,9 @@ export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   try {
     const mod = await import("unpdf");
     const pdf = await mod.getDocumentProxy(bytes);
-    const result = await mod.extractText(pdf, { mergePages: true });
+    // Keep line breaks. mergePages: true flattens the whole document onto
+    // one line, which hides every lab row from the line parser.
+    const result = await mod.extractText(pdf, { mergePages: false });
     const t = result.text as unknown;
     let text = "";
     if (typeof t === "string") text = t;
