@@ -6,6 +6,7 @@
  */
 
 import { createHash } from "crypto";
+import { assertTextOnlyModelPayload } from "./model-outbound";
 import {
   buildShieldUserContent,
   type ClientContext,
@@ -329,6 +330,7 @@ export async function handleShieldPost(req: Request, deps: ShieldDeps): Promise<
 
   const start = Date.now();
   try {
+    assertTextOnlyModelPayload(modelRequest);
     const response = await deps.createMessage(modelRequest);
 
     let generated = "";
