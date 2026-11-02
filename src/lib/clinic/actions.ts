@@ -1,4 +1,5 @@
 import type { Actor, CircleRole, HomeReading, PanelRow, StaffRole, Thresholds } from "./logic";
+import { buildScorecard, type MeasureId, MEASURE_IDS, validScreen, type ScorecardPatient } from "./scorecard";
 import {
   canAddMember,
   canPostConcern,
@@ -164,6 +165,88 @@ export async function clinicMeasures(store: ClinicStore, actor: Actor, asOf: str
   if (typeof clinicId !== "string") return clinicId;
   const rows = await panelRows(store, clinicId, asOf);
   return { ok: true as const, data: estimateMeasures(rows, asOf) };
+}
+
+async function scorecardRows(store: ClinicStore, clinicId: string, month: string): Promise<ScorecardPatient[]> {
+  const patients = await store.listPatients(clinicId);
+  const rows: ScorecardPatient[] = [];
+  for (const patient of patients) {
+    const readings = await store.listReadings(patient.id);
+    const vitals = effectiveVitals(
+      {
+        a1c: patient.last_a1c,
+        a1c_date: patient.last_a1c_date,
+        systolic: patient.bp_systolic,
+        diastolic: patient.bp_diastolic,
+        bp_date: patient.last_bp_date,
+      },
+      readings,
+    );
+    const screens = await store.listScreens(patient.id);
+    rows.push({
+      external_id: patient.external_id,
+      age: patient.age,
+      has_diabetes: patient.has_diabetes,
+      has_hypertension: patient.has_hypertension,
+      a1c: vitals.a1c,
+      a1c_date: vitals.a1c_date,
+      systolic: vitals.systolic,
+      diastolic: vitals.diastolic,
+      bp_date: vitals.bp_date,
+      screens: screens.map((screen) => ({
+        instrument: screen.instrument,
+        score: screen.score,
+        follow_up: screen.follow_up,
+        recorded_on: screen.recorded_on,
+      })),
+      reading_dates: readings.map((reading) => reading.recorded_on),
+      minutes: await store.getMinutes(patient.id, month),
+    });
+  }
+  return rows;
+}
+
+export async function clinicScorecard(store: ClinicStore, actor: Actor, asOf: string) {
+  const clinicId = staffClinic(actor);
+  if (typeof clinicId !== "string") return clinicId;
+  const month = asOf.slice(0, 7);
+  const overrides = await store.getMeasureTargets(clinicId);
+  const data = buildScorecard(await scorecardRows(store, clinicId, month), overrides as Partial<Record<MeasureId, number>>, asOf, month);
+  return { ok: true as const, data };
+}
+
+export async function setMeasureTargets(
+  store: ClinicStore,
+  actor: Actor,
+  patch: Record<string, number>,
+  asOf: string,
+) {
+  if (!isActiveStaff(actor) || actor.role !== "provider") return fail(403, "provider only");
+  for (const [key, value] of Object.entries(patch)) {
+    if (!MEASURE_IDS.includes(key as MeasureId)) return fail(400, "unknown measure");
+    if (typeof value !== "number" || value < 0 || value > 1) return fail(400, "target must be from 0 to 1");
+    await store.setMeasureTarget(actor.clinicId, key, value);
+  }
+  return clinicScorecard(store, actor, asOf);
+}
+
+export async function addScreen(
+  store: ClinicStore,
+  actor: Actor,
+  input: { clinicPatientId: string; instrument: string; score: number; followUp: boolean; on: string },
+) {
+  if (!canPostConcern(actor)) return fail(403, "caregiver or patient only");
+  if (!validScreen(input.instrument, input.score)) return fail(400, "PHQ-2 is 0 to 6 and PHQ-9 is 0 to 27");
+  const patient = await patientForActor(store, actor, input.clinicPatientId);
+  if ("ok" in patient) return patient;
+  const saved = await store.addScreen({
+    clinic_patient_id: patient.id,
+    instrument: input.instrument,
+    score: input.score,
+    follow_up: input.followUp,
+    recorded_on: input.on,
+  });
+  return { ok: true as const, data: { id: saved.id, instrument: saved.instrument, score: saved.score } };
 }
 
 export async function clinicGaps(store: ClinicStore, actor: Actor, asOf: string) {

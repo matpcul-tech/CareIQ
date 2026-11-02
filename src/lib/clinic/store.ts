@@ -84,6 +84,15 @@ export interface MinuteRecord {
   minutes: number;
 }
 
+export interface ScreenRecord {
+  id: string;
+  clinic_patient_id: string;
+  instrument: "phq2" | "phq9";
+  score: number;
+  follow_up: boolean;
+  recorded_on: string;
+}
+
 export interface ClinicStore {
   createClinic(name: string): Promise<ClinicRecord>;
   addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null): Promise<StaffRecord>;
@@ -111,6 +120,10 @@ export interface ClinicStore {
   listOutreach(clinicPatientId: string): Promise<OutreachRecord[]>;
   addMinutes(clinicPatientId: string, month: string, minutes: number): Promise<MinuteRecord>;
   getMinutes(clinicPatientId: string, month: string): Promise<number>;
+  addScreen(input: Omit<ScreenRecord, "id">): Promise<ScreenRecord>;
+  listScreens(clinicPatientId: string): Promise<ScreenRecord[]>;
+  getMeasureTargets(clinicId: string): Promise<Record<string, number>>;
+  setMeasureTarget(clinicId: string, measureId: string, target: number): Promise<void>;
 }
 
 function id(): string {
@@ -129,6 +142,8 @@ export class MemoryClinicStore implements ClinicStore {
   checkins: CheckinRecord[] = [];
   outreach: OutreachRecord[] = [];
   minutes: MinuteRecord[] = [];
+  screens: ScreenRecord[] = [];
+  measureTargets = new Map<string, Record<string, number>>();
 
   async createClinic(name: string): Promise<ClinicRecord> {
     const row = { id: id(), name: name.slice(0, 120) };
@@ -313,5 +328,25 @@ export class MemoryClinicStore implements ClinicStore {
 
   async getMinutes(clinicPatientId: string, month: string): Promise<number> {
     return this.minutes.find((row) => row.clinic_patient_id === clinicPatientId && row.month === month)?.minutes || 0;
+  }
+
+  async addScreen(input: Omit<ScreenRecord, "id">): Promise<ScreenRecord> {
+    const row = { ...input, id: id() };
+    this.screens.push(row);
+    return row;
+  }
+
+  async listScreens(clinicPatientId: string): Promise<ScreenRecord[]> {
+    return this.screens.filter((row) => row.clinic_patient_id === clinicPatientId);
+  }
+
+  async getMeasureTargets(clinicId: string): Promise<Record<string, number>> {
+    return { ...(this.measureTargets.get(clinicId) || {}) };
+  }
+
+  async setMeasureTarget(clinicId: string, measureId: string, target: number): Promise<void> {
+    const current = await this.getMeasureTargets(clinicId);
+    current[measureId] = target;
+    this.measureTargets.set(clinicId, current);
   }
 }

@@ -7,8 +7,11 @@ import {
   clinicGaps,
   clinicMeasures,
   clinicTracking,
+  addScreen,
+  clinicScorecard,
   clinicWorklist,
   importRegistry,
+  setMeasureTargets,
   listCircle,
   listConcerns,
   logMinutes,
@@ -53,6 +56,10 @@ export async function handleClinicHttp(req: Request, deps: ClinicHttpDeps): Prom
     }
     if (view === "measures") {
       const result = await clinicMeasures(deps.store, actor, deps.asOf);
+      return json(result.ok ? result.data : { error: result.error }, result.ok ? 200 : result.status);
+    }
+    if (view === "scorecard") {
+      const result = await clinicScorecard(deps.store, actor, deps.asOf);
       return json(result.ok ? result.data : { error: result.error }, result.ok ? 200 : result.status);
     }
     if (view === "gaps") {
@@ -164,6 +171,26 @@ async function dispatch(
       month: String(body.month || deps.asOf.slice(0, 7)),
       minutes: num(body.minutes) || 0,
     });
+  }
+  if (action === "screen") {
+    return addScreen(deps.store, actor, {
+      clinicPatientId: id,
+      instrument: String(body.instrument || ""),
+      score: num(body.score) || 0,
+      followUp: body.follow_up === true,
+      on: String(body.on || deps.asOf),
+    });
+  }
+  if (action === "targets") {
+    const patch: Record<string, number> = {};
+    if (body.targets && typeof body.targets === "object") {
+      for (const [key, value] of Object.entries(body.targets as Record<string, unknown>)) {
+        const parsed = num(value);
+        if (parsed == null) return { ok: false as const, status: 400, error: "target must be from 0 to 1" };
+        patch[key] = parsed;
+      }
+    }
+    return setMeasureTargets(deps.store, actor, patch, deps.asOf);
   }
   if (action === "insight") return maskedInsight(deps.store, actor, id);
   if (action === "sms") {

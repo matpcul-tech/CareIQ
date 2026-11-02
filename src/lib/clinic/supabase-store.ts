@@ -13,6 +13,7 @@ import type {
   OutreachRecord,
   PatientRecord,
   ReadingRecord,
+  ScreenRecord,
   StaffRecord,
 } from "./store";
 import type { CsvPatient } from "./logic";
@@ -400,6 +401,53 @@ export class SupabaseClinicStore implements ClinicStore {
     if (error) throw new Error(error.message);
     return data ? Number(data.minutes) : 0;
   }
+
+  async addScreen(input: Omit<ScreenRecord, "id">): Promise<ScreenRecord> {
+    const { data, error } = await this.sb().from("circle_screens").insert({
+      clinic_patient_id: input.clinic_patient_id,
+      instrument: input.instrument,
+      score: input.score,
+      follow_up: input.follow_up,
+      recorded_on: input.recorded_on,
+    }).select("*").single();
+    if (error || !data) throw new Error(error?.message || "screen insert failed");
+    return screenFrom(data as Row);
+  }
+
+  async listScreens(clinicPatientId: string): Promise<ScreenRecord[]> {
+    const { data, error } = await this.sb().from("circle_screens").select("*").eq("clinic_patient_id", clinicPatientId);
+    if (error) throw new Error(error.message);
+    return (data || []).map((row) => screenFrom(row as Row));
+  }
+
+  async getMeasureTargets(clinicId: string): Promise<Record<string, number>> {
+    const { data, error } = await this.sb()
+      .from("clinic_measure_targets")
+      .select("measure_id,target")
+      .eq("clinic_id", clinicId);
+    if (error) throw new Error(error.message);
+    const out: Record<string, number> = {};
+    for (const row of data || []) out[row.measure_id] = Number(row.target);
+    return out;
+  }
+
+  async setMeasureTarget(clinicId: string, measureId: string, target: number): Promise<void> {
+    const { error } = await this.sb()
+      .from("clinic_measure_targets")
+      .upsert({ clinic_id: clinicId, measure_id: measureId, target }, { onConflict: "clinic_id,measure_id" });
+    if (error) throw new Error(error.message);
+  }
+}
+
+function screenFrom(row: Row): ScreenRecord {
+  return {
+    id: String(row.id),
+    clinic_patient_id: String(row.clinic_patient_id),
+    instrument: row.instrument === "phq2" ? "phq2" : "phq9",
+    score: Number(row.score),
+    follow_up: Boolean(row.follow_up),
+    recorded_on: day(row.recorded_on) || "",
+  };
 }
 
 function readingFrom(row: Row): ReadingRecord {

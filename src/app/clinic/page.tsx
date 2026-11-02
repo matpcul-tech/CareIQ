@@ -11,7 +11,7 @@ export default function ClinicPage() {
         Patients and caregivers send home blood pressure, glucose, missed medication or appointment check-ins, and short concerns to this clinic. Provider, MA, and CHW roles share that circle. Only the patient or an admin can add or revoke members.
       </p>
       <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-        CMS165 and CMS122 figures are estimates, not validated measures. Reading days and care management minutes are tracking only, not claims submission. Text delivery is skipped when SMS is not configured. Any AI summary is masked before it is sent.
+        The scorecard shows an estimated rate, the gap to the clinic target, and the patients who would close that gap. Defaults come from the public scorecard. CMS2 and CMS159 have no default percent there, so those targets stay blank until a provider sets them. P4P dollars and RPM dollars are estimates. CCM and APCM time is tracked only, with no dollar estimate. Nothing here is a validated measure or a claim.
       </p>
       <ClinicPanel />
     </main>
