@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
 import type { ResolvedLabs } from "@/lib/lab-values";
+import { buildHealthNarrative } from "@/lib/local-health";
 
 const ZK_SALT = "CARE-IQ-ZK-SHIELD-2026";
 const ZK_TERMS = ["fqhc","careiq","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
@@ -287,6 +288,7 @@ export interface ClinicalData {
   /** Labs already decrypted on the server. Optional so demo mode can omit them. */
   labs?: ResolvedLabs;
   sex?: "male" | "female" | "unknown";
+  recordedConditions?: string[];
 }
 
 const AiEnabledContext = createContext(false);
@@ -302,6 +304,9 @@ const DEMO_DATA: ClinicalData = {
   wearSteps7Day: DEMO_WEAR_STEPS_7DAY,
   wearDays: DEMO_WEAR_DAYS,
   wearableSource: "demo",
+  labs: { bpSystolic: 118, bpDiastolic: 76, a1c: 6.4, ldl: 212 },
+  sex: "unknown",
+  recordedConditions: [],
 };
 
 const ClinicalDataContext = createContext<ClinicalData>(DEMO_DATA);
@@ -405,7 +410,23 @@ function GeneratedCard({
   );
 }
 
-function HealthNarrative() { return <GeneratedCard title="Today's Health Narrative" badge="AI" mode="narrative" />; }
+function HealthNarrative() {
+  const data = useContext(ClinicalDataContext);
+  const text = buildHealthNarrative({
+    labs: data.labs,
+    sex: data.sex,
+    conditions: data.recordedConditions,
+  });
+  return (
+    <div className="card">
+      <div className="card-hdr">
+        <span className="card-title">Today's Health Narrative</span>
+        <span className="badge b-violet">Local</span>
+      </div>
+      <div style={{ fontSize: 12, color: "#a3b5cc", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
+    </div>
+  );
+}
 function WorkoutPlan()    { return <GeneratedCard title="Today's Workout Plan"     badge="AI" mode="workout" />; }
 function MealPlan()       { return <GeneratedCard title="Today's Meal Plan"        badge="AI" mode="meal_plan" />; }
 

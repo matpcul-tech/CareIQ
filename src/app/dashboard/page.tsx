@@ -18,6 +18,7 @@ interface ProfilePlaintext {
   lastName?: string;
   dateOfBirth?: string;
   communityAffiliation?: string;
+  sex?: "male" | "female";
 }
 
 interface ManualLabs {
@@ -29,6 +30,8 @@ interface ManualLabs {
   bpDiastolic?: number;
   triglycerides?: number;
   egfr?: number;
+  tsh?: number;
+  vitaminD?: number;
 }
 
 interface HistoryPlaintext {
@@ -276,14 +279,18 @@ export default async function DashboardPage() {
         <LabFilesCard files={labFiles} />
 
         <div className="card md:col-span-2">
-          <h2 className="mb-3 text-base font-bold">AI Health Insight</h2>
+          <h2 className="mb-3 text-base font-bold">Local health note</h2>
           <p className="text-sm text-ink-mute">
-            The Prompt Shield builds a reduced summary for the model. Your typed question is not sent.
-            The stored name is replaced, conditions and vital names come from a fixed list, and detected
-            identifiers are replaced. This reduces identifiers. It does not certify that every possible
-            identifier is gone.
+            This note is built from labs and recorded conditions already on the page. It does not call a model.
           </p>
-          <InsightButton aiEnabled={isAiEnabled()} />
+          <InsightButton
+            aiEnabled={isAiEnabled()}
+            facts={{
+              labs: manualLabs,
+              sex: profile?.sex === "male" || profile?.sex === "female" ? profile.sex : "unknown",
+              conditions: history?.chronicConditions ?? [],
+            }}
+          />
         </div>
       </section>
 

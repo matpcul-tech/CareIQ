@@ -32,6 +32,8 @@ interface ManualLabs {
   bpDiastolic?: number;
   triglycerides?: number;
   egfr?: number;
+  tsh?: number;
+  vitaminD?: number;
 }
 
 interface HistoryPlaintext {
@@ -321,6 +323,7 @@ function buildClinicalData(args: {
     primaryDeviceLabel: deviceType ? humanDevice(deviceType) : undefined,
     labs: manual,
     sex,
+    recordedConditions: (history?.chronicConditions ?? []).map((c) => c.trim()).filter(Boolean),
   };
   return result;
 }
