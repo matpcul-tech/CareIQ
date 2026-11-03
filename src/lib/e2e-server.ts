@@ -17,6 +17,7 @@ export interface E2eStore {
   getClinicPublicKey(patientId: string): Promise<{ clinic_id: string; public_jwk: unknown } | null>;
   enroll(patientId: string, b: Enroll): Promise<void>;
   saveEntry(patientId: string, e: Entry): Promise<void>;
+  listEntries(patientId: string, dekId: string): Promise<Array<Entry & { patient_id: string }>>;
   withdraw(patientId: string, w: Withdraw): Promise<void>;
 }
 
@@ -82,4 +83,13 @@ export async function handleWithdraw(patientId: string | null, raw: unknown, sto
   if (w.entries.some((x) => x.dek_id !== w.new_dek_id || x.envelope.kid !== w.new_dek_id)) return { status: 400, body: { error: "entries not rotated" } };
   await store.withdraw(patientId, w);
   return { status: 200, body: { ok: true } };
+}
+
+/** GET entries: the patient's own ciphertext rows under the active data key. Decrypt happens on the device. */
+export async function handleListEntries(patientId: string | null, store: E2eStore, e?: Record<string, string | undefined>): Promise<Result> {
+  if (!env(e)) return NOT_FOUND;
+  if (!patientId) return { status: 401, body: { error: "authentication required" } };
+  const key = await store.getUserKey(patientId);
+  if (!key) return { status: 200, body: { entries: [] } };
+  return { status: 200, body: { entries: await store.listEntries(patientId, key.active_dek_id) } };
 }

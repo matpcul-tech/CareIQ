@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
 import OnboardClient from "./OnboardClient";
+import { isClientEncEnabled } from "@/lib/e2e/flag";
 import { loadSavedHistory } from "@/lib/history-read";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,7 @@ export default async function OnboardPage({
   return (
     <OnboardClient
       savedHistory={savedHistory}
+      encEnabled={isClientEncEnabled()}
       initialStep={initialStep}
       authenticated={Boolean(session.patientId)}
       expired={searchParams?.expired === "1"}

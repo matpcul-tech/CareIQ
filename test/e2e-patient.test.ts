@@ -180,6 +180,7 @@ function memStore(): E2eStore & { state: Record<string, unknown> } {
       state.wraps.push(...b.wraps);
     },
     async saveEntry(_p, e) { state.entries.push(e); },
+    async listEntries(p, d) { return (state.entries as Array<Record<string, unknown>>).filter((x) => x.dek_id === d).map((x) => ({ ...x, patient_id: p })) as never; },
     async withdraw(_p, w) {
       state.wraps = state.wraps.filter((x: any) => x.dek_id !== w.old_dek_id).concat(w.wraps);
       state.key.active_dek_id = w.new_dek_id;

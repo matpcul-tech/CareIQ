@@ -1,5 +1,8 @@
 "use client";
 
+import { DeviceLockedError, fetchTransport, NotEnrolledError, saveEncryptedForm } from "@/lib/e2e/forms";
+import { IndexedDbKeyStore } from "@/lib/e2e/keystore";
+import type { FormCategory } from "@/lib/e2e/scoring";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ADULT_A1C_PROMPT, adultA1cPrompt } from "@/lib/a1c-prompt";
@@ -143,13 +146,32 @@ async function postForm(path: string, form: FormData): Promise<Response> {
   });
 }
 
+const SETUP_MESSAGE = "Set up encryption on this device first. Open /secure-setup to save your recovery code, then come back.";
+
+/**
+ * While NEXT_PUBLIC_CAREIQ_CLIENT_ENC_V1 is on, forms are encrypted on this device and saved to
+ * /api/e2e/entries; LE8 band and alert severity are computed here. While off, the legacy route is used.
+ */
+async function saveForm(enc: boolean, path: string, category: FormCategory, payload: unknown): Promise<{ ok: boolean; setup?: boolean }> {
+  if (!enc) return { ok: (await postJson(path, payload)).ok };
+  try {
+    await saveEncryptedForm(category, payload, { transport: fetchTransport, keystore: new IndexedDbKeyStore() });
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof NotEnrolledError || e instanceof DeviceLockedError) return { ok: false, setup: true };
+    return { ok: false };
+  }
+}
+
 export default function OnboardClient(props: {
   initialStep: number;
   authenticated: boolean;
   expired: boolean;
   linkError: boolean;
   savedHistory?: SavedHistory | null;
+  encEnabled?: boolean;
 }) {
+  const enc = props.encEnabled === true;
   const router = useRouter();
   const [step, setStep] = useState<number>(props.initialStep);
   const [banner, setBanner] = useState<string>(() => {
@@ -190,13 +212,14 @@ export default function OnboardClient(props: {
       <section className="mx-auto mt-6 max-w-2xl card sm:p-7">
         {step === 1 && <Step1Email />}
         {step === 2 && (
-          <Step2Profile authenticated={props.authenticated} onDone={() => setStep(3)} />
+          <Step2Profile enc={enc} authenticated={props.authenticated} onDone={() => setStep(3)} />
         )}
         {step === 3 && (
-          <Step3History authenticated={props.authenticated} saved={props.savedHistory ?? null} onDone={() => setStep(4)} />
+          <Step3History enc={enc} authenticated={props.authenticated} saved={props.savedHistory ?? null} onDone={() => setStep(4)} />
         )}
         {step === 4 && (
           <Step4Upload
+            enc={enc}
             authenticated={props.authenticated}
             onDone={() => router.push("/dashboard")}
           />
@@ -434,11 +457,13 @@ function Step1Email() {
 }
 
 function Step2Profile({
+  enc,
   authenticated,
   onDone,
 }: {
   authenticated: boolean;
   onDone: () => void;
+  enc: boolean;
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -462,7 +487,7 @@ function Step2Profile({
     setBusy(true);
     setErr("");
     try {
-      const res = await postJson("/api/onboard/profile", {
+      const res = await saveForm(enc, "/api/onboard/profile", "profile", {
         firstName,
         lastName,
         dateOfBirth: dob,
@@ -470,7 +495,7 @@ function Step2Profile({
         communityAffiliation: community || undefined,
       });
       if (!res.ok) {
-        setErr("Could not save your profile. Please review your entries.");
+        setErr(res.setup ? SETUP_MESSAGE : "Could not save your profile. Please review your entries.");
       } else {
         onDone();
       }
@@ -485,7 +510,7 @@ function Step2Profile({
     <form onSubmit={submit} className="flex flex-col gap-3">
       <h1 className="text-2xl font-bold">Your profile</h1>
       <p className="text-ink-soft">
-        Encrypted on the server before storage. Community affiliation is optional and never required.
+        {enc ? "Encrypted on this device before it is sent." : "Encrypted on the server before storage."} Community affiliation is optional and never required.
       </p>
       <div className="flex flex-wrap gap-3">
         <div className="flex-1 min-w-[180px]">
@@ -555,6 +580,7 @@ function Step2Profile({
 }
 
 function Step3History({
+  enc,
   authenticated,
   saved,
   onDone,
@@ -562,6 +588,7 @@ function Step3History({
   authenticated: boolean;
   saved: SavedHistory | null;
   onDone: () => void;
+  enc: boolean;
 }) {
   const init = initialFormState(saved);
   const [conditions, setConditions] = useState<Set<string>>(new Set(init.conditions));
@@ -609,9 +636,9 @@ function Step3History({
         },
         saved,
       );
-      const res = await postJson("/api/onboard/health-history", payload);
+      const res = await saveForm(enc, "/api/onboard/health-history", "health_history", payload);
       if (!res.ok) {
-        setErr("Could not save your health history. Please try again.");
+        setErr(res.setup ? SETUP_MESSAGE : "Could not save your health history. Please try again.");
       } else {
         onDone();
       }
@@ -766,11 +793,13 @@ function todayIso(): string {
 }
 
 function Step4Upload({
+  enc,
   authenticated,
   onDone,
 }: {
   authenticated: boolean;
   onDone: () => void;
+  enc: boolean;
 }) {
   const [labStatus, setLabStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [autoFillStatus, setAutoFillStatus] = useState<{ ok: boolean; message: string } | null>(null);
@@ -1008,11 +1037,11 @@ function Step4Upload({
     setSavingLabs(true);
     setLabsStatus(null);
     try {
-      const res = await postJson("/api/onboard/manual-labs", payload);
+      const res = await saveForm(enc, "/api/onboard/manual-labs", "manual_labs", payload);
       if (!res.ok) {
         setLabsStatus({
           ok: false,
-          message: "Could not save lab values. Please review the numbers.",
+          message: res.setup ? SETUP_MESSAGE : "Could not save lab values. Please review the numbers.",
         });
         setSavingLabs(false);
         return;
