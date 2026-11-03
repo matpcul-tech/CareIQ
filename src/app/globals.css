@@ -99,7 +99,7 @@
     color: #d4a843;
   }
 
-  /* Top-right "ZK SHIELD ON" indicator used on landing + onboard. The
+  /* Top-right "SHIELD ON" indicator used on landing + onboard. The
      clinical OS has its own indicator inside CareIQHealthOS.tsx. */
   .zk-shield-pill {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em];
