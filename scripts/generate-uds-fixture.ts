@@ -22,6 +22,13 @@ for (let i = 1; i <= 50; i++) {
   if (rand() < 0.3) bps.push(`${date(2025)} ${int(120, 160)}/${int(70, 95)}`);
   const a1cs = dm ? Array.from({ length: int(0, 2) }, () => `${date(2026)} ${(5.6 + rand() * 6).toFixed(1)}`) : [];
   const sex = pick(["female", "male"]);
+  const phqDate = date(2026);
+  const phqScore = int(0, 18);
+  const phq = rand() < 0.7 ? `${phqDate} phq9 ${phqScore}` : "";
+  const phqFollow = phq && phqScore >= 10 && rand() < 0.5 ? phqDate : "";
+  const tobUser = rand() < 0.25;
+  const tob = rand() < 0.8 ? `${date(2026)} ${tobUser ? "user" : "nonuser"}` : "";
+  const tobInt = tob && tobUser && rand() < 0.5 ? date(2026) : "";
   const yn = (p: number) => (rand() < p ? "yes" : "no");
   const row = [
     `SYN-${String(i).padStart(4, "0")}`,
@@ -33,6 +40,21 @@ for (let i = 1; i <= 50; i++) {
     a1cs.join(";"),
     [date(2026)].join(";"),
     yn(0.04), yn(0.04), yn(0.1), yn(0.08), yn(0.03), yn(0.03), "no", "no", sex === "female" && birthYear > 1980 ? yn(0.1) : "no",
+    // Care gap columns, in template order.
+    sex,
+    sex === "female" && rand() < 0.6 ? date(int(2024, 2026)) : "",
+    rand() < 0.55 ? `${date(int(2017, 2026))} ${pick(["colonoscopy", "fit", "fit_dna", "ct_colonography", "flex_sig"])}` : "",
+    sex === "female" && rand() < 0.6 ? `${date(int(2021, 2026))} ${pick(["cytology", "hpv", "cotest"])}` : "",
+    phq,
+    phqFollow,
+    tob,
+    tobInt,
+    yn(0.12), yn(0.05), yn(0.15), yn(0.5),
+    sex === "female" ? yn(0.04) : "no",
+    sex === "female" ? yn(0.06) : "no",
+    yn(0.02), yn(0.02), yn(0.04), yn(0.04),
+    sex === "female" && birthYear > 1985 ? yn(0.05) : "no",
+    yn(0.02), yn(0.05),
   ];
   lines.push(row.map(csvCell).join(","));
 }

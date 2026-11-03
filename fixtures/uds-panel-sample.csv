@@ -1,51 +1,51 @@
-patient_id,birth_date,sex,diagnosis_codes,hypertension,diabetes,hypertension_onset,bp_readings,a1c_results,visit_dates,hospice,palliative_care,frailty,advanced_illness,long_term_care,esrd,dialysis,kidney_transplant,pregnancy
-SYN-0001,1981-02-28,female,E11.65,,,,,2026-05-24 11.1,2026-09-10,no,no,yes,no,no,no,no,no,no
-SYN-0002,1966-07-21,female,I10;E11.9,,,,2025-01-17 157/91,2026-04-11 5.7,2026-04-22,no,no,no,no,no,no,no,no,no
-SYN-0003,1986-07-20,female,I10,,,,2026-07-12 144/92;2026-01-09 150/77,,2026-10-13,no,yes,no,no,no,no,no,no,no
-SYN-0004,1938-10-27,female,I10;E11.65,,,,2026-09-02 122/75,,2026-09-10,no,no,no,no,no,no,no,no,no
-SYN-0005,1981-08-19,female,,,,,2025-03-05 142/79,,2026-12-09,no,no,no,no,no,no,no,no,no
-SYN-0006,2003-11-02,male,E10.9,,,,2026-12-13 132/75,2026-01-12 8.0;2026-10-07 9.5,2026-08-25,no,no,no,no,no,no,no,no,no
-SYN-0007,1980-01-13,male,I10;E11.9,,,,2026-10-12 129/89,2026-11-10 8.4;2026-10-20 7.4,2026-06-21,no,no,no,no,no,no,no,no,no
-SYN-0008,1977-05-10,female,I10,,,,,,2026-11-04,no,no,no,no,yes,no,no,no,no
-SYN-0009,1999-02-05,male,I10;E11.65,,,,2026-09-22 149/96;2026-05-09 126/96;2025-12-01 155/78,2026-05-28 10.4;2026-06-15 9.0,2026-11-18,no,no,no,no,no,no,no,no,no
-SYN-0010,1983-03-28,female,I10;E11.65;E78.5,,,,2026-06-06 168/84;2026-06-23 148/94;2025-11-16 125/93,2026-04-04 8.1,2026-02-19,no,yes,no,no,no,no,no,no,no
-SYN-0011,1971-09-11,female,E10.9,,,,2026-05-26 132/71;2026-05-20 129/80;2026-12-07 164/95,,2026-09-22,no,no,no,no,no,no,no,no,no
-SYN-0012,1980-01-05,female,E11.9,,,,2026-10-05 128/83,2026-02-17 10.1;2026-05-17 10.6,2026-03-23,no,no,no,no,no,no,no,no,no
-SYN-0013,2003-05-09,female,E11.65,,,,2026-11-25 121/76;2026-12-14 137/80,2026-05-24 8.6;2026-08-16 8.0,2026-03-23,no,no,no,no,no,no,no,no,no
-SYN-0014,1961-02-15,female,I10;E10.9,,,,,2026-12-15 6.6,2026-02-06,no,no,no,no,no,no,no,no,no
-SYN-0015,1948-03-08,female,I10,,,,2026-01-04 131/83;2026-07-16 142/89;2026-12-26 129/96,,2026-08-09,no,no,yes,no,no,no,no,no,no
-SYN-0016,1992-02-06,female,I10;E11.65,,,,2026-11-14 116/95,,2026-05-26,no,no,no,no,yes,no,no,no,no
-SYN-0017,2006-01-11,female,I10,,,,,,2026-02-27,no,no,no,no,yes,no,no,no,no
-SYN-0018,1970-12-01,male,E78.5,,,,2026-02-12 148/73;2026-06-10 167/80,,2026-05-05,no,no,no,no,no,no,no,no,no
-SYN-0019,1996-05-21,female,,,,,2026-03-11 117/79,,2026-12-23,no,no,no,no,no,no,no,no,no
-SYN-0020,1998-04-24,female,I10;E10.9,,,,2026-10-06 115/87;2026-07-23 154/98,,2026-10-06,no,no,no,no,no,no,no,no,no
-SYN-0021,1939-12-16,male,E78.5,,,,2026-06-08 168/98;2026-10-01 144/95;2026-01-22 136/72,,2026-02-03,no,no,no,no,no,no,no,no,no
-SYN-0022,2009-01-24,male,I10;E10.9,,,,2026-07-08 126/90;2026-04-24 116/74;2025-01-14 120/78,,2026-08-23,no,no,no,no,no,no,no,no,no
-SYN-0023,2008-11-05,female,E11.9,,,,2026-06-03 168/81;2025-05-03 158/77,,2026-05-23,no,no,yes,no,no,no,no,no,no
-SYN-0024,1993-04-14,female,I10;E11.65,,,,2026-05-25 164/69;2026-09-11 144/68;2026-03-25 142/74,2026-07-20 8.1,2026-06-18,yes,no,no,no,no,no,no,no,no
-SYN-0025,2001-10-23,male,I10;E11.9;E78.5,,,,2026-11-03 129/96;2026-01-19 142/91;2026-08-20 163/73,,2026-09-01,no,no,no,no,no,no,no,no,no
-SYN-0026,1953-02-02,male,,,,,2026-01-09 140/85;2026-10-09 129/94,,2026-04-10,no,no,no,no,no,no,no,no,no
-SYN-0027,1960-08-24,male,I10,,,,2026-04-09 164/90;2026-11-04 123/92,,2026-01-02,no,no,no,no,no,no,no,no,no
-SYN-0028,1969-01-15,male,E11.9,,,,2026-03-09 125/66;2025-06-22 120/75,2026-05-28 5.8,2026-01-02,no,no,no,yes,no,no,no,no,no
-SYN-0029,1967-01-20,female,I10;E78.5,,,,2026-12-10 125/98;2026-10-19 151/81,,2026-06-06,yes,no,no,no,no,no,no,no,no
-SYN-0030,1945-06-21,female,I10;E11.65,,,,2026-04-07 122/85;2025-11-12 151/81,,2026-01-20,no,no,no,no,no,no,no,no,no
-SYN-0031,1947-02-18,female,I10,,,,2025-11-19 146/88,,2026-03-21,no,no,no,no,no,no,no,no,no
-SYN-0032,1946-11-03,female,I10;E10.9,,,,2026-08-24 135/70;2026-12-11 147/66;2026-02-26 162/75,2026-04-17 8.8;2026-04-22 6.3,2026-12-22,no,no,no,no,no,no,no,no,no
-SYN-0033,2005-01-05,female,,,,,2025-11-28 142/92,,2026-02-10,no,no,no,no,no,no,no,no,no
-SYN-0034,1979-09-28,male,I10;E78.5,,,,2026-10-08 116/67,,2026-04-11,no,no,no,no,no,no,no,no,no
-SYN-0035,2001-11-12,female,E11.65,,,,2026-11-14 138/72;2026-02-21 124/87;2026-01-22 164/96,2026-08-11 8.3;2026-04-07 9.8,2026-05-15,no,no,no,no,no,no,no,no,no
-SYN-0036,1985-03-27,female,I10;E78.5,,,,2026-11-13 122/97;2026-05-14 133/78;2026-04-02 167/96,,2026-11-18,no,no,no,no,no,no,no,no,no
-SYN-0037,1949-06-02,female,I10;E10.9,,,,2026-02-06 115/74;2026-05-02 146/90;2025-04-17 141/74,2026-06-17 8.4,2026-11-03,no,yes,no,no,no,no,no,no,no
-SYN-0038,2005-09-28,female,,,,,2026-11-24 159/87;2026-07-20 157/69;2026-07-11 150/98;2025-11-15 122/75,,2026-07-18,no,no,no,no,no,no,no,no,no
-SYN-0039,1963-04-10,female,I10;E10.9,,,,2026-03-26 115/98,2026-02-19 7.5,2026-09-12,no,no,no,no,no,no,no,no,no
-SYN-0040,2010-04-26,male,E78.5,,,,2026-08-04 130/97;2026-01-04 146/78;2026-04-11 121/79,,2026-01-19,no,no,no,no,no,no,no,no,no
-SYN-0041,1943-02-02,female,,,,,2026-10-23 127/70;2026-03-20 150/87,,2026-02-17,no,no,no,no,no,no,no,no,no
-SYN-0042,2004-08-27,male,I10,,,,2026-03-17 118/98;2026-08-09 166/94;2026-05-19 155/84,,2026-03-11,no,no,no,no,no,no,no,no,no
-SYN-0043,1947-05-14,female,E11.9,,,,2026-11-21 132/95;2026-10-03 140/84;2026-01-16 143/73;2025-03-05 132/95,2026-03-23 7.5;2026-06-02 8.4,2026-12-17,no,no,no,no,no,no,no,no,no
-SYN-0044,1993-01-20,female,I10,,,,,,2026-07-05,no,no,no,no,no,no,no,no,no
-SYN-0045,2002-12-09,male,E11.65,,,,,2026-09-14 8.9;2026-04-15 5.8,2026-03-07,no,no,no,no,no,no,no,no,no
-SYN-0046,1962-07-09,male,I10,,,,2026-09-04 139/66,,2026-07-07,no,no,no,no,no,no,no,no,no
-SYN-0047,1941-09-16,male,E10.9,,,,2026-06-04 121/74;2026-11-18 154/77;2026-07-05 112/75,2026-09-11 8.8,2026-06-26,no,no,no,no,no,no,no,no,no
-SYN-0048,1970-02-03,male,I10;E10.9,,,,,2026-04-08 9.1,2026-11-25,no,no,no,no,no,no,no,no,no
-SYN-0049,2010-07-13,male,I10;E10.9,,,,2026-09-25 146/92,2026-11-23 8.8;2026-10-26 10.6,2026-02-17,no,no,no,no,no,no,no,no,no
-SYN-0050,1965-01-14,female,I10,,,,,,2026-11-05,no,no,no,no,no,no,no,no,no
+patient_id,birth_date,sex,diagnosis_codes,hypertension,diabetes,hypertension_onset,bp_readings,a1c_results,visit_dates,hospice,palliative_care,frailty,advanced_illness,long_term_care,esrd,dialysis,kidney_transplant,pregnancy,sex_at_birth,mammogram_dates,colorectal_screenings,cervical_screenings,phq_results,depression_followup_dates,tobacco_screenings,tobacco_intervention_dates,ascvd,ldl_190_or_fh,ascvd_risk_20,statin,bilateral_mastectomy,hysterectomy,colorectal_cancer,total_colectomy,bipolar,depression_screen_exception,breastfeeding,rhabdomyolysis,statin_exception
+SYN-0001,1981-06-10,female,E11.65,,,,,2026-05-24 11.1,2026-05-02,no,no,no,no,yes,no,no,no,no,female,,,,2026-02-28 phq9 12,2026-02-28,2026-02-02 nonuser,,no,no,yes,yes,no,no,no,no,no,no,no,no,no
+SYN-0002,1985-03-20,female,,,,,2026-12-15 143/79;2026-07-23 112/76,,2026-12-16,yes,no,no,no,no,no,no,no,no,female,2024-04-16,2021-10-27 ct_colonography,2021-06-27 cotest,2026-09-09 phq9 10,,2026-01-17 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0003,1941-11-03,male,,,,,2026-04-09 135/90,,2026-05-12,no,no,no,no,no,no,no,no,no,male,,,,2026-09-26 phq9 15,,2026-12-13 user,2026-04-15,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0004,1943-09-24,male,E10.9,,,,2026-09-11 153/95,2026-10-20 7.4,2026-10-21,no,no,no,no,yes,no,no,no,no,male,,2020-05-26 colonoscopy,,,,,,yes,no,yes,yes,no,no,yes,no,no,no,no,no,no
+SYN-0005,2001-02-05,female,,,,,2026-12-11 130/74;2026-12-04 167/66,,2026-11-18,no,no,no,no,no,no,no,no,no,female,2025-06-01,,2022-12-17 hpv,,,2026-07-20 nonuser,,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0006,1951-05-05,female,E11.65,,,,,2026-09-14 10.6,2026-05-20,no,no,no,no,no,no,no,no,no,female,2024-01-20,2023-10-26 flex_sig,2025-08-18 hpv,2026-09-04 phq9 14,,,,no,yes,no,no,no,no,no,no,no,no,no,no,no
+SYN-0007,1981-02-10,female,E11.65,,,,2025-03-07 152/73,2026-04-14 11.0,2026-12-14,no,no,no,no,no,no,no,no,no,female,,,2023-05-09 cytology,2026-11-23 phq9 5,,2026-11-25 nonuser,,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0008,2001-07-15,female,I10,,,,2026-07-05 138/71;2026-07-03 123/72;2026-05-17 162/92,,2026-09-28,no,no,no,no,no,no,no,no,no,female,,2021-08-02 ct_colonography,2026-09-13 hpv,,,2026-05-15 user,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0009,2003-06-20,female,I10;E11.65,,,,2025-08-27 132/92,2026-02-21 8.2,2026-08-05,no,no,no,no,no,no,no,no,no,female,,2020-09-27 colonoscopy,2021-02-06 hpv,2026-05-05 phq9 18,,2026-01-19 user,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0010,1954-08-10,male,I10,,,,2026-01-22 159/85;2026-07-07 153/93;2026-06-02 151/94,,2026-03-09,no,no,no,no,no,no,no,no,no,male,,2024-10-28 colonoscopy,,2026-03-02 phq9 12,,,,no,no,no,no,no,no,no,no,no,no,no,no,yes
+SYN-0011,1979-04-22,female,E10.9,,,,,2026-12-16 6.3,2026-09-16,no,no,no,no,no,no,no,no,no,female,2024-03-01,2017-04-03 flex_sig,2026-08-23 hpv,2026-12-19 phq9 2,,2026-12-10 nonuser,,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0012,1943-06-08,male,E78.5,,,,2026-01-27 128/70;2025-11-05 133/90,,2026-10-10,no,no,no,no,no,no,no,no,no,male,,2018-11-16 fit,,2026-06-02 phq9 13,,2026-07-07 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0013,1940-11-07,female,I10,,,,2026-10-20 161/66;2026-01-07 116/98,,2026-06-09,no,no,no,no,yes,no,no,no,no,female,2026-08-22,,2024-06-21 cotest,2026-04-27 phq9 0,,2026-08-20 nonuser,,yes,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0014,1960-02-15,female,I10;E11.9,,,,2026-06-24 129/67;2026-10-13 148/74;2026-04-26 155/95;2025-03-23 143/95,2026-10-03 6.0,2026-05-07,no,no,yes,yes,no,no,no,no,no,female,2024-07-11,,2026-01-15 cytology,2026-07-14 phq9 2,,2026-08-03 nonuser,,yes,no,no,no,yes,no,no,no,no,no,no,yes,no
+SYN-0015,2006-08-05,female,I10;E10.9,,,,2026-09-14 154/71;2026-01-20 136/72;2025-03-23 139/87,,2026-11-12,no,no,yes,no,no,no,no,no,yes,female,,,2023-10-16 cytology,,,2026-03-06 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0016,1954-04-22,female,E11.65,,,,2026-02-02 118/82;2025-12-12 151/86,2026-05-04 11.3;2026-05-18 5.7,2026-02-03,no,no,no,no,no,no,no,no,no,female,,2021-09-27 flex_sig,,,,2026-07-15 nonuser,,no,no,yes,no,no,no,no,no,yes,no,no,no,no
+SYN-0017,1962-02-18,male,I10,,,,2026-02-25 144/81;2026-08-01 136/91;2026-04-03 114/80,,2026-11-22,no,no,no,no,no,no,no,no,no,male,,2023-01-22 flex_sig,,,,2026-12-26 user,2026-11-21,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0018,2000-04-02,male,I10;E11.65,,,,2026-12-18 147/83,2026-05-27 6.2,2026-12-27,no,no,no,no,no,no,no,no,no,male,,2017-05-17 flex_sig,,,,2026-05-11 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0019,1941-03-22,female,I10;E11.9,,,,2026-02-09 146/83;2026-02-16 137/85,,2026-02-26,no,no,no,no,no,no,no,no,no,female,,,2025-10-03 hpv,,,,,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0020,1984-05-28,female,,,,,2026-05-28 164/77;2026-05-05 166/87,,2026-03-07,no,no,yes,no,no,no,no,no,yes,female,,,2022-12-03 cytology,2026-11-02 phq9 18,2026-11-02,2026-04-03 user,2026-05-21,no,no,no,yes,no,no,no,no,no,no,no,yes,no
+SYN-0021,1975-10-18,female,E10.9,,,,2026-01-28 147/96;2026-08-23 157/75;2025-03-20 147/86,,2026-11-11,no,no,no,no,no,no,no,no,no,female,,,2026-11-12 hpv,2026-02-02 phq9 2,,2026-08-12 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0022,2003-12-07,male,I10;E10.9,,,,2026-10-23 164/90,2026-10-03 8.6;2026-07-02 8.9,2026-10-09,no,no,no,no,no,no,no,no,no,male,,,,2026-03-03 phq9 3,,,,no,no,yes,no,no,no,no,no,no,no,no,no,no
+SYN-0023,1974-11-26,male,I10;E78.5,,,,,,2026-01-13,no,no,no,no,no,no,no,no,no,male,,,,2026-03-05 phq9 8,,2026-07-09 nonuser,,no,no,yes,no,no,no,no,no,no,no,no,no,no
+SYN-0024,1978-07-20,female,I10;E11.9,,,,,2026-06-20 6.3,2026-05-14,no,no,no,no,no,no,no,no,no,female,2024-02-08,,,2026-01-16 phq9 12,2026-01-16,2026-12-10 nonuser,,no,no,no,yes,yes,no,no,no,no,no,no,no,no
+SYN-0025,1989-02-13,male,I10,,,,,,2026-08-09,no,no,no,no,no,no,no,no,no,male,,,,2026-03-02 phq9 8,,2026-09-13 nonuser,,no,yes,no,no,no,no,no,no,no,no,no,no,no
+SYN-0026,1988-03-21,male,I10,,,,2026-10-23 163/94;2026-10-16 155/95,,2026-10-07,no,no,yes,no,no,no,no,no,no,male,,2018-10-13 flex_sig,,2026-07-13 phq9 2,,2026-10-21 user,2026-11-11,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0027,2003-01-06,female,I10;E10.9,,,,2026-09-06 137/96;2026-12-15 147/79;2025-06-08 155/91,2026-05-16 10.2;2026-06-08 6.8,2026-09-22,no,no,no,no,no,no,no,no,no,female,2025-06-06,,,2026-03-21 phq9 10,2026-03-21,2026-02-16 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0028,1960-12-28,female,,,,,2026-01-01 141/77,,2026-12-01,no,no,no,no,no,no,no,no,no,female,,2018-11-20 fit_dna,2026-12-23 hpv,2026-12-25 phq9 6,,2026-05-01 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0029,1963-04-08,female,I10,,,,2026-03-25 112/83;2026-01-10 118/71,,2026-08-22,no,no,yes,no,no,no,no,no,no,female,,,2025-10-18 cytology,,,2026-09-21 user,2026-05-01,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0030,2002-12-23,female,,,,,2026-09-26 162/93,,2026-03-13,yes,no,no,no,no,no,no,no,yes,female,2025-06-11,2022-06-25 fit_dna,,2026-02-10 phq9 9,,,,yes,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0031,2009-08-09,female,E10.9,,,,2026-01-14 119/94;2026-10-12 139/90,2026-10-10 9.5,2026-09-22,no,yes,no,yes,no,no,no,no,no,female,,2024-08-05 colonoscopy,,,,2026-05-02 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0032,1966-01-07,male,I10,,,,2026-11-01 136/98;2026-01-10 151/78;2026-03-08 114/79,,2026-06-06,no,no,no,no,no,no,no,no,no,male,,,,,,2026-02-28 nonuser,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0033,1991-01-26,female,I10;E78.5,,,,2026-02-15 146/75,,2026-05-17,no,no,no,no,no,no,no,no,no,female,2026-01-14,2025-10-09 ct_colonography,,2026-01-10 phq9 8,,,,no,no,no,yes,yes,no,no,no,no,no,no,no,no
+SYN-0034,1945-11-05,female,E11.9,,,,2026-08-06 139/97;2025-01-08 150/81,2026-09-11 6.3;2026-10-03 10.1,2026-04-08,no,no,no,yes,no,no,no,no,no,female,,2024-08-16 ct_colonography,,,,,,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0035,1998-07-24,female,I10,,,,2026-08-04 158/75;2026-12-24 164/90,,2026-06-02,no,no,no,no,no,no,no,no,no,female,2024-06-10,,2022-08-02 hpv,2026-05-21 phq9 5,,2026-11-02 nonuser,,yes,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0036,1993-10-11,male,E10.9,,,,,2026-10-21 7.5;2026-02-10 7.4,2026-06-17,no,yes,no,no,no,no,no,no,no,male,,,,2026-05-02 phq9 6,,2026-07-19 nonuser,,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0037,1967-03-17,male,I10,,,,,,2026-02-18,no,no,no,yes,no,no,no,no,no,male,,,,2026-02-13 phq9 17,2026-02-13,2026-12-04 nonuser,,no,yes,yes,no,no,no,no,no,no,no,no,no,no
+SYN-0038,1993-05-08,female,I10;E11.65;E78.5,,,,2026-03-04 127/90;2026-11-13 121/75;2026-01-02 120/86;2025-10-25 159/91,2026-03-12 6.7;2026-06-02 11.6,2026-02-13,no,no,no,no,no,no,no,no,no,female,2026-05-28,,2026-05-15 hpv,2026-09-14 phq9 6,,2026-03-20 user,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0039,2003-09-15,male,,,,,2026-10-20 151/97,,2026-02-08,no,no,no,no,yes,no,no,no,no,male,,,,2026-01-04 phq9 8,,2026-05-03 user,2026-10-15,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0040,1969-12-27,male,I10,,,,,,2026-01-04,no,no,no,yes,no,no,no,no,no,male,,,,2026-04-14 phq9 8,,,,no,no,yes,yes,no,no,no,no,no,no,no,no,no
+SYN-0041,1963-12-18,male,,,,,2025-09-02 146/78,,2026-03-08,no,no,no,no,no,no,no,no,no,male,,,,2026-01-28 phq9 10,,2026-07-04 user,2026-02-03,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0042,1959-11-16,male,I10;E11.9,,,,2026-09-22 131/91;2026-04-03 129/81;2026-12-18 119/93;2025-04-20 138/76,2026-10-07 10.1;2026-08-03 8.8,2026-07-13,no,no,yes,no,no,no,no,no,no,male,,,,2026-08-23 phq9 1,,,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0043,1965-06-07,male,I10;E11.9,,,,2026-07-28 117/84,2026-01-06 10.0;2026-04-17 11.0,2026-10-20,no,no,no,no,no,no,no,no,no,male,,2019-03-27 colonoscopy,,,,,,yes,yes,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0044,1984-03-07,female,,,,,2025-02-09 128/76,,2026-03-28,no,no,no,no,no,no,no,no,no,female,2024-05-02,2025-12-21 flex_sig,2026-02-02 hpv,2026-10-10 phq9 8,,2026-03-02 user,2026-03-05,no,no,yes,no,no,no,no,no,no,no,no,no,no
+SYN-0045,2001-10-14,male,,,,,2026-07-03 131/79,,2026-02-03,no,no,no,no,no,no,no,no,no,male,,,,,,2026-05-20 nonuser,,no,no,no,yes,no,no,no,no,no,no,no,no,no
+SYN-0046,2004-10-01,male,I10,,,,,,2026-12-27,no,no,no,yes,no,no,no,no,no,male,,,,2026-08-09 phq9 11,,,,no,no,no,yes,no,no,no,yes,no,no,no,no,no
+SYN-0047,2004-10-22,female,I10;E11.65,,,,2026-12-19 129/70;2026-01-07 119/76;2026-03-06 167/73,,2026-03-19,no,no,no,no,no,no,no,no,yes,female,,2026-01-06 fit,2022-10-23 cytology,2026-11-26 phq9 8,,,,no,no,no,yes,yes,no,no,no,no,no,no,no,no
+SYN-0048,1956-12-17,male,E11.9;E78.5,,,,2026-09-28 159/87;2026-08-13 129/73;2026-09-19 128/97,2026-02-20 6.2;2026-02-12 9.9,2026-08-25,no,no,no,no,no,no,no,no,no,male,,2022-06-05 flex_sig,,2026-02-01 phq9 3,,2026-09-27 user,,no,no,yes,yes,no,no,no,no,no,no,no,no,no
+SYN-0049,1954-10-27,male,E11.65,,,,2026-06-15 149/69;2026-11-01 144/93;2026-08-17 155/97,2026-11-05 7.3,2026-09-06,no,no,no,no,no,no,no,no,no,male,,2025-10-02 colonoscopy,,2026-07-22 phq9 17,,,,no,no,no,no,no,no,no,no,no,no,no,no,no
+SYN-0050,1989-04-11,female,E11.9,,,,2026-03-20 126/88;2026-03-20 118/85,,2026-07-20,no,no,no,yes,no,no,no,no,no,female,,2019-06-13 fit_dna,2023-07-21 cytology,,,2026-11-08 nonuser,,no,no,no,no,no,yes,no,no,no,no,no,no,no

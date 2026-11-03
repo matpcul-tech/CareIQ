@@ -27,7 +27,28 @@ export type FieldKey =
   | "esrd"
   | "dialysis"
   | "kidney_transplant"
-  | "pregnancy";
+  | "pregnancy"
+  | "sex_at_birth"
+  | "mammogram_dates"
+  | "colorectal_screenings"
+  | "cervical_screenings"
+  | "phq_results"
+  | "depression_followup_dates"
+  | "tobacco_screenings"
+  | "tobacco_intervention_dates"
+  | "ascvd"
+  | "ldl_190_or_fh"
+  | "ascvd_risk_20"
+  | "statin"
+  | "bilateral_mastectomy"
+  | "hysterectomy"
+  | "colorectal_cancer"
+  | "total_colectomy"
+  | "bipolar"
+  | "depression_screen_exception"
+  | "breastfeeding"
+  | "rhabdomyolysis"
+  | "statin_exception";
 
 export interface FieldSpec {
   key: FieldKey;
@@ -57,6 +78,27 @@ export const FIELDS: FieldSpec[] = [
   { key: "dialysis", label: "Dialysis", required: false, help: "yes or no", aliases: [] },
   { key: "kidney_transplant", label: "Kidney transplant", required: false, help: "yes or no", aliases: ["transplant"] },
   { key: "pregnancy", label: "Pregnancy", required: false, help: "yes or no", aliases: ["pregnant"] },
+  { key: "sex_at_birth", label: "Sex at birth", required: false, help: "female, male, or blank (falls back to Sex)", aliases: ["birth_sex"] },
+  { key: "mammogram_dates", label: "Mammogram dates", required: false, help: "dates separated by ;", aliases: ["mammograms"] },
+  { key: "colorectal_screenings", label: "Colorectal screenings", required: false, help: "date type separated by ; types colonoscopy, fit, fit_dna, ct_colonography, flex_sig", aliases: ["crc_screenings"] },
+  { key: "cervical_screenings", label: "Cervical screenings", required: false, help: "date type separated by ; types cytology, hpv, cotest", aliases: ["pap_hpv"] },
+  { key: "phq_results", label: "PHQ results", required: false, help: "date tool score separated by ; e.g. 2026-03-01 phq9 12", aliases: ["phq"] },
+  { key: "depression_followup_dates", label: "Depression follow-up plan dates", required: false, help: "dates separated by ;", aliases: ["depression_followup"] },
+  { key: "tobacco_screenings", label: "Tobacco screenings", required: false, help: "date user or date nonuser separated by ;", aliases: ["tobacco"] },
+  { key: "tobacco_intervention_dates", label: "Tobacco cessation intervention dates", required: false, help: "dates separated by ;", aliases: ["cessation_dates"] },
+  { key: "ascvd", label: "Clinical ASCVD", required: false, help: "yes or no", aliases: [] },
+  { key: "ldl_190_or_fh", label: "LDL 190 or more, or familial hypercholesterolemia", required: false, help: "yes or no", aliases: ["ldl190"] },
+  { key: "ascvd_risk_20", label: "10-year ASCVD risk 20 percent or more", required: false, help: "yes or no", aliases: [] },
+  { key: "statin", label: "Statin active or ordered in period", required: false, help: "yes or no", aliases: ["statin_therapy"] },
+  { key: "bilateral_mastectomy", label: "Bilateral mastectomy", required: false, help: "yes or no", aliases: [] },
+  { key: "hysterectomy", label: "Hysterectomy, no residual cervix", required: false, help: "yes or no", aliases: [] },
+  { key: "colorectal_cancer", label: "Colorectal cancer", required: false, help: "yes or no", aliases: [] },
+  { key: "total_colectomy", label: "Total colectomy", required: false, help: "yes or no", aliases: [] },
+  { key: "bipolar", label: "Bipolar disorder", required: false, help: "yes or no", aliases: [] },
+  { key: "depression_screen_exception", label: "Depression screen exception", required: false, help: "yes or no (patient refused or medical reason)", aliases: [] },
+  { key: "breastfeeding", label: "Breastfeeding", required: false, help: "yes or no", aliases: [] },
+  { key: "rhabdomyolysis", label: "Rhabdomyolysis", required: false, help: "yes or no", aliases: [] },
+  { key: "statin_exception", label: "Statin exception", required: false, help: "yes or no (allergy, muscle symptoms, liver disease, medical reason)", aliases: [] },
 ];
 
 export type ColumnMapping = Partial<Record<FieldKey, number>>;
@@ -67,6 +109,8 @@ export function templateCsv(): string {
   const example = [
     "SYN-0001", "1970-05-14", "female", "I10;E11.9", "", "", "", "2026-02-03 148/92;2026-09-12 134/82",
     "2026-03-01 8.1;2026-08-20 9.4", "2026-02-03;2026-09-12", "no", "no", "no", "no", "no", "no", "no", "no", "no",
+    "female", "2025-11-10", "2024-06-01 fit_dna", "2023-04-15 cotest", "2026-02-03 phq9 12", "2026-02-04",
+    "2026-02-03 user", "2026-02-03", "no", "no", "no", "yes", "no", "no", "no", "no", "no", "no", "no", "no", "no",
   ];
   return `${TEMPLATE_HEADERS.join(",")}\n${example.map(csvCell).join(",")}\n`;
 }
@@ -147,6 +191,16 @@ export function codesImply(codes: string[]): { hypertension: boolean; diabetes: 
   };
 }
 
+const BOOL_KEYS: FieldKey[] = [
+  "hypertension", "diabetes", "hospice", "palliative_care", "frailty", "advanced_illness", "long_term_care", "esrd",
+  "dialysis", "kidney_transplant", "pregnancy", "ascvd", "ldl_190_or_fh", "ascvd_risk_20", "statin",
+  "bilateral_mastectomy", "hysterectomy", "colorectal_cancer", "total_colectomy", "bipolar",
+  "depression_screen_exception", "breastfeeding", "rhabdomyolysis", "statin_exception",
+];
+
+const COLORECTAL = new Set(["colonoscopy", "fit", "fit_dna", "ct_colonography", "flex_sig"]);
+const CERVICAL = new Set(["cytology", "hpv", "cotest"]);
+
 const SEX = new Set(["female", "male", "other", "unknown"]);
 
 export function parsePanelCsv(text: string, mapping?: ColumnMapping): ParseResult {
@@ -186,7 +240,7 @@ export function parsePanelCsv(text: string, mapping?: ColumnMapping): ParseResul
     if (!SEX.has(sex)) messages.push("Sex must be female, male, other, or blank.");
 
     const flags: Partial<Record<FieldKey, boolean>> = {};
-    for (const key of ["hypertension", "diabetes", "hospice", "palliative_care", "frailty", "advanced_illness", "long_term_care", "esrd", "dialysis", "kidney_transplant", "pregnancy"] as FieldKey[]) {
+    for (const key of BOOL_KEYS) {
       const b = parseBool(get(cells, key));
       if (b === null) messages.push(`${FIELDS.find((f) => f.key === key)!.label} must be yes or no.`);
       flags[key] = b === true;
@@ -218,6 +272,52 @@ export function parsePanelCsv(text: string, mapping?: ColumnMapping): ParseResul
       else visitDates.push(item);
     }
 
+    const sabRaw = get(cells, "sex_at_birth").toLowerCase();
+    const sexAtBirth = sabRaw === "f" || sabRaw === "female" ? "female" : sabRaw === "m" || sabRaw === "male" ? "male" : null;
+    if (sabRaw && !sexAtBirth) messages.push("Sex at birth must be female, male, or blank.");
+    const dateList = (key: FieldKey, label: string) => {
+      const out: string[] = [];
+      for (const item of splitList(get(cells, key))) {
+        if (!isIsoDate(item)) messages.push(`${label} "${item}" must be YYYY-MM-DD.`);
+        else out.push(item);
+      }
+      return out;
+    };
+    const mammograms = dateList("mammogram_dates", "Mammogram date");
+    const depressionFollowUps = dateList("depression_followup_dates", "Depression follow-up date");
+    const tobaccoInterventions = dateList("tobacco_intervention_dates", "Tobacco intervention date");
+    const typed = (key: FieldKey, allowed: Set<string>, label: string) => {
+      const out: { date: string; type: string }[] = [];
+      for (const item of splitList(get(cells, key))) {
+        const m = item.match(/^(\d{4}-\d{2}-\d{2})\s+([a-z_]+)$/i);
+        if (!m || !isIsoDate(m[1]) || !allowed.has(m[2].toLowerCase())) {
+          messages.push(`${label} "${item}" must look like 2026-03-01 ${[...allowed][0]}.`);
+          continue;
+        }
+        out.push({ date: m[1], type: m[2].toLowerCase() });
+      }
+      return out;
+    };
+    const colorectalScreens = typed("colorectal_screenings", COLORECTAL, "Colorectal screening") as PanelPatient["colorectalScreens"];
+    const cervicalScreens = typed("cervical_screenings", CERVICAL, "Cervical screening") as PanelPatient["cervicalScreens"];
+    const phqResults: NonNullable<PanelPatient["phqResults"]> = [];
+    for (const item of splitList(get(cells, "phq_results"))) {
+      const m = item.match(/^(\d{4}-\d{2}-\d{2})\s+(phq2|phq9)\s+(\d{1,2})$/i);
+      const tool = m ? (m[2].toLowerCase() as "phq2" | "phq9") : "phq9";
+      const score = m ? Number(m[3]) : -1;
+      if (!m || !isIsoDate(m[1]) || score > (tool === "phq2" ? 6 : 27)) {
+        messages.push(`PHQ result "${item}" must look like 2026-03-01 phq9 12 (PHQ-2 0 to 6, PHQ-9 0 to 27).`);
+        continue;
+      }
+      phqResults.push({ date: m[1], tool, score });
+    }
+    const tobaccoScreens: NonNullable<PanelPatient["tobaccoScreens"]> = [];
+    for (const item of splitList(get(cells, "tobacco_screenings"))) {
+      const m = item.match(/^(\d{4}-\d{2}-\d{2})\s+(user|nonuser|non_user)$/i);
+      if (!m || !isIsoDate(m[1])) { messages.push(`Tobacco screening "${item}" must look like 2026-03-01 user or 2026-03-01 nonuser.`); continue; }
+      tobaccoScreens.push({ date: m[1], user: m[2].toLowerCase() === "user" });
+    }
+
     if (messages.length) { errors.push({ row: r, patientId, messages }); continue; }
     seen.add(patientId);
     patients.push({
@@ -239,6 +339,27 @@ export function parsePanelCsv(text: string, mapping?: ColumnMapping): ParseResul
       dialysis: flags.dialysis,
       kidneyTransplant: flags.kidney_transplant,
       pregnancy: flags.pregnancy,
+      sexAtBirth,
+      mammograms,
+      colorectalScreens,
+      cervicalScreens,
+      phqResults,
+      depressionFollowUps,
+      tobaccoScreens,
+      tobaccoInterventions,
+      ascvd: flags.ascvd,
+      ldl190OrFh: flags.ldl_190_or_fh,
+      ascvdRisk20: flags.ascvd_risk_20,
+      statin: flags.statin,
+      bilateralMastectomy: flags.bilateral_mastectomy,
+      hysterectomy: flags.hysterectomy,
+      colorectalCancer: flags.colorectal_cancer,
+      totalColectomy: flags.total_colectomy,
+      bipolar: flags.bipolar,
+      depressionScreenException: flags.depression_screen_exception,
+      breastfeeding: flags.breastfeeding,
+      rhabdomyolysis: flags.rhabdomyolysis,
+      statinException: flags.statin_exception,
     });
   }
   return { patients, errors, mappingErrors };
@@ -257,10 +378,12 @@ const STATUS_TEXT: Record<string, string> = {
   missing_reading: "missing reading",
   excluded: "excluded",
   not_in_denominator: "",
+  met: "met",
+  due: "due",
 };
 
-export function gapListCsv(rows: PanelRow[]): string {
-  const header = ["patient_id", "age", "cms165_status", "last_bp_date", "last_bp", "cms122_status", "last_a1c_date", "last_a1c"];
+export function gapListCsv(rows: (PanelRow & { gapsDue?: string[] })[]): string {
+  const header = ["patient_id", "age", "gaps_due", "cms165_status", "last_bp_date", "last_bp", "cms122_status", "last_a1c_date", "last_a1c"];
   const lines = [header.join(",")];
   for (const row of rows.filter((r) => r.needsOutreach)) {
     const bp = row.cms165.latest as BpReading | null;
@@ -268,6 +391,7 @@ export function gapListCsv(rows: PanelRow[]): string {
     lines.push([
       row.patientId,
       row.age,
+      (row.gapsDue || []).join("; "),
       STATUS_TEXT[row.cms165.status],
       bp?.date ?? "",
       bp ? `${bp.systolic}/${bp.diastolic}` : "",
