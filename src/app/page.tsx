@@ -10,7 +10,7 @@ export default function Home() {
 
   return (
     <main className="relative flex min-h-screen flex-col bg-sov-bg text-ink">
-      {/* Top bar: wordmark + ZK Shield indicator (always visible) */}
+      {/* Top bar: wordmark + Prompt Shield indicator (always visible) */}
       <header className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-between px-6 pt-6 sm:pt-8">
         <div className="flex items-center gap-3">
           <span
