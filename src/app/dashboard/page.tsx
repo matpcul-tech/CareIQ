@@ -1,3 +1,4 @@
+import { resolveLabs } from "@/lib/lab-values";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
@@ -35,6 +36,7 @@ interface HistoryPlaintext {
   allergies?: string;
   familyHistory?: string;
   manualLabs?: ManualLabs;
+  biomarkers?: Record<string, unknown>;
 }
 
 interface DailyMetric {
@@ -89,7 +91,7 @@ export default async function DashboardPage() {
     }
   }
 
-  const manualLabs: ManualLabs = history?.manualLabs ?? {};
+  const manualLabs: ManualLabs = resolveLabs(history);
 
   const { data: labRows } = await sb
     .from("lab_files")
