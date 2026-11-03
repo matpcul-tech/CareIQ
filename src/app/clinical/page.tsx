@@ -1,5 +1,5 @@
 import { isAiEnabled } from "@/lib/ai-flag";
-import { glucoseRangeSentence, glucoseRangeLabel, kdigoGStage, kdigoSentence, PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
+import { buildRiskInputs, glucoseRangeSentence, glucoseRangeLabel, kdigoGStage, kdigoSentence } from "@/lib/clinical-info";
 import { resolveLabs } from "@/lib/lab-values";
 import { bmiFromUs, scoreLe8, type Le8Input } from "@/lib/le8";
 import { weightLbForLe8 } from "@/lib/wearable/model";
@@ -361,8 +361,16 @@ function buildClinicalData(args: {
     activity,
     glucoseNote: glucoseLabel ? glucoseRangeSentence(glucoseLabel) : null,
     kdigoNote: gStage && manual.egfr != null ? kdigoSentence(gStage, manual.egfr) : null,
-    preventTodo: PREVENT_TODO,
-    uspstfTodo: USPSTF_TODO,
+    riskInputs: buildRiskInputs({
+      age: ageFromDob(profile?.dateOfBirth),
+      sex,
+      labs: manual,
+      conditions: history?.chronicConditions ?? null,
+      nicotine: history?.le8?.nicotine,
+      bpTreated: history?.le8?.bpTreated,
+      lipidTreated: history?.le8?.lipidTreated,
+      bmi: planBmi,
+    }),
   };
   return result;
 }

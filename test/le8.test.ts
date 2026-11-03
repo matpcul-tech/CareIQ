@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { glucoseRangeLabel, glucoseRangeSentence, kdigoGStage, kdigoSentence, PREVENT_TODO, USPSTF_TODO } from "../src/lib/clinical-info";
+import { glucoseRangeLabel, glucoseRangeSentence, kdigoGStage, kdigoSentence } from "../src/lib/clinical-info";
 import {
   activityScore,
   bmiScore,
@@ -231,6 +231,4 @@ test("glucose wording and KDIGO stage stay non-diagnostic", () => {
   const kidney = kdigoSentence("G2", 72);
   assert.match(kidney, /G2/);
   assert.equal(kidney.includes("you have"), false);
-  assert.match(PREVENT_TODO, /^TODO: PREVENT/);
-  assert.match(USPSTF_TODO, /^TODO: A USPSTF/);
 });
