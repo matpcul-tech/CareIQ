@@ -29,4 +29,5 @@ export {
 } from "./ranges";
 
 export { phraseFor } from "./phrases";
+export { buildHealthNarrative, type NarrativeInput, type NarrativeLabs } from "./narrative";
 export { DISCLAIMER, finishOutput, wordingProblems } from "./wording";
