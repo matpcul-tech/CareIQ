@@ -2,6 +2,7 @@
 -- Tokens are random 256 bit values shown once; only their SHA-256 hash is stored.
 -- Redemption is a single UPDATE ... WHERE used_at is null and expires_at > now(), so a token works once.
 -- Direct table access is denied; the CareIQ server uses the service role.
+-- Numbered 0019: 0016 is e2e patient keys (PR 44), 0017 and 0018 are used by open PRs 45 and 47.
 -- NOT APPLIED. Needs owner approval before running against komimlqbxekranbijtat.
 
 create table if not exists public.clinic_setup_tokens (

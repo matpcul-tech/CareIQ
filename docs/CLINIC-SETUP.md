@@ -4,7 +4,7 @@ No manual SQL is needed to start a clinic.
 
 ## Before the first clinic
 
-1. Apply migration `supabase/migrations/0016_clinic_onboarding_tokens.sql` (owner approval required).
+1. Apply migration `supabase/migrations/0019_clinic_onboarding_tokens.sql` (owner approval required).
 
 ## Operator: make a setup link
 

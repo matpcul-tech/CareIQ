@@ -132,7 +132,7 @@ test("operator script caps the setup link lifetime", () => {
   assert.equal(setupHours(undefined), 24);
   assert.equal(setupHours("500"), 72);
   assert.equal(setupHours("-1"), 24);
-  const sql = readFileSync("supabase/migrations/0016_clinic_onboarding_tokens.sql", "utf8");
+  const sql = readFileSync("supabase/migrations/0019_clinic_onboarding_tokens.sql", "utf8");
   assert.match(sql, /force row level security/);
   assert.doesNotMatch(sql, /token\s+text/);
 });
