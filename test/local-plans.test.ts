@@ -66,7 +66,7 @@ test("workout and meal cards do not call the shield", async () => {
   assert.equal(src.includes("useShieldGenerate"), false);
   const workout = src.slice(src.indexOf("function WorkoutPlan"), src.indexOf("function MealPlan"));
   const meal = src.slice(src.indexOf("function MealPlan"), src.indexOf("function dc"));
-  assert.match(workout, /buildWorkoutPlan/);
+  assert.match(workout, /buildWeeklyPlan/);
   assert.match(meal, /buildMealPlan/);
   assert.equal(workout.includes("fetch("), false);
   assert.equal(meal.includes("fetch("), false);

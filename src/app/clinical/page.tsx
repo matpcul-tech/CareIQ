@@ -1,7 +1,7 @@
 import { isAiEnabled } from "@/lib/ai-flag";
 import { glucoseRangeSentence, glucoseRangeLabel, kdigoGStage, kdigoSentence, PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
 import { resolveLabs } from "@/lib/lab-values";
-import { scoreLe8, type Le8Input } from "@/lib/le8";
+import { bmiFromUs, scoreLe8, type Le8Input } from "@/lib/le8";
 import { weightLbForLe8 } from "@/lib/wearable/model";
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
@@ -220,6 +220,14 @@ function buildClinicalData(args: {
     bpDiastolic: manual.bpDiastolic,
     bpTreated: history?.le8?.bpTreated,
   });
+  const planWeight = manual.weight ?? deviceWeight;
+  const planBmi = planWeight != null && manual.height != null ? bmiFromUs(planWeight, manual.height) ?? undefined : undefined;
+  const activity = {
+    ageYears: patient.age > 0 ? patient.age : undefined,
+    bmi: planBmi,
+    moderateMinutesPerWeek: history?.le8?.moderateMinutesPerWeek,
+    vigorousMinutesPerWeek: history?.le8?.vigorousMinutesPerWeek,
+  };
   const glucoseLabel = glucoseRangeLabel({ a1c: manual.a1c, fastingGlucose: manual.fastingGlucose });
   const gStage = manual.egfr != null ? kdigoGStage(manual.egfr) : null;
 
@@ -350,6 +358,7 @@ function buildClinicalData(args: {
     sex,
     recordedConditions: (history?.chronicConditions ?? []).map((c) => c.trim()).filter(Boolean),
     heartHealth,
+    activity,
     glucoseNote: glucoseLabel ? glucoseRangeSentence(glucoseLabel) : null,
     kdigoNote: gStage && manual.egfr != null ? kdigoSentence(gStage, manual.egfr) : null,
     preventTodo: PREVENT_TODO,
