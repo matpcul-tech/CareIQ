@@ -19,6 +19,9 @@ export default function ClinicPage({ searchParams }: { searchParams?: { demo?: s
       <p className="mt-2 text-sm leading-relaxed text-ink-soft">
         <Link href="/demo">Open the sample clinic</Link> for a fictional rural panel. No sign-in.
       </p>
+      <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+        Clinic staff: <Link href="/clinic/uds">open the UDS patient panel</Link> for CMS165 and CMS122.
+      </p>
       <ClinicPanel />
     </main>
   );
