@@ -38,6 +38,7 @@ import type { StaffInviteDelivery } from "./staff-mail";
 import type { SmsEnv } from "./sms";
 import type { ClinicStore } from "./store";
 import { raiseAlertForReading, type AlertAudit, type AlertQueueStore } from "./alerts/queue";
+import { circleSeverity, kindForRule, notifyCircle, type CircleAlertSink } from "../circle-alerts/notify";
 
 export interface ClinicHttpDeps {
   store: ClinicStore;
@@ -49,6 +50,8 @@ export interface ClinicHttpDeps {
   alertQueue?: AlertQueueStore;
   alertAudit?: AlertAudit;
   nowIso?: () => string;
+  /** In-app CareCircle alerts. Optional so tests and demo stores can leave it out. */
+  circleAlerts?: CircleAlertSink;
   sendStaffInvite?: (email: string) => Promise<{ ok: true; delivery: StaffInviteDelivery } | { ok: false; error: string }>;
 }
 
@@ -199,6 +202,15 @@ async function dispatch(
           thresholds: await deps.store.getThresholds(patient.clinic_id),
           nowIso: deps.nowIso ? deps.nowIso() : new Date().toISOString(),
         }).catch(() => null);
+        if (queued) {
+          // Type, severity, and time only. The reading itself is not passed.
+          await notifyCircle(deps.circleAlerts, {
+            patientId: patient.patient_id,
+            kind: kindForRule(queued.payload.rule),
+            severity: circleSeverity(queued.severity),
+            firedAt: queued.createdAt,
+          });
+        }
         return { ok: true as const, data: { ...saved.data, queue_alert_id: queued?.id || null, queue_severity: queued?.severity || null } };
       }
     }
@@ -283,7 +295,7 @@ async function dispatch(
     return markWellnessOk(deps.store, actor, { clinicPatientId: id, at: String(body.at || `${deps.asOf}T12:00:00Z`) });
   }
   if (action === "wellness_tick") {
-    return tickWellness(deps.store, actor, { nowIso: String(body.at || `${deps.asOf}T12:00:00Z`), env: deps.smsEnv, fetchImpl: deps.fetchImpl });
+    return tickWellness(deps.store, actor, { nowIso: String(body.at || `${deps.asOf}T12:00:00Z`), env: deps.smsEnv, fetchImpl: deps.fetchImpl, circleAlerts: deps.circleAlerts });
   }
   if (action === "cognitive") {
     return recordCognitive(deps.store, actor, { clinicPatientId: id, score: num(body.score) || 0, on: String(body.on || deps.asOf) });

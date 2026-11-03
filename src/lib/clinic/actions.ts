@@ -1,4 +1,5 @@
 import type { Actor, CircleRole, HomeReading, PanelRow, StaffRole, Thresholds } from "./logic";
+import { notifyCircle, type CircleAlertSink } from "../circle-alerts/notify";
 import { buildScorecard, type MeasureId, MEASURE_IDS, validScreen, type ScorecardPatient } from "./scorecard";
 import {
   canAddMember,
@@ -679,7 +680,7 @@ export async function markWellnessOk(
 export async function tickWellness(
   store: ClinicStore,
   actor: Actor,
-  input: { nowIso: string; env: SmsEnv; fetchImpl?: typeof fetch },
+  input: { nowIso: string; env: SmsEnv; fetchImpl?: typeof fetch; circleAlerts?: CircleAlertSink },
 ) {
   if (!isActiveStaff(actor)) return fail(403, "clinic staff only");
   const clinicId = actor.clinicId;
@@ -703,6 +704,19 @@ export async function tickWellness(
       await store.updatePatient(patient.id, { wellness_team_notified_at: input.nowIso });
       escalations.push({ external_id: patient.external_id, step: "care_team", sms: sms.reason });
     };
+    // First escalation for this missed check-in: tell the care circle in-app once.
+    if (
+      (decision === "escalate_family" || decision === "escalate_care_team") &&
+      !patient.wellness_family_notified_at &&
+      !patient.wellness_team_notified_at
+    ) {
+      await notifyCircle(input.circleAlerts, {
+        patientId: patient.patient_id,
+        kind: "wellness_check_missed",
+        severity: "critical",
+        firedAt: input.nowIso,
+      });
+    }
     if (decision === "escalate_family") {
       const sms = await deliverSms(input.env, patient.wellness_family_phone, input.fetchImpl);
       await store.updatePatient(patient.id, {
