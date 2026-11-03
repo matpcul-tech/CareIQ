@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { a1cScreeningPrompt, ageFromDateOfBirth } from "@/lib/a1c-screening";
 
 const CONDITIONS = [
   { value: "diabetes", label: "Diabetes" },
@@ -458,6 +459,8 @@ function Step2Profile({
     }
   }
 
+  const screening = a1cScreeningPrompt(ageFromDateOfBirth(dob));
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <h1 className="text-2xl font-bold">Your profile</h1>
@@ -494,6 +497,11 @@ function Step2Profile({
         required
         className="field-input"
       />
+      {screening && (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-ink">
+          {screening}
+        </p>
+      )}
       <div>
         <label className="field-label" htmlFor="profile-sex">Sex</label>
         <select

@@ -7,6 +7,7 @@ const DASH = /[\u2013\u2014]/;
 
 const ROOTS = [
   "src/lib/ai-flag.ts",
+  "src/lib/a1c-screening.ts",
   "src/lib/shield-anthropic.ts",
   "src/lib/local-health",
   "test/ai-flag.test.ts",
