@@ -9,6 +9,7 @@ import { SupabaseClinicStore } from "@/lib/clinic/supabase-store";
 import { readClinicActor } from "@/lib/clinic/token";
 import { auditAlerts } from "@/lib/clinic/alerts/audit-adapter";
 import { SupabaseAlertQueueStore } from "@/lib/clinic/alerts/supabase-queue-store";
+import { SupabaseCircleAlertSink } from "@/lib/circle-alerts/supabase-sink";
 import type { Actor } from "@/lib/clinic/logic";
 import { hashEmail } from "@/lib/crypto";
 import { getPublicOrigin } from "@/lib/origin";
@@ -38,6 +39,7 @@ async function respond(req: NextRequest) {
       asOf: new Date().toISOString().slice(0, 10),
       hashStaffEmail: (email) => hashEmail(email),
       alertQueue: new SupabaseAlertQueueStore(),
+      circleAlerts: new SupabaseCircleAlertSink(),
       alertAudit: auditAlerts(req.headers.get("x-session-id") || ""),
       sendStaffInvite: async (email) => {
         const redirectTo = `${origin}/auth/callback`;
