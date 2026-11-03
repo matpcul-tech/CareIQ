@@ -34,6 +34,23 @@ test("biomarkers win over manualLabs, manualLabs fills gaps", () => {
   assert.equal(labs.ldl, 99);
 });
 
+test("reads tsh and vitamin D from biomarker keys", () => {
+  const labs = resolveLabs({
+    biomarkers: {
+      tsh: { value: 2.2 },
+      vitamin_d: { value: 28 },
+    },
+  });
+  assert.equal(labs.tsh, 2.2);
+  assert.equal(labs.vitaminD, 28);
+});
+
+test("vitamin D falls back to manualLabs vitaminD", () => {
+  const labs = resolveLabs({ manualLabs: { vitaminD: 18, tsh: 6.1 } });
+  assert.equal(labs.vitaminD, 18);
+  assert.equal(labs.tsh, 6.1);
+});
+
 test("ignores missing or bad values", () => {
   assert.deepEqual(resolveLabs(null), {});
   assert.deepEqual(resolveLabs({}), {});

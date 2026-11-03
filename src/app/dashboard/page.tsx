@@ -1,3 +1,4 @@
+import { isAiEnabled } from "@/lib/ai-flag";
 import { resolveLabs } from "@/lib/lab-values";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -282,7 +283,7 @@ export default async function DashboardPage() {
             identifiers are replaced. This reduces identifiers. It does not certify that every possible
             identifier is gone.
           </p>
-          <InsightButton />
+          <InsightButton aiEnabled={isAiEnabled()} />
         </div>
       </section>
 
