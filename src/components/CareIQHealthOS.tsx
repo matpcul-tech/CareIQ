@@ -379,7 +379,7 @@ function Insights(){
     <div className="pad">
       <div className="sec">Today's Workout</div>
       <WorkoutPlan/>
-      <div className="sec">AI Clinical Insights</div>
+      <div className="sec">Clinical Insights</div>
       {insights.map((ins,i)=>(
         <div key={i} className={`insight ${ins.type}`}>
           <div className="insight-hdr"><span style={{fontSize:14}}>{ins.icon}</span><span className="insight-title">{ins.title}</span></div>
@@ -469,7 +469,7 @@ function Sovereignty(){
       </div>
       <div className="card">
         <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
-          AI insights are an Anthropic inference call. The app does not train a model on patient data. The typed question is not sent. Detected identifiers are replaced in the reduced summary. That is not a promise that every possible identifier is removed.
+          Notes on this screen are built on the device. A model call runs only when the server flag is on, and the app does not train a model on patient data.
         </div>
       </div>
       <div className="card">
@@ -541,7 +541,7 @@ function ShieldDash({logs}:{logs:SLog[]}){
       </div>
       {logs.length===0?(
         <div className="card">
-          <div style={{fontSize:12,color:"#7a9bbf"}}>No queries yet. Use the AI tab to see Shield in action.</div>
+          <div style={{fontSize:12,color:"#7a9bbf"}}>No queries yet. The Local tab answers on this device.</div>
         </div>
       ):logs.slice().reverse().slice(0,12).map((log,i)=>(
         <div className="shield-msg" key={i}>
@@ -657,7 +657,7 @@ function Profile(){
         ["Storage","AES-256-GCM at rest on the server"],
         ["Key","Application server environment"],
         ["Shield","Prompt Shield blocks critical identifier queries"],
-        ["AI","Anthropic inference. No training on patient data"],
+        ["Local","Answers on this device unless the server model flag is on"],
         ["Wearables","Uploaded files. No live device or RPM time tracking"],
         ["Records","No FHIR or EHR connection"],
       ] as const).map(([k,v],i)=>(
@@ -741,7 +741,7 @@ function Wearable(){
   );
 }
 
-const PNAV=[{id:"overview",icon:"H",label:"Health"},{id:"insights",icon:"I",label:"Insights"},{id:"nutrition",icon:"N",label:"Nutrition"},{id:"wearable",icon:"W",label:"Wearable"},{id:"ai",icon:"AI",label:"AI"},{id:"profile",icon:"P",label:"Profile"}];
+const PNAV=[{id:"overview",icon:"H",label:"Health"},{id:"insights",icon:"I",label:"Insights"},{id:"nutrition",icon:"N",label:"Nutrition"},{id:"wearable",icon:"W",label:"Wearable"},{id:"ai",icon:"L",label:"Local"},{id:"profile",icon:"P",label:"Profile"}];
 const CNAV=[{id:"blood",icon:"B",label:"Blood"},{id:"telehealth",icon:"T",label:"Telehealth"},{id:"sovereignty",icon:"S",label:"Sovereign"},{id:"impact",icon:"$",label:"Impact"},{id:"shield",icon:"X",label:"Shield"}];
 
 const RING_R=37;

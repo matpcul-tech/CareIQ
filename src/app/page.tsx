@@ -50,9 +50,9 @@ export default function Home() {
         </p>
         <p className="max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
           Built for community health centers and FQHCs. Records are encrypted
-          at rest with AES-256-GCM on the application server. AI insights use
-          a reduced summary, and critical identifier queries are blocked before
-          any model call.
+          at rest with AES-256-GCM on the application server. Health notes are
+          local. A model call stays off unless the server flag is on, and
+          critical identifier queries are blocked before any model call.
         </p>
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
           <Link href={primaryHref} className="btn-primary no-underline w-56 sm:w-auto">

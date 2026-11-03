@@ -77,7 +77,7 @@ export default function ConnectDevicePage() {
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft sm:text-base">
           CareIQ does not connect to a device account and does not track remote patient monitoring time.
           You export a file and upload it. The server keeps daily metrics and discards the original file after parsing.
-          Those metrics can later be included, with dates shifted, in an AI summary sent to the model provider.
+          Those metrics stay on the server. They are not sent to a model unless the server model flag is on.
         </p>
       </header>
 
@@ -112,7 +112,7 @@ export default function ConnectDevicePage() {
           <li>Only standard daily metrics (heart rate, steps, sleep, SpO2, calories) are kept.</li>
           <li>The metrics are encrypted with AES-256-GCM before being written to the database. The key is in the server environment.</li>
           <li>The original file is discarded after parsing and is not sent to the model provider.</li>
-          <li>Reduced daily metrics can be included in a later AI summary.</li>
+          <li>Reduced daily metrics are not sent to a model unless the server model flag is on.</li>
         </ul>
       </section>
 

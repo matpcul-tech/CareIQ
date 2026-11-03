@@ -139,7 +139,7 @@ test("synthetic PDF sends redacted text and never raw PDF bytes", async () => {
   const pdf = buildPdf(LONG_REPORT);
   const { calls, client } = recordingClient();
   const result = await parsePdfBiomarkers(pdf, {
-    env: { LAB_PDF_MODEL_FALLBACK_ENABLED: "true" },
+    env: { LAB_PDF_MODEL_FALLBACK_ENABLED: "true", CAREIQ_AI_ENABLED: "true" },
     knownNames: KNOWN_NAMES,
     modelClient: client,
   });
@@ -201,6 +201,20 @@ test("flag fails closed for unset, invalid, and false values", async () => {
     assert.equal(result.user_message, LAB_PDF_MANUAL_ENTRY_MESSAGE);
     assert.match(result.user_message, /manually/);
   }
+});
+
+test("model fallback stays off when CAREIQ_AI_ENABLED is not true", async () => {
+  const pdf = buildPdf(LONG_REPORT);
+  const { calls, client } = recordingClient();
+  const result = await parsePdfBiomarkers(pdf, {
+    env: { LAB_PDF_MODEL_FALLBACK_ENABLED: "true" },
+    knownNames: KNOWN_NAMES,
+    modelClient: client,
+  });
+  assert.equal(calls.length, 0);
+  assert.equal(result.reason, "ai_disabled");
+  assert.equal(result.extraction_mode, "none");
+  assert.equal(result.user_message, LAB_PDF_MANUAL_ENTRY_MESSAGE);
 });
 
 test("image-only PDF never reaches the model, even when the flag is on", async () => {
