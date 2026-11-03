@@ -13,6 +13,7 @@ const ROOTS = [
   "test/local-health.test.ts",
   "test/local-narrative.test.ts",
   "test/local-plans.test.ts",
+  "test/local-chat.test.ts",
   "test/local-copy.test.ts",
 ];
 
