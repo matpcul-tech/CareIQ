@@ -27,7 +27,11 @@ export type AuditAction =
   | "rate_limit.exceeded"
   | "csrf.failed"
   | "validation.failed"
-  | "carecircle.invite.created";
+  | "carecircle.invite.created"
+  | "clinic.alert.created"
+  | "clinic.alert.acknowledged"
+  | "clinic.alert.resolved"
+  | "clinic.alert.listed";
 
 export type DataType =
   | "none"
@@ -38,7 +42,8 @@ export type DataType =
   | "session"
   | "auth"
   | "ai_inference"
-  | "care_circle_invites";
+  | "care_circle_invites"
+  | "clinic_alert";
 
 export interface AuditEntry {
   sessionId: string;
@@ -88,6 +93,8 @@ const ALLOWED_META_KEYS = new Set<string>([
   "patient_hash",
   "fields_accessed",
   "requester_role",
+  "alert_id",
+  "severity",
 ]);
 
 function sanitizeMetadata(
