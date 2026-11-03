@@ -37,6 +37,8 @@ export type AuditAction =
   | "clinic.reminders.dispatched"
   | "clinic.reminders.template"
   | "clinic.reminders.inbound"
+  | "clinic.followups.viewed"
+  | "clinic.followups.call_logged"
   | "clinic.settings.time_zone";
 
 export type DataType =
@@ -50,7 +52,8 @@ export type DataType =
   | "ai_inference"
   | "care_circle_invites"
   | "clinic_alert"
-  | "clinic_reminder";
+  | "clinic_reminder"
+  | "clinic_followup";
 
 export interface AuditEntry {
   sessionId: string;

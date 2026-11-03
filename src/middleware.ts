@@ -35,6 +35,7 @@ const STAFF_ONLY_CLINIC_APIS = new Set<string>([
   "/api/clinic/uds",
   "/api/clinic/alerts",
   "/api/clinic/appointments",
+  "/api/clinic/followups",
   "/api/clinic/settings",
 ]);
 
