@@ -366,7 +366,7 @@ function WorkoutPlan() {
               <span className="wp-mins">{d.minutes > 0 ? `${d.minutes} min` : "Rest"}</span>
             </div>
             <div className="wp-act">{d.activity}</div>
-            {d.minutes > 0 && <div className="wp-fine">{d.intensityNote}</div>}
+            <div className="wp-fine">{d.intensityNote}</div>
           </li>
         ))}
       </ul>
