@@ -6,6 +6,7 @@ import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } fr
 import { answerLocally, buildHealthNarrative, buildMealPlan, buildWeeklyPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 import WearableUpload from "@/components/WearableUpload";
 import UdsPanel from "@/app/clinic/uds/UdsPanel";
+import FollowUpCalls from "@/app/clinic/uds/FollowUpCalls";
 
 const C = { navy:"#07101f", teal:"#00d4b8", teal2:"#00b89e", gold:"#d4a843", rose:"#e8526e", violet:"#8060cc", green:"#4ade80", slate:"#7a9bbf", white:"#eef2f8" };
 void C;
@@ -563,11 +564,16 @@ function BloodPanel(){
 function Telehealth(){
   return(
     <div className="pad">
-      <div className="sec">Appointments</div>
+      <div className="sec">Your care team</div>
       <div className="card">
         <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
-          CareIQ does not book visits and does not connect to an EHR. There is no appointment list in this app.
+          Your care team may call you about a home reading, a screening that is due, or an upcoming visit. CareIQ does not book visits and has no video visits; call your clinic to schedule or change a visit.
         </div>
+      </div>
+      <div className="sec">Follow-up calls (clinic staff)</div>
+      <div className="card" style={{background:"#ffffff",color:"#0f172a"}}>
+        <FollowUpCalls/>
+        <div style={{fontSize:12,color:"#475569"}} className="staff-hint">Clinic staff see the call list here after signing in on the clinic page.</div>
       </div>
       <div className="sec">Cost figures</div>
       <div className="card">

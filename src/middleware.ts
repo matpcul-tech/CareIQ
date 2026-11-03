@@ -36,6 +36,8 @@ const STAFF_ONLY_CLINIC_APIS = new Set<string>([
   "/api/clinic/alerts",
   "/api/clinic/appointments",
   "/api/clinic/invites",
+  "/api/clinic/followups",
+  "/api/clinic/settings",
 ]);
 
 // These routes skip the CSRF check. Clinic staff sign-in is not in this set.

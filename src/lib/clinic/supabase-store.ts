@@ -100,9 +100,21 @@ export class SupabaseClinicStore implements ClinicStore {
   }
 
   async getClinic(clinicId: string): Promise<ClinicRecord | null> {
+    const withTz = await this.sb().from("clinics").select("id,name,time_zone").eq("id", clinicId).maybeSingle();
+    if (!withTz.error) {
+      const d = withTz.data as { id: string; name: string | null; time_zone: string | null } | null;
+      return d ? { id: d.id, name: d.name ?? "", time_zone: d.time_zone ?? undefined } : null;
+    }
+    // Before migration 0017 the column does not exist (Postgres 42703). Fall back to the name only.
+    if (withTz.error.code !== "42703" && !/time_zone/.test(withTz.error.message)) throw new Error(withTz.error.message);
     const { data, error } = await this.sb().from("clinics").select("id,name").eq("id", clinicId).maybeSingle();
     if (error) throw new Error(error.message);
     return data ? { id: data.id, name: data.name ?? "" } : null;
+  }
+
+  async setClinicTimeZone(clinicId: string, timeZone: string): Promise<void> {
+    const { error } = await this.sb().from("clinics").update({ time_zone: timeZone }).eq("id", clinicId);
+    if (error) throw new Error(error.message);
   }
 
   async createClinic(name: string): Promise<ClinicRecord> {

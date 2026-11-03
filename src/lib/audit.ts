@@ -42,7 +42,10 @@ export type AuditAction =
   | "clinic.invite_link.created"
   | "clinic.invite_link.redeemed"
   | "clinic.invite_link.failed"
-  | "clinic.invite_link.revoked";
+  | "clinic.invite_link.revoked"
+  | "clinic.followups.viewed"
+  | "clinic.followups.call_logged"
+  | "clinic.settings.time_zone";
 
 export type DataType =
   | "none"
@@ -56,7 +59,8 @@ export type DataType =
   | "care_circle_invites"
   | "clinic_alert"
   | "clinic_reminder"
-  | "clinic_onboarding";
+  | "clinic_onboarding"
+  | "clinic_followup";
 
 export interface AuditEntry {
   sessionId: string;
