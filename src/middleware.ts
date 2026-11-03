@@ -35,6 +35,9 @@ const STAFF_ONLY_CLINIC_APIS = new Set<string>([
   "/api/clinic/uds",
   "/api/clinic/alerts",
   "/api/clinic/appointments",
+  "/api/clinic/invites",
+  "/api/clinic/followups",
+  "/api/clinic/settings",
 ]);
 
 // These routes skip the CSRF check. Clinic staff sign-in is not in this set.
@@ -54,6 +57,9 @@ const CSRF_EXEMPT_API_PATHS = new Set<string>([
 const NO_PATIENT_SESSION_API_PATHS = new Set<string>([
   ...CSRF_EXEMPT_API_PATHS,
   "/api/clinic/sign-in",
+  // Setup and invite redemption. CSRF is still required; the routes check the token.
+  "/api/clinic/setup",
+  "/api/clinic/join",
 ]);
 
 function getClientIp(req: NextRequest): string {

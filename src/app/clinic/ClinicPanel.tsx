@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import InviteLinks from "./InviteLinks";
 import ScorecardView from "./ScorecardView";
 
 function csrf(): string {
@@ -157,6 +158,7 @@ export default function ClinicPanel() {
           {inviteStatus && <p className="text-sm text-ink-soft">{inviteStatus}</p>}
         </form>
       )}
+      {card && <InviteLinks />}
     </section>
   );
 }

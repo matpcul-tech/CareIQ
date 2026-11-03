@@ -1,0 +1,16 @@
+import { NextRequest, NextResponse } from "next/server";
+import { readSession } from "@/lib/session";
+import { handleWithdraw } from "@/lib/e2e-server";
+import { supabaseE2eStore } from "@/lib/e2e-store";
+import { isClientEncEnabled } from "@/lib/e2e/flag";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+
+export async function DELETE(req: NextRequest) {
+  if (!isClientEncEnabled()) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const body = await req.json().catch(() => null);
+  const r = await handleWithdraw(readSession().patientId, body, supabaseE2eStore());
+  return NextResponse.json(r.body, { status: r.status });
+}
