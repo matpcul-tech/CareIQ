@@ -5,6 +5,7 @@ import { decryptJson, encryptJson } from "@/lib/crypto";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
+import { mergeHealthHistory } from "@/lib/history-merge";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,10 +52,8 @@ export async function POST(req: NextRequest) {
       prior = {};
     }
   }
-  const history: Record<string, unknown> = { ...prior, ...parsed.data };
-  if (parsed.data.le8 && prior.le8 && typeof prior.le8 === "object") {
-    history.le8 = { ...(prior.le8 as object), ...parsed.data.le8 };
-  }
+  // Blank answers keep the saved ones (see src/lib/history-merge.ts).
+  const history = mergeHealthHistory(prior, parsed.data as Record<string, unknown>);
   const encrypted = encryptJson(history, aad);
 
   let dbError = null as null | { code?: string };

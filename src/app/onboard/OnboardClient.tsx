@@ -617,7 +617,8 @@ function Step3History({
         allergies,
         familyHistory: family,
         le8: {
-          mepa: mepaPayload,
+          // Leave diet out when nothing was entered so saved answers are kept.
+          mepa: Object.keys(mepaPayload).length > 0 ? mepaPayload : undefined,
           moderateMinutesPerWeek: num(moderate),
           vigorousMinutesPerWeek: num(vigorous),
           nicotine: nicotine || undefined,
@@ -691,7 +692,7 @@ function Step3History({
       <fieldset className="rounded-xl border border-slate-200 p-4">
         <legend className="px-1 text-xs font-semibold text-ink-soft">Heart health questions</legend>
         <p className="mb-3 text-sm text-ink-soft">
-          These answers stay in the encrypted record. They are the diet, activity, nicotine, and sleep questions used for the Heart Health Score. Talk with your care team before changing medicines. This is general information, not a diagnosis.
+          These answers stay in the encrypted record. They are the diet, activity, nicotine, and sleep questions used for the Heart Health Score. Leave a question blank to keep the answer you saved before. Talk with your care team before changing medicines. This is general information, not a diagnosis.
         </p>
         <label className="field-label">Moderate activity minutes in a usual week</label>
         <input value={moderate} onChange={(e) => setModerate(e.target.value)} type="number" min="0" className="field-input" />
