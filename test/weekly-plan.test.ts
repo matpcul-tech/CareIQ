@@ -110,3 +110,19 @@ test("same input gives the same plan", () => {
   const i = { ...base, bpSystolic: 135, bpDiastolic: 80 };
   assert.equal(buildWeeklyPlan(i).text, buildWeeklyPlan(i).text);
 });
+
+test("rest days show Rest, no minutes, and add nothing to the total", () => {
+  const p = buildWeeklyPlan({ ...base, bpSystolic: 118, bpDiastolic: 76 });
+  const rest = p.days.filter((d) => d.intensity === "rest");
+  assert.deepEqual(rest.map((d) => d.day), ["Wed", "Sun"]);
+  for (const d of rest) {
+    assert.equal(d.activity, "Rest day. Gentle stretching is optional.");
+    assert.equal(d.minutes, 0);
+    assert.equal(d.aerobicCredit, 0);
+    assert.match(d.intensityNote, /^Light:/);
+  }
+  assert.equal(p.weeklyMinutes, p.days.reduce((s, d) => s + d.minutes - (/strength/.test(d.activity) ? 15 : 0), 0));
+  assert.match(p.text, /Wed: Rest day\. Gentle stretching is optional\. Light:/);
+  assert.doesNotMatch(p.text, /Wed: [^\n]*\d+ min/);
+  assert.doesNotMatch(p.text, /Sun: [^\n]*\d+ min/);
+});

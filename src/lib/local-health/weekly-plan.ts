@@ -220,7 +220,8 @@ export function buildWeeklyPlan(input: WeeklyPlanInput): WeeklyPlan {
   for (const day of order) {
     if (day === "Wed" || day === "Sun") {
       if (older) add(day, `${balance}, then gentle stretching`, 10, "light", TALK.light, 0);
-      else add(day, "Rest day. Gentle stretching if you like", day === "Wed" ? 10 : 0, day === "Wed" ? "light" : "rest", day === "Wed" ? TALK.light : TALK.rest, 0);
+      // Rest days show no minutes and add nothing to the weekly total.
+      else add(day, "Rest day. Gentle stretching is optional.", 0, "rest", TALK.light, 0);
       continue;
     }
     if (day === vigorousDay) {
@@ -271,7 +272,7 @@ export function buildWeeklyPlan(input: WeeklyPlanInput): WeeklyPlan {
   lines.push("This Week's Activity Plan");
   lines.push("Check with your care team before starting.");
   for (const d of days) {
-    lines.push(d.minutes === 0 ? `${d.day}: ${d.activity}.` : `${d.day}: ${d.activity}, ${d.minutes} min total. ${d.intensityNote}`);
+    lines.push(d.minutes === 0 ? `${d.day}: ${d.activity} ${d.intensityNote}` : `${d.day}: ${d.activity}, ${d.minutes} min total. ${d.intensityNote}`);
   }
   lines.push(`Weekly aerobic total: ${weeklyMinutes} of ${WEEKLY_TARGET_MINUTES} minutes (vigorous minutes count double). Strength days: 2.`);
   lines.push(stepUp);
