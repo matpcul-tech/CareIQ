@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadSyncSources } from "@/lib/sync-sources-server";
+import type { SyncSource } from "@/lib/sync-status";
 import { headers } from "next/headers";
 import { decryptJson, sha256Hex } from "@/lib/crypto";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -455,6 +457,10 @@ interface DecryptedPayload {
   health_narrative: HealthNarrative | null;
   clinical_insights: ClinicalInsight[] | null;
   health_timeline: HealthTimelineEvent[] | null;
+  /** Newest upload time of the wearable row the readings came from. */
+  wearable_synced_at: string | null;
+  /** One entry per data source with the time CareIQ last received data. */
+  sync_sources: SyncSource[];
 }
 
 async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
@@ -527,6 +533,13 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
         : wearableUpdatedAt
       : historyUpdatedAt || wearableUpdatedAt || null;
 
+  let syncSources: SyncSource[] = [];
+  try {
+    syncSources = await loadSyncSources(sb, patientId, historyUpdatedAt);
+  } catch {
+    syncSources = [];
+  }
+
   let trends: TrendMap = {};
   try {
     trends = await loadTrends(patientId, sex);
@@ -590,6 +603,8 @@ async function decryptPayload(patientId: string): Promise<DecryptedPayload> {
     health_narrative: healthNarrative,
     clinical_insights: clinicalInsights,
     health_timeline: healthTimeline,
+    wearable_synced_at: wearableIsDemo ? null : wearableUpdatedAt,
+    sync_sources: syncSources,
   };
 }
 

@@ -10,6 +10,9 @@ import HealthChart from "./HealthChart";
 import InsightButton from "./InsightButton";
 import InviteFamilyModal from "@/components/InviteFamilyModal";
 import LabFilesCard from "./LabFilesCard";
+import { SafetyDisclaimer, SyncSourceList } from "@/components/SyncStatus";
+import { loadSyncSources } from "@/lib/sync-sources-server";
+import type { SyncSource } from "@/lib/sync-status";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +83,7 @@ export default async function DashboardPage() {
 
   const { data: hh } = await sb
     .from("health_history")
-    .select("data_encrypted")
+    .select("data_encrypted, updated_at")
     .eq("patient_id", session.patientId)
     .maybeSingle();
   let history: HistoryPlaintext | null = null;
@@ -96,6 +99,17 @@ export default async function DashboardPage() {
   }
 
   const manualLabs: ManualLabs = resolveLabs(history);
+
+  let syncSources: SyncSource[] = [];
+  try {
+    syncSources = await loadSyncSources(
+      sb,
+      session.patientId,
+      (hh as { updated_at?: string } | null)?.updated_at ?? null,
+    );
+  } catch {
+    syncSources = [];
+  }
 
   const { data: labRows } = await sb
     .from("lab_files")
@@ -275,6 +289,12 @@ export default async function DashboardPage() {
             <p className="text-sm text-ink-mute">No wearable data uploaded yet.</p>
           )}
         </Link>
+
+        <div className="card md:col-span-2">
+          <h2 className="mb-3 text-base font-bold">Last synced by source</h2>
+          <SyncSourceList sources={syncSources} theme="light" />
+          <SafetyDisclaimer theme="light" />
+        </div>
 
         <LabFilesCard files={labFiles} />
 

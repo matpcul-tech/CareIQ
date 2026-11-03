@@ -1,6 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { SafetyDisclaimer, SyncSourceList, useNow } from '@/components/SyncStatus';
+import {
+  CHECK_INTERVAL_MS,
+  lastSyncedText,
+  newestSync,
+  syncFreshness,
+  type SyncSource,
+} from '@/lib/sync-status';
 
 /**
  * CareIQ Health Intelligence section components used by the patient
@@ -8,8 +16,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  * CareIQ for non-native healthcare systems. Each export is a
  * self-contained slot:
  *
- *   LiveWearable         4x2 wearable grid, polls /api/wearable/latest
- *                        every 5s. Shows the last uploaded file, not a live device.
+ *   LiveWearable         4x2 wearable grid. Checks /api/wearable/latest about
+ *                        once a minute and shows "Last synced" per source. Not a live device.
  *   ZKShieldBanner       Server-side AES-256-GCM and HIPAA-aligned architecture.
  *   PatientCard          Teal initials avatar, name, CHK-YYYY-XXXXX,
  *                        big risk score, alert count + next-scan,
@@ -123,9 +131,14 @@ interface LiveMetrics {
   hrv: number | null;
   steps: number | null;
   sleep_hours: number | null;
+  updated_at?: string | null;
+  sync_sources?: SyncSource[];
 }
 
-const POLL_MS = 5000;
+// Checking more often does not make the data newer. Readings only change
+// when a source syncs, so a slow check plus a visible "Last synced" time
+// avoids implying a live feed.
+const POLL_MS = CHECK_INTERVAL_MS;
 
 function useLiveMetrics(): { m: LiveMetrics | null; err: string | null; tick: number } {
   const [m, setM] = useState<LiveMetrics | null>(null);
@@ -223,6 +236,11 @@ function sleepTone(v: number | null): string {
 
 export function LiveWearable() {
   const { m, err } = useLiveMetrics();
+  const now = useNow();
+  const syncedAt = newestSync(m?.sync_sources ?? []) ?? m?.updated_at ?? null;
+  const fresh = syncFreshness(syncedAt, now);
+  const freshTone = fresh === 'recent' ? OK : fresh === 'stale' ? WARN : fresh === 'old' ? ALERT : MUTED;
+  const freshLabel = fresh === 'recent' ? 'RECENT' : fresh === 'stale' ? 'STALE' : fresh === 'old' ? 'OUT OF DATE' : 'NONE';
   const fmtSleep = (h: number | null) => {
     if (h == null) return '-';
     const hh = Math.floor(h);
@@ -275,20 +293,16 @@ export function LiveWearable() {
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Wearable file</div>
             <div style={{ fontFamily: T, fontSize: 9, color: MUTED, marginTop: 1 }}>
-              {m?.device || 'No file uploaded'} · Last upload, not a live device
+              {m?.device || 'No file uploaded'} · {lastSyncedText(syncedAt, now)}. Not a live device
             </div>
           </div>
         </div>
         <div
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
             padding: '4px 10px',
             borderRadius: 12,
-            background: 'rgba(74,222,128,0.14)',
-            color: OK,
-            border: '1px solid rgba(74,222,128,0.4)',
+            color: freshTone,
+            border: `1px solid ${freshTone}66`,
             fontFamily: T,
             fontSize: 9,
             fontWeight: 700,
@@ -297,16 +311,7 @@ export function LiveWearable() {
             flexShrink: 0,
           }}
         >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: OK,
-              animation: 'pulse 1.5s infinite',
-            }}
-          />
-          {m?.device ? 'FILE' : 'NONE'}
+          {freshLabel}
         </div>
       </div>
       {err && (
@@ -377,6 +382,10 @@ export function LiveWearable() {
           tone={sleepTone(m?.sleep_hours ?? null)}
         />
       </div>
+      <div style={{ marginTop: 10 }}>
+        <SyncSourceList sources={m?.sync_sources} />
+      </div>
+      <SafetyDisclaimer compact />
     </div>
   );
 }
