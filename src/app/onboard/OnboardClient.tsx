@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ADULT_A1C_PROMPT, adultA1cPrompt } from "@/lib/a1c-prompt";
+import WearableUpload from "@/components/WearableUpload";
 
 const MEPA_FIELDS = [
   { key: "oliveOilPerDay", label: "Olive oil, servings per day (1 tablespoon)" },
@@ -1052,26 +1053,8 @@ function Step4Upload({
       </div>
 
       <div className="rounded-xl border border-dashed border-slate-400 bg-slate-50 p-4">
-        <div className="font-bold">Zone B: Wearable export (optional)</div>
-        <div className="mb-2 text-sm text-ink-soft">
-          CSV, JSON, or XML from any device. The raw file is parsed and discarded; only key
-          metrics are encrypted and stored.
-        </div>
-        <input
-          type="file"
-          accept=".csv,.json,.xml"
-          disabled={busy === "wearable"}
-          className="block w-full text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-sov-gold file:px-3 file:py-2 file:text-sm file:font-semibold file:text-sov-bg hover:file:bg-sov-goldDark"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) upload("wearable", f);
-          }}
-        />
-        {wearableStatus && (
-          <div className={`mt-2 ${wearableStatus.ok ? "alert-success" : "alert-error"}`}>
-            {wearableStatus.message}
-          </div>
-        )}
+        <div className="mb-2 text-sm text-ink-soft">Zone B is optional. You can also do this later from the wearable tab.</div>
+        <WearableUpload />
       </div>
 
       {/* Blood Pressure card (vitals, not a biomarker spec) */}

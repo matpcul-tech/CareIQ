@@ -2,6 +2,7 @@ import { isAiEnabled } from "@/lib/ai-flag";
 import { glucoseRangeSentence, glucoseRangeLabel, kdigoGStage, kdigoSentence, PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
 import { resolveLabs } from "@/lib/lab-values";
 import { scoreLe8, type Le8Input } from "@/lib/le8";
+import { weightLbForLe8 } from "@/lib/wearable/model";
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -55,6 +56,7 @@ interface DailyMetric {
   sleepHours?: number;
   spo2?: number;
   calories?: number;
+  weightLb?: number;
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -182,11 +184,16 @@ function buildClinicalData(args: {
     ? { icon: "O2", val: String(last.spo2), unit: "SpO2 %", name: "Oxygen Sat", s: spo2Status(last.spo2) }
     : { icon: "O2", val: "-", unit: "SpO2 %", name: "Oxygen Sat", s: "ok" };
 
-  // Fasting glucose when the patient entered one. There is no weight field
-  // on the manual lab record, so the tile stays empty instead of a sample weight.
+  const deviceWeight = weightLbForLe8({
+    heightIn: manual.height,
+    wearable: metrics,
+  });
+  const shownWeight = manual.weight ?? metrics.map((day) => day.weightLb).filter((value) => value != null).slice(-1)[0];
   const sixthVital: ClinicalVital = manual.fastingGlucose != null
     ? { icon: "GLU", val: String(Math.round(manual.fastingGlucose)), unit: "mg/dL", name: "Fasting Glucose", s: glucoseStatus(manual.fastingGlucose) }
-    : { icon: "WT", val: "-", unit: "lbs", name: "Body Weight", s: "unknown" };
+    : shownWeight != null
+      ? { icon: "WT", val: String(Math.round(shownWeight)), unit: "lbs", name: "Body Weight", s: "unknown" }
+      : { icon: "WT", val: "-", unit: "lbs", name: "Body Weight", s: "unknown" };
 
   const vitals: ClinicalVital[] = [bpVital, a1cVital, ldlVital, hrVital, spo2Vital, sixthVital];
 
@@ -201,7 +208,7 @@ function buildClinicalData(args: {
     nicotine: history?.le8?.nicotine,
     livesWithIndoorSmoker: history?.le8?.livesWithIndoorSmoker,
     sleepHours: history?.le8?.sleepHours,
-    weightLb: manual.weight,
+    weightLb: manual.weight ?? deviceWeight,
     heightIn: manual.height,
     totalCholesterol: manual.totalCholesterol,
     hdl: manual.hdl,

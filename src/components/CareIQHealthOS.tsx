@@ -4,6 +4,7 @@ import type { ResolvedLabs } from "@/lib/lab-values";
 import { PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
 import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
 import { answerLocally, buildHealthNarrative, buildMealPlan, buildWorkoutPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
+import WearableUpload from "@/components/WearableUpload";
 
 const C = { navy:"#07101f", teal:"#00d4b8", teal2:"#00b89e", gold:"#d4a843", rose:"#e8526e", violet:"#8060cc", green:"#4ade80", slate:"#7a9bbf", white:"#eef2f8" };
 void C;
@@ -721,13 +722,14 @@ function Wearable(){
   const hrMin = wearHr7Day.length ? Math.min(...wearHr7Day) : 0;
   const stepsMax = wearSteps7Day.length ? Math.max(...wearSteps7Day) : 0;
   const note = wearableSource === "demo"
-    ? "Sample chart only. CareIQ does not connect to Apple Watch, Fitbit, or Withings, and it does not track RPM time."
+    ? "Sample chart only. This is not a live connection and does not track RPM time."
     : wearableSource === "upload"
-      ? `From the last uploaded file${primaryDeviceLabel ? ` (${primaryDeviceLabel})` : ""}. This is not a live device connection.`
-      : "No wearable file uploaded. CareIQ does not connect to a device account and does not track RPM time.";
+      ? `From the last uploaded file${primaryDeviceLabel ? ` (${primaryDeviceLabel})` : ""}. This is not a live connection and does not track RPM time.`
+      : "No wearable file uploaded. This is not a live connection and does not track RPM time.";
   return(
     <div className="pad">
-      <div className="sec">Wearable file</div>
+      <div className="sec">Upload an export from any device</div>
+      <WearableUpload variant="dark" />
       <div className="card">
         <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>{note}</div>
       </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import WearableUpload from "@/components/WearableUpload";
 
 export const dynamic = "force-static";
 export const revalidate = false;
@@ -18,7 +19,7 @@ const DEVICES: Device[] = [
       "Go to Settings, then Data Export.",
       "Click Request Data, and confirm via the email Fitbit sends you.",
       "Download the archive when ready, then unzip it on your computer.",
-      "Upload the largest .json file from inside the archive to Zone B on the dashboard.",
+      "Upload the zip, or the largest .json file inside it, on this page.",
     ],
   },
   {
@@ -29,7 +30,7 @@ const DEVICES: Device[] = [
       "Tap your profile picture in the top right.",
       "Scroll down and tap Export All Health Data.",
       "Wait for the export.zip to be prepared, then save it to Files.",
-      "Unzip on a computer and upload export.xml to Zone B.",
+      "Upload the zip on this page. CareIQ reads export.xml on this device.",
     ],
   },
   {
@@ -39,7 +40,7 @@ const DEVICES: Device[] = [
       "Open Garmin Connect on a desktop browser and sign in.",
       "Go to Account Management, then Manage My Data.",
       "Choose Export Your Data and download the archive.",
-      "Unzip and upload the activity or wellness CSV file to Zone B.",
+      "Upload the zip, a FIT file, or a wellness CSV on this page.",
     ],
   },
   {
@@ -50,7 +51,7 @@ const DEVICES: Device[] = [
       "Tap the menu, then Settings.",
       "Tap Download personal data.",
       "Confirm the download and locate the resulting CSV file.",
-      "Upload the CSV file to Zone B.",
+      "Upload the CSV file on this page. If the columns are unfamiliar, match them before saving.",
     ],
   },
   {
@@ -61,7 +62,7 @@ const DEVICES: Device[] = [
       "Click Deselect all, then check only Fit.",
       "Choose JSON as the export format and create the export.",
       "Download the archive when Google emails you, and unzip it.",
-      "Upload the daily summary JSON to Zone B.",
+      "Upload the zip or the daily summary JSON on this page.",
     ],
   },
 ];
@@ -73,13 +74,16 @@ export default function ConnectDevicePage() {
         <div className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-mute">
           CareIQ
         </div>
-        <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Upload a wearable export</h1>
+        <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Upload an export from any device</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft sm:text-base">
-          CareIQ does not connect to a device account and does not track remote patient monitoring time.
-          You export a file and upload it. The server keeps daily metrics and discards the original file after parsing.
-          Those metrics stay on the server. They are not sent to a model unless the server model flag is on.
+          This is not a live connection and does not track RPM time.
+          The file is read on this device. Only a daily summary is uploaded.
         </p>
       </header>
+
+      <section className="card mx-auto mb-6 max-w-3xl">
+        <WearableUpload />
+      </section>
 
       <section className="mx-auto grid max-w-3xl gap-4">
         {DEVICES.map((d) => (
@@ -108,11 +112,11 @@ export default function ConnectDevicePage() {
       <section className="card mx-auto mt-6 max-w-3xl">
         <h2 className="mb-2 text-lg font-bold">What happens to my file?</h2>
         <ul className="list-disc space-y-1 pl-6 text-sm leading-relaxed text-ink">
-          <li>The raw file is parsed in memory on the application server.</li>
-          <li>Only standard daily metrics (heart rate, steps, sleep, SpO2, calories) are kept.</li>
-          <li>The metrics are encrypted with AES-256-GCM before being written to the database. The key is in the server environment.</li>
-          <li>The original file is discarded after parsing and is not sent to the model provider.</li>
-          <li>Reduced daily metrics are not sent to a model unless the server model flag is on.</li>
+          <li>The file stays on this device. It is not uploaded.</li>
+          <li>A daily summary can include heart rate, steps, sleep, SpO2, calories, blood pressure, glucose, weight, and heart rate variability.</li>
+          <li>The summary is encrypted with AES-256-GCM before it is stored. The key is in the server environment.</li>
+          <li>This is not a live connection and does not track RPM time.</li>
+          <li>The summary is not sent to a model unless the server model flag is on.</li>
         </ul>
       </section>
 
