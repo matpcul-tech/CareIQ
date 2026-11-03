@@ -1,6 +1,7 @@
 import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
+import { isAiEnabled } from "@/lib/ai-flag";
 import { BIOMARKER_KEYS } from "@/lib/biomarker-ranges";
 import { assertTextOnlyModelPayload } from "@/lib/model-outbound";
 import { detectPii, redactIdentifiers, replaceKnownNames } from "@/lib/shield-redact";
@@ -13,8 +14,10 @@ import { detectPii, redactIdentifiers, replaceKnownNames } from "@/lib/shield-re
  *
  * If that match finds nothing and the PDF has enough real text, a model
  * fallback may run on Shield-redacted text only. The fallback is off
- * unless LAB_PDF_MODEL_FALLBACK_ENABLED is the exact string "true".
- * Unset, empty, and any other value keep it off.
+ * unless LAB_PDF_MODEL_FALLBACK_ENABLED is the exact string "true"
+ * and CAREIQ_AI_ENABLED is the exact string "true".
+ * Unset, empty, and any other value keep it off. Missing either flag
+ * keeps regex parsing, then manual entry.
  *
  * Scanned or image-only PDFs are never sent to a model, even when the
  * flag is on. Those pages cannot be redacted reliably. Raw PDF bytes,
@@ -714,7 +717,11 @@ export async function parsePdfBiomarkers(
     return manualEntryResult(textChars, "redaction_incomplete");
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!isAiEnabled(env)) {
+    return manualEntryResult(textChars, "ai_disabled");
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
   if (!options.modelClient && !apiKey) {
     // eslint-disable-next-line no-console
     console.warn("[lab-pdf-parser] model fallback skipped: ANTHROPIC_API_KEY not configured");
