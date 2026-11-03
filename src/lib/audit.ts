@@ -38,7 +38,8 @@ export type AuditAction =
   | "clinic.reminders.template"
   | "clinic.reminders.inbound"
   | "clinic.followups.viewed"
-  | "clinic.followups.call_logged";
+  | "clinic.followups.call_logged"
+  | "clinic.settings.time_zone";
 
 export type DataType =
   | "none"

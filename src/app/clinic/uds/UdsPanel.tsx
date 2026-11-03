@@ -13,6 +13,7 @@ import {
   type ParseResult,
 } from "@/lib/clinic/uds/csv";
 import AlertQueue from "./AlertQueue";
+import ClinicSettings from "./ClinicSettings";
 import Appointments from "./Appointments";
 import type { CareGapRow } from "@/lib/clinic/uds/care-gaps";
 import { MEASURE_LABEL, type MeasureId, type MeasureRate, type PatientStatus } from "@/lib/clinic/uds/measures";
@@ -134,6 +135,7 @@ export default function UdsPanel() {
 
   return (
     <section className="mt-6 space-y-6">
+      <ClinicSettings />
       <AlertQueue />
       <Appointments />
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4">
