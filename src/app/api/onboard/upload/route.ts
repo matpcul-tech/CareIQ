@@ -11,6 +11,12 @@ import {
 } from "@/lib/validate";
 import { decryptJson, encryptBuffer, encryptJson } from "@/lib/crypto";
 import { parseWearable } from "@/lib/parse-wearable";
+import {
+  isDeviceTypeCheckError,
+  parseWearableSummary,
+  SUMMARY_MAX_CHARS,
+  type DeviceType,
+} from "@/lib/wearable/model";
 import { namesFromProfile } from "@/lib/shield-redact";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
@@ -39,6 +45,10 @@ export async function POST(req: NextRequest) {
   const zone = (form.get("zone") || "").toString();
   if (zone !== "lab" && zone !== "wearable") {
     return NextResponse.json({ error: "invalid zone" }, { status: 400 });
+  }
+  const summaryField = form.get("summary");
+  if (zone === "wearable" && typeof summaryField === "string") {
+    return handleWearableSummary(sessionId, session.patientId, summaryField);
   }
   const file = form.get("file");
   if (!(file instanceof File)) {
@@ -267,11 +277,7 @@ async function handleWearable(
   );
 
   const sb = getServiceClient();
-  const { error } = await sb.from("wearable_data").insert({
-    patient_id: patientId,
-    data_encrypted: encrypted,
-    device_type: parsed.deviceType,
-  });
+  const error = await insertWearableRow(sb, patientId, encrypted, parsed.deviceType);
   if (error) {
     await logAudit({
       sessionId,
@@ -300,4 +306,83 @@ async function handleWearable(
     device: parsed.deviceType,
     metrics: parsed.metrics.length,
   });
+}
+
+async function handleWearableSummary(sessionId: string, patientId: string, raw: string) {
+  if (raw.length === 0 || raw.length > SUMMARY_MAX_CHARS) {
+    return NextResponse.json({ error: "summary was rejected" }, { status: 400 });
+  }
+  let parsed;
+  try {
+    parsed = parseWearableSummary(JSON.parse(raw));
+  } catch {
+    await logAudit({
+      sessionId,
+      action: "patient.wearable.uploaded",
+      dataType: "wearable",
+      success: false,
+      metadata: { reason_code: "summary_rejected" },
+    });
+    return NextResponse.json({ error: "summary was rejected" }, { status: 400 });
+  }
+  const encrypted = encryptJson(
+    {
+      device: parsed.deviceType,
+      sourceFormat: parsed.sourceFormat,
+      metrics: parsed.metrics,
+      ingestedAt: new Date().toISOString(),
+    },
+    `wearable:${patientId}`,
+  );
+  const sb = getServiceClient();
+  const error = await insertWearableRow(sb, patientId, encrypted, parsed.deviceType);
+  if (error) {
+    await logAudit({
+      sessionId,
+      action: "patient.wearable.uploaded",
+      dataType: "wearable",
+      success: false,
+      metadata: { reason_code: "db_insert", device_type: parsed.deviceType },
+    });
+    return NextResponse.json({ error: "upload failed" }, { status: 500 });
+  }
+  await logAudit({
+    sessionId,
+    action: "patient.wearable.uploaded",
+    dataType: "wearable",
+    success: true,
+    metadata: {
+      device_type: parsed.deviceType,
+      file_type: "json",
+      metric_count: parsed.metrics.length,
+    },
+  });
+  return NextResponse.json({
+    ok: true,
+    device: parsed.deviceType,
+    metrics: parsed.metrics.length,
+  });
+}
+
+async function insertWearableRow(
+  sb: ReturnType<typeof getServiceClient>,
+  patientId: string,
+  encrypted: string,
+  deviceType: DeviceType,
+) {
+  const first = await sb.from("wearable_data").insert({
+    patient_id: patientId,
+    data_encrypted: encrypted,
+    device_type: deviceType,
+  });
+  if (!first.error) return null;
+  if (isDeviceTypeCheckError(first.error) && deviceType !== "generic") {
+    const second = await sb.from("wearable_data").insert({
+      patient_id: patientId,
+      data_encrypted: encrypted,
+      device_type: "generic",
+    });
+    return second.error ?? null;
+  }
+  return first.error;
 }
