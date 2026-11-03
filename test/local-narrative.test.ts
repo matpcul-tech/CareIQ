@@ -77,7 +77,8 @@ test("narrative card does not infer conditions or call the shield", async () => 
   assert.equal(body.includes("inferConditions"), false);
   assert.equal(body.includes("/api/shield"), false);
   assert.equal(body.includes("Regenerate"), false);
-  assert.match(body, />Local</);
+  assert.match(body, /buildHealthNarrative/);
+  assert.match(src, /badge b-violet">Local</);
 
   const button = await readFile(path.resolve(__dirname, "../src/app/dashboard/InsightButton.tsx"), "utf8");
   assert.equal(button.includes("fetch("), false);

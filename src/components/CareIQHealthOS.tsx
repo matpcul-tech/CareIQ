@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
 import type { ResolvedLabs } from "@/lib/lab-values";
-import { buildHealthNarrative } from "@/lib/local-health";
+import { buildHealthNarrative, buildMealPlan, buildWorkoutPlan } from "@/lib/local-health";
 
 const ZK_SALT = "CARE-IQ-ZK-SHIELD-2026";
 const ZK_TERMS = ["fqhc","careiq","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
@@ -311,101 +311,20 @@ const DEMO_DATA: ClinicalData = {
 
 const ClinicalDataContext = createContext<ClinicalData>(DEMO_DATA);
 
-interface ShieldGenState { loading: boolean; text: string; error: string; blocked: boolean; }
-
-function inferConditions(domains: ClinicalDomain[], vitals: ClinicalVital[]): string[] {
-  const out: string[] = [];
-  const cardio = domains.find((d) => /cardio/i.test(d.name));
-  if (cardio && cardio.score <= 65) out.push("hypertension");
-  const metab = domains.find((d) => /metabolic/i.test(d.name));
-  if (metab && metab.score <= 65) out.push("prediabetes");
-  const ldl = vitals.find((v) => /LDL/i.test(v.name));
-  if (ldl && ldl.s === "alert") out.push("dyslipidemia");
-  return out;
+function latestSteps(values: number[]): number | undefined {
+  if (values.length === 0) return undefined;
+  const last = values[values.length - 1];
+  return Number.isFinite(last) && last > 0 ? last : undefined;
 }
 
-function useShieldGenerate(mode: "workout" | "meal_plan" | "narrative"): ShieldGenState & { regen: () => void } {
-  const { patient, vitals, domains } = useContext(ClinicalDataContext);
-  const [state, setState] = useState<ShieldGenState>({ loading: true, text: "", error: "", blocked: false });
-  const [tick, setTick] = useState(0);
-  const conditions = inferConditions(domains, vitals);
-  const key = `${mode}:${patient.id}:${new Date().toISOString().slice(0, 10)}:${tick}`;
-  useEffect(() => {
-    let cancelled = false;
-    setState({ loading: true, text: "", error: "", blocked: false });
-    (async () => {
-      try {
-        const res = await fetch("/api/shield", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mode,
-            context: {
-              patientAge: patient.age,
-              communityAffiliation: "COMMUNITY_LOCATION",
-              vitals: vitals.map((v) => ({ name: v.name, val: v.val, unit: v.unit, status: v.s })),
-              domains: domains.map((d) => ({ name: d.name, score: d.score })),
-              conditions,
-            },
-          }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        const blocked = Boolean(body?.meta?.blocked) || body?.riskLevel === "CRITICAL";
-        if (blocked) {
-          setState({ loading: false, text: "", error: "", blocked: true });
-        } else if (typeof body?.insight === "string" && body.insight.length > 0) {
-          setState({ loading: false, text: body.insight, error: "", blocked: false });
-        } else {
-          setState({ loading: false, text: "", error: "Prompt Shield returned no content.", blocked: false });
-        }
-      } catch {
-        if (!cancelled) setState({ loading: false, text: "", error: "Shield offline. Try again.", blocked: false });
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return { ...state, regen: () => setTick((t) => t + 1) };
-}
-
-function GeneratedCard({
-  title, badge, mode,
-}: { title: string; badge: string; mode: "workout" | "meal_plan" | "narrative" }) {
-  const { loading, text, error, blocked, regen } = useShieldGenerate(mode);
+function LocalPlanCard({ title, text }: { title: string; text: string }) {
   return (
     <div className="card">
       <div className="card-hdr">
         <span className="card-title">{title}</span>
-        <span className="badge b-violet">{badge}</span>
+        <span className="badge b-violet">Local</span>
       </div>
-      {loading ? (
-        <div style={{ fontSize: 11, color: "#7a9bbf", fontStyle: "italic" }}>
-          CareIQ AI is generating, this takes a few seconds...
-        </div>
-      ) : blocked ? (
-        <div style={{ fontSize: 11, color: "#e8526e", lineHeight: 1.5 }}>
-          Blocked: identifying information detected. The block is written to the audit log.
-        </div>
-      ) : error ? (
-        <div style={{ fontSize: 11, color: "#e8526e", lineHeight: 1.5 }}>{error}</div>
-      ) : (
-        <div style={{ fontSize: 12, color: "#a3b5cc", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
-      )}
-      <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: "#7a9bbf", letterSpacing: ".12em" }}>
-          via Prompt Shield, identifiers reduced
-        </span>
-        <button
-          type="button"
-          className="insight-cta"
-          onClick={regen}
-          disabled={loading}
-          style={{ opacity: loading ? 0.5 : 1 }}
-        >
-          {loading ? "..." : "Regenerate"}
-        </button>
-      </div>
+      <div style={{ fontSize: 12, color: "#a3b5cc", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
     </div>
   );
 }
@@ -417,18 +336,30 @@ function HealthNarrative() {
     sex: data.sex,
     conditions: data.recordedConditions,
   });
-  return (
-    <div className="card">
-      <div className="card-hdr">
-        <span className="card-title">Today's Health Narrative</span>
-        <span className="badge b-violet">Local</span>
-      </div>
-      <div style={{ fontSize: 12, color: "#a3b5cc", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
-    </div>
-  );
+  return <LocalPlanCard title="Today's Health Narrative" text={text} />;
 }
-function WorkoutPlan()    { return <GeneratedCard title="Today's Workout Plan"     badge="AI" mode="workout" />; }
-function MealPlan()       { return <GeneratedCard title="Today's Meal Plan"        badge="AI" mode="meal_plan" />; }
+
+function WorkoutPlan() {
+  const data = useContext(ClinicalDataContext);
+  const text = buildWorkoutPlan({
+    labs: data.labs,
+    sex: data.sex,
+    conditions: data.recordedConditions,
+    steps: latestSteps(data.wearSteps7Day),
+  }, new Date().getDay());
+  return <LocalPlanCard title="Today's Workout Plan" text={text} />;
+}
+
+function MealPlan() {
+  const data = useContext(ClinicalDataContext);
+  const text = buildMealPlan({
+    labs: data.labs,
+    sex: data.sex,
+    conditions: data.recordedConditions,
+    steps: latestSteps(data.wearSteps7Day),
+  }, new Date().getDay());
+  return <LocalPlanCard title="Today's Meal Plan" text={text} />;
+}
 
 
 function dc(s:number){return s>=80?"#00d4b8":s>=60?"#d4a843":"#e8526e"}
@@ -529,7 +460,7 @@ function Nutrition(){
   const { meals } = useContext(ClinicalDataContext);
   return(
     <div className="pad">
-      <div className="sec">Today's Meal Plan, AI Generated</div>
+      <div className="sec">Today's Meal Plan</div>
       <MealPlan/>
       <div className="sec">Example meals, not your log</div>
       <div style={{fontSize:11,color:"#d4a843",lineHeight:1.5,margin:"-4px 0 8px"}}>
