@@ -45,7 +45,10 @@ interface PanelData {
   unsupported_exclusions: string[];
 }
 
+export const NOT_STAFF_MESSAGE = "The patient panel is for clinic staff. Sign in as clinic staff on the clinic page to view it.";
+
 export default function UdsPanel() {
+  const [denied, setDenied] = useState(false);
   const thisYear = new Date().getFullYear();
   const [start, setStart] = useState(`${thisYear}-01-01`);
   const [end, setEnd] = useState(`${thisYear}-12-31`);
@@ -63,9 +66,12 @@ export default function UdsPanel() {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       setData(null);
-      setStatus(res.status === 401 ? "Sign in as clinic staff on the clinic page first." : body.error || "Could not load the panel");
+      const notStaff = res.status === 401 || res.status === 403;
+      setDenied(notStaff);
+      setStatus(notStaff ? "" : body.error || "Could not load the panel");
       return;
     }
+    setDenied(false);
     setData(body as PanelData);
     setStatus("");
   }
@@ -113,6 +119,14 @@ export default function UdsPanel() {
     if (filter === "cms122") return inAny.filter((r) => r.cms122.status !== "not_in_denominator");
     return inAny;
   }, [data, filter]);
+
+  if (denied) {
+    return (
+      <section className="mt-6">
+        <p className="text-sm text-ink-soft">{NOT_STAFF_MESSAGE} <a href="/clinic">Clinic sign-in</a></p>
+      </section>
+    );
+  }
 
   return (
     <section className="mt-6 space-y-6">

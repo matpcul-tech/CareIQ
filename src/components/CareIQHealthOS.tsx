@@ -5,6 +5,7 @@ import { PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
 import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
 import { answerLocally, buildHealthNarrative, buildMealPlan, buildWeeklyPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 import WearableUpload from "@/components/WearableUpload";
+import UdsPanel from "@/app/clinic/uds/UdsPanel";
 
 const C = { navy:"#07101f", teal:"#00d4b8", teal2:"#00b89e", gold:"#d4a843", rose:"#e8526e", violet:"#8060cc", green:"#4ade80", slate:"#7a9bbf", white:"#eef2f8" };
 void C;
@@ -601,14 +602,12 @@ function Sovereignty(){
   );
 }
 
-function Impact(){
+function PatientPanelTab(){
   return(
     <div className="pad">
-      <div className="sec">Impact figures</div>
-      <div className="card">
-        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
-          CareIQ does not calculate cost per member, ER diversion, hospitalizations prevented, or annual savings. This tab does not show measured results.
-        </div>
+      <div className="sec">Patient panel</div>
+      <div className="card" style={{background:"#ffffff",color:"#0f172a"}}>
+        <UdsPanel/>
       </div>
     </div>
   );
@@ -863,7 +862,7 @@ function Wearable(){
 }
 
 const PNAV=[{id:"overview",icon:"H",label:"Health"},{id:"insights",icon:"I",label:"Insights"},{id:"nutrition",icon:"N",label:"Nutrition"},{id:"wearable",icon:"W",label:"Wearable"},{id:"ai",icon:"L",label:"Local"},{id:"profile",icon:"P",label:"Profile"}];
-const CNAV=[{id:"blood",icon:"B",label:"Blood"},{id:"telehealth",icon:"T",label:"Telehealth"},{id:"sovereignty",icon:"S",label:"Sovereign"},{id:"impact",icon:"$",label:"Impact"},{id:"shield",icon:"X",label:"Shield"}];
+const CNAV=[{id:"blood",icon:"B",label:"Blood"},{id:"telehealth",icon:"T",label:"Telehealth"},{id:"sovereignty",icon:"S",label:"Sovereign"},{id:"panel",icon:"P",label:"Panel"},{id:"shield",icon:"X",label:"Shield"}];
 
 const RING_R=37;
 const RING_C=2*Math.PI*RING_R;
@@ -922,7 +921,7 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
       case"blood":return<BloodPanel/>;
       case"telehealth":return<Telehealth/>;
       case"sovereignty":return<Sovereignty/>;
-      case"impact":return<Impact/>;
+      case"panel":return<PatientPanelTab/>;
       case"shield":return<ShieldDash logs={logs}/>;
       case"profile":return<Profile/>;
       case"ai":return(
