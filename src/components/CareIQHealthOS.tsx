@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useContext, createContext, Component, Reac
 import type { ResolvedLabs } from "@/lib/lab-values";
 import { PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
 import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
-import { answerLocally, buildHealthNarrative, buildMealPlan, buildWorkoutPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
+import { answerLocally, buildHealthNarrative, buildMealPlan, buildWeeklyPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 import WearableUpload from "@/components/WearableUpload";
 
 const C = { navy:"#07101f", teal:"#00d4b8", teal2:"#00b89e", gold:"#d4a843", rose:"#e8526e", violet:"#8060cc", green:"#4ade80", slate:"#7a9bbf", white:"#eef2f8" };
@@ -127,6 +127,27 @@ const CSS = `
 .chat-send:disabled{opacity:.5;cursor:not-allowed}
 .err-card{padding:14px;background:rgba(232,82,110,.06);border:1px solid rgba(232,82,110,.25);border-radius:11px;margin:18px;color:#e8526e;font-size:11px;line-height:1.5}
 .hos.elder{font-size:18px}
+.wp-body{font-size:12px;color:#a3b5cc;line-height:1.6}
+.wp-fine{font-size:11px;color:#7a9bbf;line-height:1.55;margin-top:6px}
+.wp-total{margin:10px 0;padding:10px;border-radius:10px;background:rgba(0,212,184,.06);border:1px solid rgba(0,212,184,.15)}
+.wp-total-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;flex-wrap:wrap}
+.wp-mono{font-family:'DM Mono',monospace;color:#00d4b8}
+.wp-days{list-style:none;display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.wp-day{padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.03);border-left:3px solid #7a9bbf}
+.wp-day.wp-moderate{border-left-color:#00d4b8}.wp-day.wp-vigorous{border-left-color:#d4a843}.wp-day.wp-light{border-left-color:#8060cc}
+.wp-day-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.wp-dayname{font-weight:700;font-size:12px}
+.wp-mins{font-family:'DM Mono',monospace;font-size:11px;color:#00d4b8;white-space:nowrap}
+.wp-act{font-size:12px;color:#eef2f8;line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
+.wp-step{font-size:12px;color:#eef2f8;line-height:1.6;padding:10px;border-radius:10px;background:rgba(212,168,67,.08);border:1px solid rgba(212,168,67,.25);margin:8px 0}
+.wp-h{font-size:11px;font-weight:700;color:#00d4b8;margin:10px 0 4px}
+.wp-list{padding-left:18px;font-size:12px;color:#a3b5cc;line-height:1.6}
+.wp-urgent{border:1px solid rgba(232,82,110,.5);border-left:3px solid #e8526e;background:rgba(232,82,110,.08)}
+.wp-urgent .card-title{color:#e8526e}
+.hos.elder .wp-body,.hos.elder .wp-act,.hos.elder .wp-step,.hos.elder .wp-list,.hos.elder .wp-total-row{font-size:16px}
+.hos.elder .wp-fine,.hos.elder .wp-mins{font-size:14px}
+.hos.elder .wp-dayname,.hos.elder .wp-h{font-size:15px}
+.hos.elder .wp-day-top{flex-wrap:wrap}
 .hos.elder .vital-val{font-size:20px}
 .hos.elder .vital-name{font-size:11px}
 .hos.elder .vital-unit{font-size:10px}
@@ -236,6 +257,8 @@ export interface ClinicalData {
   labs?: ResolvedLabs;
   sex?: "male" | "female" | "unknown";
   recordedConditions?: string[];
+  /** Inputs for the local weekly activity plan. Missing values stay missing. */
+  activity?: { ageYears?: number; bmi?: number; moderateMinutesPerWeek?: number; vigorousMinutesPerWeek?: number };
   heartHealth?: Le8Result;
   glucoseNote?: string | null;
   kdigoNote?: string | null;
@@ -298,14 +321,66 @@ function HealthNarrative() {
 
 function WorkoutPlan() {
   const data = useContext(ClinicalDataContext);
-  const text = buildWorkoutPlan({
-    labs: data.labs,
-    sex: data.sex,
-    conditions: data.recordedConditions,
-    steps: latestSteps(data.wearSteps7Day),
-  }, new Date().getDay());
-  return <LocalPlanCard title="Today's Workout Plan" text={text} />;
+  const hasWear = data.wearableSource !== "none";
+  const plan = buildWeeklyPlan({
+    bpSystolic: data.labs?.bpSystolic,
+    bpDiastolic: data.labs?.bpDiastolic,
+    ageYears: data.activity?.ageYears ?? (data.patient.age > 0 ? data.patient.age : undefined),
+    bmi: data.activity?.bmi,
+    moderateMinutesPerWeek: data.activity?.moderateMinutesPerWeek,
+    vigorousMinutesPerWeek: data.activity?.vigorousMinutesPerWeek,
+    dailySteps: hasWear ? data.wearSteps7Day : undefined,
+    dailyHeartRate: hasWear ? data.wearHr7Day : undefined,
+  });
+  if (plan.status === "contact_care_team") {
+    return (
+      <div className="card wp-urgent" role="alert">
+        <div className="card-hdr">
+          <span className="card-title">Contact your care team now</span>
+          <span className="badge b-violet">Local</span>
+        </div>
+        <div className="wp-body">{plan.urgentMessage}</div>
+        <div className="wp-body" style={{ marginTop: 8 }}>No exercise plan is shown until your care team says it is safe.</div>
+        <div className="wp-fine">{DISCLAIMER_TEXT}</div>
+      </div>
+    );
+  }
+  const pct = Math.min(100, Math.round((plan.weeklyMinutes / plan.weeklyTarget) * 100));
+  return (
+    <div className="card">
+      <div className="card-hdr">
+        <span className="card-title">This Week's Activity Plan</span>
+        <span className="badge b-violet">Local</span>
+      </div>
+      <div className="wp-body"><strong>Check with your care team before starting.</strong></div>
+      <div className="wp-total">
+        <div className="wp-total-row"><span>Weekly aerobic total</span><span className="wp-mono">{plan.weeklyMinutes} / {plan.weeklyTarget} min</span></div>
+        <div className="prog-bg"><div className="prog-fill" style={{ width: `${pct}%`, background: "#00d4b8" }} /></div>
+        <div className="wp-fine">Strength on 2 days. Vigorous minutes count double.{plan.stepGoal !== null ? ` Daily step goal: ${plan.stepGoal}.` : ""}</div>
+      </div>
+      <ul className="wp-days">
+        {plan.days.map((d) => (
+          <li key={d.day} className={`wp-day wp-${d.intensity}`}>
+            <div className="wp-day-top">
+              <span className="wp-dayname">{d.day}</span>
+              <span className="wp-mins">{d.minutes > 0 ? `${d.minutes} min` : "Rest"}</span>
+            </div>
+            <div className="wp-act">{d.activity}</div>
+            {d.minutes > 0 && <div className="wp-fine">{d.intensityNote}</div>}
+          </li>
+        ))}
+      </ul>
+      <div className="wp-step">{plan.stepUp}</div>
+      <div className="wp-h">Safety notes</div>
+      <ul className="wp-list">{plan.safety.map((s) => <li key={s}>{s}</li>)}</ul>
+      {plan.basedOn.length > 0 && <div className="wp-fine"><strong>Based on:</strong> {plan.basedOn.join("; ")}.</div>}
+      {plan.missing.length > 0 && <div className="wp-fine"><strong>Not on file:</strong> {plan.missing.join("; ")}. Adding these lets the plan fit you better.</div>}
+      <div className="wp-fine">Sources: HHS Physical Activity Guidelines for Americans, American Heart Association. {DISCLAIMER_TEXT}</div>
+    </div>
+  );
 }
+
+const DISCLAIMER_TEXT = "This is general information, not a diagnosis.";
 
 function MealPlan() {
   const data = useContext(ClinicalDataContext);
@@ -408,7 +483,7 @@ function Insights(){
   const { insights, timeline } = useContext(ClinicalDataContext);
   return(
     <div className="pad">
-      <div className="sec">Today's Workout</div>
+      <div className="sec">This Week's Activity</div>
       <WorkoutPlan/>
       <div className="sec">Clinical Insights</div>
       {insights.map((ins,i)=>(

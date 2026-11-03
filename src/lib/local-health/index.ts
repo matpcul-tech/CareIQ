@@ -40,3 +40,4 @@ export {
   type LocalAnswer,
 } from "./chat";
 export { DISCLAIMER, finishOutput, wordingProblems } from "./wording";
+export { bpCategory, buildWeeklyPlan, stepGoalFrom, URGENT_MESSAGE, WEEKLY_TARGET_MINUTES, type BpCategory, type PlanDay, type WeeklyPlan, type WeeklyPlanInput } from "./weekly-plan";
