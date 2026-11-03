@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ADULT_A1C_PROMPT, adultA1cPrompt } from "@/lib/a1c-prompt";
+import { formToPayload, initialFormState, type SavedHistory } from "@/lib/history-form";
 import WearableUpload from "@/components/WearableUpload";
 
 const MEPA_FIELDS = [
@@ -147,6 +148,7 @@ export default function OnboardClient(props: {
   authenticated: boolean;
   expired: boolean;
   linkError: boolean;
+  savedHistory?: SavedHistory | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<number>(props.initialStep);
@@ -191,7 +193,7 @@ export default function OnboardClient(props: {
           <Step2Profile authenticated={props.authenticated} onDone={() => setStep(3)} />
         )}
         {step === 3 && (
-          <Step3History authenticated={props.authenticated} onDone={() => setStep(4)} />
+          <Step3History authenticated={props.authenticated} saved={props.savedHistory ?? null} onDone={() => setStep(4)} />
         )}
         {step === 4 && (
           <Step4Upload
@@ -554,23 +556,26 @@ function Step2Profile({
 
 function Step3History({
   authenticated,
+  saved,
   onDone,
 }: {
   authenticated: boolean;
+  saved: SavedHistory | null;
   onDone: () => void;
 }) {
-  const [conditions, setConditions] = useState<Set<string>>(new Set());
-  const [meds, setMeds] = useState("");
-  const [allergies, setAllergies] = useState("");
-  const [family, setFamily] = useState("");
-  const [moderate, setModerate] = useState("");
-  const [vigorous, setVigorous] = useState("");
-  const [nicotine, setNicotine] = useState("");
-  const [indoor, setIndoor] = useState("");
-  const [sleepHours, setSleepHours] = useState("");
-  const [lipidTreated, setLipidTreated] = useState("");
-  const [bpTreated, setBpTreated] = useState("");
-  const [mepa, setMepa] = useState<Record<string, string>>({});
+  const init = initialFormState(saved);
+  const [conditions, setConditions] = useState<Set<string>>(new Set(init.conditions));
+  const [meds, setMeds] = useState(init.meds);
+  const [allergies, setAllergies] = useState(init.allergies);
+  const [family, setFamily] = useState(init.family);
+  const [moderate, setModerate] = useState(init.moderate);
+  const [vigorous, setVigorous] = useState(init.vigorous);
+  const [nicotine, setNicotine] = useState(init.nicotine);
+  const [indoor, setIndoor] = useState(init.indoor);
+  const [sleepHours, setSleepHours] = useState(init.sleepHours);
+  const [lipidTreated, setLipidTreated] = useState(init.lipidTreated);
+  const [bpTreated, setBpTreated] = useState(init.bpTreated);
+  const [mepa, setMepa] = useState<Record<string, string>>(init.mepa);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -597,37 +602,14 @@ function Step3History({
     setBusy(true);
     setErr("");
     try {
-      const mepaPayload: Record<string, number> = {};
-      for (const item of MEPA_FIELDS) {
-        const raw = (mepa[item.key] ?? "").trim();
-        if (raw === "") continue;
-        const n = Number(raw);
-        if (Number.isFinite(n)) mepaPayload[item.key] = n;
-      }
-      const num = (raw: string) => {
-        const trimmed = raw.trim();
-        if (trimmed === "") return undefined;
-        const n = Number(trimmed);
-        return Number.isFinite(n) ? n : undefined;
-      };
-      const yesNo = (raw: string) => raw === "yes" ? true : raw === "no" ? false : undefined;
-      const res = await postJson("/api/onboard/health-history", {
-        chronicConditions: Array.from(conditions),
-        medications: meds,
-        allergies,
-        familyHistory: family,
-        le8: {
-          // Leave diet out when nothing was entered so saved answers are kept.
-          mepa: Object.keys(mepaPayload).length > 0 ? mepaPayload : undefined,
-          moderateMinutesPerWeek: num(moderate),
-          vigorousMinutesPerWeek: num(vigorous),
-          nicotine: nicotine || undefined,
-          livesWithIndoorSmoker: yesNo(indoor),
-          sleepHours: num(sleepHours),
-          lipidTreated: yesNo(lipidTreated),
-          bpTreated: yesNo(bpTreated),
+      const payload = formToPayload(
+        {
+          conditions: Array.from(conditions), meds, allergies, family, moderate, vigorous,
+          nicotine, indoor, sleepHours, lipidTreated, bpTreated, mepa,
         },
-      });
+        saved,
+      );
+      const res = await postJson("/api/onboard/health-history", payload);
       if (!res.ok) {
         setErr("Could not save your health history. Please try again.");
       } else {
@@ -662,7 +644,10 @@ function Step3History({
         </div>
       </fieldset>
 
-      <label className="field-label">Current medications</label>
+      <div className="flex items-center justify-between">
+        <label className="field-label">Current medications</label>
+        {meds && <RemoveButton label="Current medications" onClick={() => setMeds("")} />}
+      </div>
       <textarea
         value={meds}
         onChange={(e) => setMeds(e.target.value)}
@@ -671,7 +656,10 @@ function Step3History({
         className="field-textarea"
       />
 
-      <label className="field-label">Allergies</label>
+      <div className="flex items-center justify-between">
+        <label className="field-label">Allergies</label>
+        {allergies && <RemoveButton label="Allergies" onClick={() => setAllergies("")} />}
+      </div>
       <textarea
         value={allergies}
         onChange={(e) => setAllergies(e.target.value)}
@@ -680,7 +668,10 @@ function Step3History({
         className="field-textarea"
       />
 
-      <label className="field-label">Family history</label>
+      <div className="flex items-center justify-between">
+        <label className="field-label">Family history</label>
+        {family && <RemoveButton label="Family history" onClick={() => setFamily("")} />}
+      </div>
       <textarea
         value={family}
         onChange={(e) => setFamily(e.target.value)}
@@ -692,12 +683,15 @@ function Step3History({
       <fieldset className="rounded-xl border border-slate-200 p-4">
         <legend className="px-1 text-xs font-semibold text-ink-soft">Heart health questions</legend>
         <p className="mb-3 text-sm text-ink-soft">
-          These answers stay in the encrypted record. They are the diet, activity, nicotine, and sleep questions used for the Heart Health Score. Leave a question blank to keep the answer you saved before. Talk with your care team before changing medicines. This is general information, not a diagnosis.
+          These answers stay in the encrypted record. They are the diet, activity, nicotine, and sleep questions used for the Heart Health Score. Talk with your care team before changing medicines. This is general information, not a diagnosis.
         </p>
+        {saved && <p className="mb-2 text-xs text-ink-mute">Your saved answers are filled in. Use Remove to clear one.</p>}
         <label className="field-label">Moderate activity minutes in a usual week</label>
         <input value={moderate} onChange={(e) => setModerate(e.target.value)} type="number" min="0" className="field-input" />
+        {moderate && <RemoveButton label="Moderate activity" onClick={() => setModerate("")} />}
         <label className="field-label mt-2">Vigorous activity minutes in a usual week</label>
         <input value={vigorous} onChange={(e) => setVigorous(e.target.value)} type="number" min="0" className="field-input" />
+        {vigorous && <RemoveButton label="Vigorous activity" onClick={() => setVigorous("")} />}
         <label className="field-label mt-2">Nicotine</label>
         <select value={nicotine} onChange={(e) => setNicotine(e.target.value)} className="field-input">
           <option value="">Not answered</option>
@@ -707,26 +701,31 @@ function Step3History({
           <option value="quit_under_1y_or_nds">Quit less than 1 year ago, or current inhaled nicotine product</option>
           <option value="current_smoker">Current smoker</option>
         </select>
+        {nicotine && <RemoveButton label="Nicotine" onClick={() => setNicotine("")} />}
         <label className="field-label mt-2">Lives with someone who smokes indoors</label>
         <select value={indoor} onChange={(e) => setIndoor(e.target.value)} className="field-input">
           <option value="">Not answered</option>
           <option value="no">No</option>
           <option value="yes">Yes</option>
         </select>
+        {indoor && <RemoveButton label="Indoor smoker" onClick={() => setIndoor("")} />}
         <label className="field-label mt-2">Usual hours of sleep a night</label>
         <input value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} type="number" min="0" max="24" step="0.5" className="field-input" />
+        {sleepHours && <RemoveButton label="Sleep" onClick={() => setSleepHours("")} />}
         <label className="field-label mt-2">Taking a medicine for cholesterol</label>
         <select value={lipidTreated} onChange={(e) => setLipidTreated(e.target.value)} className="field-input">
           <option value="">Not answered</option>
           <option value="no">No</option>
           <option value="yes">Yes</option>
         </select>
+        {lipidTreated && <RemoveButton label="Cholesterol medicine" onClick={() => setLipidTreated("")} />}
         <label className="field-label mt-2">Taking a medicine for blood pressure</label>
         <select value={bpTreated} onChange={(e) => setBpTreated(e.target.value)} className="field-input">
           <option value="">Not answered</option>
           <option value="no">No</option>
           <option value="yes">Yes</option>
         </select>
+        {bpTreated && <RemoveButton label="Blood pressure medicine" onClick={() => setBpTreated("")} />}
         <div className="mt-3 font-semibold text-sm">Diet screener</div>
         {MEPA_FIELDS.map((item) => (
           <label key={item.key} className="mt-2 block text-sm">
@@ -739,6 +738,9 @@ function Step3History({
               onChange={(e) => setMepa((prev) => ({ ...prev, [item.key]: e.target.value }))}
               className="field-input"
             />
+            {(mepa[item.key] ?? "") !== "" && (
+              <RemoveButton label={item.label} onClick={() => setMepa((prev) => ({ ...prev, [item.key]: "" }))} />
+            )}
           </label>
         ))}
       </fieldset>
@@ -748,6 +750,14 @@ function Step3History({
       </button>
       {err && <div className="alert-error">{err}</div>}
     </form>
+  );
+}
+
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="text-xs text-ink-soft underline" aria-label={`Remove ${label}`}>
+      Remove
+    </button>
   );
 }
 

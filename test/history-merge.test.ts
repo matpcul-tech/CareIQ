@@ -30,8 +30,8 @@ test("no le8 in the save keeps all saved le8 answers; first save works with no p
 });
 
 test("form omits an empty diet object and the route uses the merge", () => {
-  const form = readFileSync("src/app/onboard/OnboardClient.tsx", "utf8");
-  assert.match(form, /mepa: Object\.keys\(mepaPayload\)\.length > 0 \? mepaPayload : undefined/);
+  const form = readFileSync("src/lib/history-form.ts", "utf8");
+  assert.match(form, /mepa: Object\.keys\(mepa\)\.length > 0 \? mepa : undefined/);
   const route = readFileSync("src/app/api/onboard/health-history/route.ts", "utf8");
   assert.match(route, /mergeHealthHistory\(prior,/);
   assert.equal(/\.\.\.parsed\.data\.le8/.test(route), false);

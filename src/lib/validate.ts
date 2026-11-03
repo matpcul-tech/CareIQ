@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { CLEARABLE_KEYS } from "./history-form";
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
 
@@ -111,6 +112,8 @@ export const healthHistorySchema = z.object({
   allergies: FREE_TEXT.optional().default(""),
   familyHistory: FREE_TEXT.optional().default(""),
   le8: le8AnswersSchema.optional(),
+  /** Saved Heart Health answers the person explicitly removed. */
+  clearLe8: z.array(z.string().refine((k) => (CLEARABLE_KEYS as readonly string[]).includes(k))).max(CLEARABLE_KEYS.length).optional(),
 });
 export type HealthHistoryInput = z.infer<typeof healthHistorySchema>;
 

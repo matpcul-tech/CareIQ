@@ -12,7 +12,7 @@ export function mergeHealthHistory(
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...prior };
   for (const [key, value] of Object.entries(incoming)) {
-    if (key === "le8") continue;
+    if (key === "le8" || key === "clearLe8") continue;
     if (value === undefined) continue;
     next[key] = value;
   }
@@ -32,6 +32,18 @@ export function mergeHealthHistory(
       }
       le8[key] = value;
     }
+    next.le8 = le8;
+  }
+  // Explicit removals only. Each entry names one saved answer the person removed.
+  if (Array.isArray(incoming.clearLe8) && isObject(next.le8)) {
+    const le8 = { ...next.le8 };
+    const mepa = isObject(le8.mepa) ? { ...le8.mepa } : null;
+    for (const key of incoming.clearLe8) {
+      if (typeof key !== "string") continue;
+      if (key.startsWith("mepa.")) { if (mepa) delete mepa[key.slice(5)]; }
+      else delete le8[key];
+    }
+    if (mepa) le8.mepa = mepa;
     next.le8 = le8;
   }
   return next;
