@@ -5,3 +5,4 @@ export * from "./patient";
 export * from "./flag";
 export * from "./scoring";
 export * from "./forms";
+export * from "./clinic";
