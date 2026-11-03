@@ -14,16 +14,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { messageClinicName } from "@/lib/clinic/reminders/engine";
+import { clinicTimeZone, localDateHour } from "@/lib/clinic/time-zone";
 
 const HEADERS = { "cache-control": "private, no-store" };
-const CLINIC_TZ = "America/Chicago";
-
-function localNow(): { today: string; hour: number } {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: CLINIC_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
-  const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
-  return { today: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
-}
-
 async function context(req: NextRequest) {
   const clinicStore = new SupabaseClinicStore();
   const token = req.headers.get("x-care-circle-token") || req.cookies.get("sov_clinic")?.value || "";
@@ -38,11 +31,12 @@ async function context(req: NextRequest) {
   };
   const env = reminderEnv(process.env);
   const sending = sendingState(sendingFlagOn(env), twilioConfigured(env));
-  // Clinic display name from the clinics record. The clinics table has no time zone column,
-  // so reminders use America/Chicago.
+  // Clinic display name and time zone from the clinics record (time zone defaults to America/Chicago).
   const clinic = actor && actor.kind === "staff" ? await clinicStore.getClinic(actor.clinicId).catch(() => null) : null;
   const clinicName = messageClinicName(clinic?.name);
-  return { actor, deps, env, sending, clinicName };
+  const tz = clinicTimeZone(clinic);
+  const localNow = () => localDateHour(tz);
+  return { actor, deps, env, sending, clinicName, localNow };
 }
 
 function reply(r: { ok: true; data: unknown } | { ok: false; status: number; error: string }) {
@@ -56,7 +50,7 @@ function unavailable(err: unknown) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { actor, deps, sending, clinicName } = await context(req);
+    const { actor, deps, sending, clinicName, localNow } = await context(req);
     if (!actor) return NextResponse.json({ error: "authentication required" }, { status: 401, headers: HEADERS });
     return reply(await reminderOverview(deps, actor, { today: localNow().today, clinicName, sending }));
   } catch (err) {
@@ -72,7 +66,7 @@ export async function POST(req: NextRequest) {
     if (raw.length > 8_000_000) return NextResponse.json({ error: "payload too large" }, { status: 413, headers: HEADERS });
     let body: Record<string, unknown> = {};
     try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: "invalid json" }, { status: 400, headers: HEADERS }); }
-    const { actor, deps, env, sending, clinicName } = await context(req);
+    const { actor, deps, env, sending, clinicName, localNow } = await context(req);
     if (!actor) return NextResponse.json({ error: "authentication required" }, { status: 401, headers: HEADERS });
     if (body.action === "import") return reply(await importAppointments(deps, actor, body.appointments, body.mode));
     if (body.action === "template") return reply(await setReminderTemplate(deps, actor, body.language, body.template));

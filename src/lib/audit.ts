@@ -36,7 +36,8 @@ export type AuditAction =
   | "clinic.reminders.viewed"
   | "clinic.reminders.dispatched"
   | "clinic.reminders.template"
-  | "clinic.reminders.inbound";
+  | "clinic.reminders.inbound"
+  | "clinic.settings.time_zone";
 
 export type DataType =
   | "none"
