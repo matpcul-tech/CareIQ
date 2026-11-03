@@ -12,6 +12,7 @@ import {
   type FieldKey,
   type ParseResult,
 } from "@/lib/clinic/uds/csv";
+import AlertQueue from "./AlertQueue";
 import type { CareGapRow } from "@/lib/clinic/uds/care-gaps";
 import { MEASURE_LABEL, type MeasureId, type MeasureRate, type PatientStatus } from "@/lib/clinic/uds/measures";
 
@@ -132,6 +133,7 @@ export default function UdsPanel() {
 
   return (
     <section className="mt-6 space-y-6">
+      <AlertQueue />
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-4">
         <label className="text-sm">
           Reporting year

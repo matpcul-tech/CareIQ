@@ -37,6 +37,7 @@ import { parseInviteRole } from "./staff-auth";
 import type { StaffInviteDelivery } from "./staff-mail";
 import type { SmsEnv } from "./sms";
 import type { ClinicStore } from "./store";
+import { raiseAlertForReading, type AlertAudit, type AlertQueueStore } from "./alerts/queue";
 
 export interface ClinicHttpDeps {
   store: ClinicStore;
@@ -45,6 +46,9 @@ export interface ClinicHttpDeps {
   fetchImpl?: typeof fetch;
   asOf: string;
   hashStaffEmail?: (email: string) => string;
+  alertQueue?: AlertQueueStore;
+  alertAudit?: AlertAudit;
+  nowIso?: () => string;
   sendStaffInvite?: (email: string) => Promise<{ ok: true; delivery: StaffInviteDelivery } | { ok: false; error: string }>;
 }
 
@@ -177,16 +181,28 @@ async function dispatch(
   }
   if (action === "reading") {
     const kind = body.kind === "glucose" ? "glucose" : "bp";
-    return addHomeReading(deps.store, actor, {
-      clinicPatientId: id,
-      reading: {
-        kind,
-        systolic: num(body.systolic),
-        diastolic: num(body.diastolic),
-        glucose: num(body.glucose),
-        recorded_on: String(body.recorded_on || deps.asOf),
-      },
-    });
+    const reading = {
+      kind: kind as "bp" | "glucose",
+      systolic: num(body.systolic),
+      diastolic: num(body.diastolic),
+      glucose: num(body.glucose),
+      recorded_on: String(body.recorded_on || deps.asOf),
+    };
+    const saved = await addHomeReading(deps.store, actor, { clinicPatientId: id, reading });
+    if (saved.ok && deps.alertQueue) {
+      const patient = await deps.store.getPatient(id);
+      if (patient) {
+        // The reading is already saved. A queue failure must not fail the reading.
+        const queued = await raiseAlertForReading(deps.store, deps.alertQueue, deps.alertAudit || (async () => {}), {
+          patient,
+          reading: { ...reading, id: saved.data.id },
+          thresholds: await deps.store.getThresholds(patient.clinic_id),
+          nowIso: deps.nowIso ? deps.nowIso() : new Date().toISOString(),
+        }).catch(() => null);
+        return { ok: true as const, data: { ...saved.data, queue_alert_id: queued?.id || null, queue_severity: queued?.severity || null } };
+      }
+    }
+    return saved;
   }
   if (action === "message") {
     return addConcern(deps.store, actor, { clinicPatientId: id, body: String(body.body || ""), on: deps.asOf });
