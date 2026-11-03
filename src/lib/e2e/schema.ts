@@ -39,3 +39,12 @@ export const withdrawSchema = z.object({
   wraps: z.array(keyWrapSchema).min(1).max(20),
   entries: z.array(entrySchema).max(500),
 }).strict();
+
+export const clinicKeySchema = z.object({
+  version: z.number().int().min(1).max(1000),
+  public_jwk: jwk,
+  custody_mode: z.enum(["passphrase", "passphrase_split_2of3"]),
+  passphrase_sealed: z.object({ v: z.literal(1), salt: b64, iterations: z.number().int().min(100_000), sealed: envelopeSchema }).strict(),
+  recovery_sealed: z.object({ v: z.literal(1), salt: b64, sealed: envelopeSchema }).strict(),
+  recovery_confirmed: z.literal(true),
+}).strict();
