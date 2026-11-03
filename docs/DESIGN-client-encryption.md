@@ -166,12 +166,22 @@ Total: about 10.5 weeks. Add 1 to 2 weeks buffer, and budget for an outside cryp
 ## 12. Open questions for owner decisions
 
 1. Custody v1: approve (a) passphrase + recovery key with optional 2 of 3 split? Who are the default 3 holders for tribal clinics?
+   - APPROVED 2026-11-02: option (a) passphrase plus printed recovery key with optional 2 of 3 split.
 2. Direct patients with no clinic: allowed? If yes, they alone hold recovery and accept data loss risk.
+   - APPROVED 2026-11-02: solo patients allowed, but must save their recovery code before entering any health data.
 3. Should the clinic always get a wrap of every patient DEK (needed for recovery and care), or only with patient consent?
+   - APPROVED 2026-11-02: clinic gets a wrap of the patient data key only with patient consent at enrollment; patient can withdraw it.
 4. AI features: allow sending shield-scrubbed text to the AI provider after on-device decrypt, or local templates only?
+   - APPROVED 2026-11-02: local template answers only; optional AI stays off unless the clinic enables it.
 5. Accept losing scheduled server-side alerts when no device is online, or plan a clinic-hosted alert agent in v2?
+   - APPROVED 2026-11-02: v1 alerts are sent when the device syncs; a clinic-hosted alert helper is planned for v2.
 6. Is coarse plaintext (for example LE8 band, alert severity) acceptable for clinic reporting, or must everything be ciphertext?
+   - APPROVED 2026-11-02: only LE8 band and alert severity may be unencrypted; no raw values.
 7. Budget and timing for an external security review before marketing launch.
+   - APPROVED 2026-11-02: outside security review is required before marketing launch.
 8. Contract language: clinic accepts that lost keys mean unrecoverable data; we cannot recover.
+   - APPROVED 2026-11-02: contract states lost keys are unrecoverable by anyone, including CareIQ.
 9. Do we remove "HIPAA compliant" and "Zero-Knowledge" copy now (recommended), before the build?
+   - APPROVED 2026-11-02: copy fix done now (PR 33).
 10. Shamir library choice: audited third party package or in-house?
+   - APPROVED 2026-11-02: use an audited open-source library for the 2 of 3 split.
