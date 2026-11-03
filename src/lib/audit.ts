@@ -36,7 +36,13 @@ export type AuditAction =
   | "clinic.reminders.viewed"
   | "clinic.reminders.dispatched"
   | "clinic.reminders.template"
-  | "clinic.reminders.inbound";
+  | "clinic.reminders.inbound"
+  | "clinic.setup.redeemed"
+  | "clinic.setup.failed"
+  | "clinic.invite_link.created"
+  | "clinic.invite_link.redeemed"
+  | "clinic.invite_link.failed"
+  | "clinic.invite_link.revoked";
 
 export type DataType =
   | "none"
@@ -49,7 +55,8 @@ export type DataType =
   | "ai_inference"
   | "care_circle_invites"
   | "clinic_alert"
-  | "clinic_reminder";
+  | "clinic_reminder"
+  | "clinic_onboarding";
 
 export interface AuditEntry {
   sessionId: string;
