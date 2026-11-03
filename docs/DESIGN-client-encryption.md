@@ -142,7 +142,7 @@ Allowed after v1 is live and legacy keys are deleted:
 - "Tribal and clinic leadership can share control of recovery (2 of 3)."
 
 Still NOT allowed:
-- "HIPAA compliant" or "100% compliant" (compliance depends on the clinic's BAA, policies, and an assessment, not on software alone). Remove "HIPAA: 100% compliant" from `index.html` and `CareIQOS.tsx` now.
+- Any claim that CareIQ is HIPAA certified or fully HIPAA conforming (compliance depends on the clinic's BAA, policies, and an assessment, not on software alone). Remove the old 100 percent HIPAA claim from `index.html` and `CareIQOS.tsx` now.
 - "Zero-knowledge" in the strict sense, while we still see metadata and serve the code. Prefer "end-to-end encrypted health records."
 - "PHI never leaves the device" (ciphertext does leave; AI features may send scrubbed text).
 - "Unhackable", "military grade", "patent protected encryption".
@@ -152,7 +152,7 @@ Still NOT allowed:
 
 | Phase | PR | Work | Weeks |
 |---|---|---|---|
-| 0 | PR 1 | This design doc; marketing copy fixes (remove "HIPAA compliant") | 0.5 |
+| 0 | PR 1 | This design doc; marketing copy fixes (remove HIPAA overclaims) | 0.5 |
 | 1 | PR 2 | `src/lib/e2e/` crypto core: key gen, wrap/unwrap, encrypt/decrypt, IndexedDB store, tests (Vitest + test vectors) | 1.5 |
 | 2 | PR 3 | Supabase migrations: clinic_keys, user_keys, devices, key_wraps, consents, RLS; behind flag | 1 |
 | 3 | PR 4 | Clinic onboarding: admin passphrase, recovery key, optional 2 of 3 shares, CSK to staff | 1.5 |
@@ -181,7 +181,7 @@ Total: about 10.5 weeks. Add 1 to 2 weeks buffer, and budget for an outside cryp
    - APPROVED 2026-11-02: outside security review is required before marketing launch.
 8. Contract language: clinic accepts that lost keys mean unrecoverable data; we cannot recover.
    - APPROVED 2026-11-02: contract states lost keys are unrecoverable by anyone, including CareIQ.
-9. Do we remove "HIPAA compliant" and "Zero-Knowledge" copy now (recommended), before the build?
+9. Do we remove the HIPAA overclaim and "Zero-Knowledge" copy now (recommended), before the build?
    - APPROVED 2026-11-02: copy fix done now (PR 33).
 10. Shamir library choice: audited third party package or in-house?
    - APPROVED 2026-11-02: use an audited open-source library for the 2 of 3 split.
