@@ -4,6 +4,7 @@ import type { Actor } from "@/lib/clinic/logic";
 import { enforceStaffClinic } from "@/lib/clinic/staff-auth";
 import { SupabaseClinicStore } from "@/lib/clinic/supabase-store";
 import { readClinicActor } from "@/lib/clinic/token";
+import { clinicTimeZone, localDateHour } from "@/lib/clinic/time-zone";
 import { importUdsPanel, parsePeriod, viewUdsPanel } from "@/lib/clinic/uds/actions";
 import { SupabaseUdsPanelStore } from "@/lib/clinic/uds/supabase-panel-store";
 
@@ -38,7 +39,7 @@ async function withStores(req: NextRequest, run: (actor: Actor, store: SupabaseC
 export async function GET(req: NextRequest) {
   return withStores(req, async (actor, store) => {
     const url = new URL(req.url);
-    const asOf = new Date().toISOString().slice(0, 10);
+    const asOf = localDateHour(clinicTimeZone(actor.kind === "staff" ? await store.getClinic(actor.clinicId).catch(() => null) : null)).today;
     const period = parsePeriod(url.searchParams.get("start"), url.searchParams.get("end"), asOf);
     if (!period) return NextResponse.json({ error: "period must be start and end dates" }, { status: 400, headers: HEADERS });
     const result = await viewUdsPanel(store, new SupabaseUdsPanelStore(), actor, period);

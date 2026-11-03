@@ -6,6 +6,8 @@ import { DEFAULT_CARE_SETTINGS, type CareSettings } from "./safety";
 export interface ClinicRecord {
   id: string;
   name: string;
+  /** IANA time zone. Missing until migration 0017 is applied; callers default to America/Chicago. */
+  time_zone?: string;
 }
 
 export interface StaffRecord {
@@ -126,6 +128,7 @@ export interface ScreenRecord {
 export interface ClinicStore {
   createClinic(name: string): Promise<ClinicRecord>;
   getClinic(clinicId: string): Promise<ClinicRecord | null>;
+  setClinicTimeZone(clinicId: string, timeZone: string): Promise<void>;
   addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null, extras?: StaffInsertExtras): Promise<StaffRecord>;
   getStaff(staffId: string): Promise<StaffRecord | null>;
   listStaff(clinicId: string): Promise<StaffRecord[]>;
@@ -194,8 +197,13 @@ export class MemoryClinicStore implements ClinicStore {
     return this.clinics.find((c) => c.id === clinicId) ?? null;
   }
 
+  async setClinicTimeZone(clinicId: string, timeZone: string): Promise<void> {
+    const c = this.clinics.find((x) => x.id === clinicId);
+    if (c) c.time_zone = timeZone;
+  }
+
   async createClinic(name: string): Promise<ClinicRecord> {
-    const row = { id: id(), name: name.slice(0, 120) };
+    const row: ClinicRecord = { id: id(), name: name.slice(0, 120), time_zone: "America/Chicago" };
     this.clinics.push(row);
     this.thresholds.set(row.id, { ...DEFAULT_THRESHOLDS });
     return row;
