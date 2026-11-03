@@ -5,6 +5,7 @@ import {
   accountKeyId, finishEnrollment, IndexedDbKeyStore, recoverAccount, RecoveryNotConfirmedError,
   startEnrollment, type PendingEnrollment, type SealedRecovery,
 } from "@/lib/e2e";
+import { csrfHeader } from "@/app/clinic/onboarding-client";
 
 interface Status {
   enrolled: boolean;
@@ -19,7 +20,7 @@ export default function SecureSetup() {
   const [pending, setPending] = useState<PendingEnrollment | null>(null);
   const [patientId, setPatientId] = useState("");
   const [typed, setTyped] = useState("");
-  const [consent, setConsent] = useState(false);
+  const [consent, setConsent] = useState<boolean | null>(null);
   const [hasDeviceKey, setHasDeviceKey] = useState(false);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,9 +51,13 @@ export default function SecureSetup() {
     setBusy(true);
     setMsg("");
     try {
-      const clinic = status?.clinic ? { clinicId: status.clinic.clinic_id, publicJwk: status.clinic.public_jwk, consent } : undefined;
+      if (status?.clinic && consent === null) {
+        setMsg("Choose whether your clinic care team can open your records.");
+        return;
+      }
+      const clinic = status?.clinic ? { clinicId: status.clinic.clinic_id, publicJwk: status.clinic.public_jwk, consent: consent === true } : undefined;
       const { bundle } = await finishEnrollment(pending, typed, { keystore: store, clinic });
-      const r = await fetch("/api/e2e/enroll", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bundle) });
+      const r = await fetch("/api/e2e/enroll", { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrfHeader() }, credentials: "same-origin", body: JSON.stringify(bundle) });
       if (!r.ok) throw new Error("save failed");
       setPending(null);
       setStatus({ ...(status as Status), enrolled: true });
@@ -93,10 +98,17 @@ export default function SecureSetup() {
           <pre className="rounded border p-3 text-lg tracking-wider">{pending.recoveryCode}</pre>
           <p>If you lose every device and this code, nobody can recover your encrypted records, including CareIQ.</p>
           {status.clinic && (
-            <label className="flex gap-2">
-              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-              <span>Let my clinic care team open my records. I can withdraw this later.</span>
-            </label>
+            <fieldset className="space-y-1">
+              <legend>Can your clinic care team open your records? You can change this later.</legend>
+              <label className="flex gap-2">
+                <input type="radio" name="clinic-consent" checked={consent === true} onChange={() => setConsent(true)} />
+                <span>Yes, let my clinic care team open my records.</span>
+              </label>
+              <label className="flex gap-2">
+                <input type="radio" name="clinic-consent" checked={consent === false} onChange={() => setConsent(false)} />
+                <span>No, only me (and family I choose later).</span>
+              </label>
+            </fieldset>
           )}
           <label className="block">Type the code back to confirm you saved it
             <input className="mt-1 w-full rounded border p-2" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />

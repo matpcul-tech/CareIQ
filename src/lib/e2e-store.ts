@@ -38,6 +38,13 @@ export function supabaseE2eStore(): E2eStore {
     async saveEntry(patientId, e) {
       check((await sb.from("patient_e2e_entries").upsert({ ...e, patient_id: patientId, updated_at: new Date().toISOString() })).error);
     },
+    async listEntries(patientId, dekId) {
+      const { data, error } = await sb.from("patient_e2e_entries")
+        .select("id, patient_id, category, dek_id, envelope, le8_band, alert_severity")
+        .eq("patient_id", patientId).eq("dek_id", dekId).order("updated_at", { ascending: false }).limit(500);
+      check(error);
+      return data ?? [];
+    },
     async withdraw(patientId, w) {
       const now = new Date().toISOString();
       check((await sb.from("key_wraps").insert(w.wraps.map((x) => ({ ...x, patient_id: patientId })))).error);
