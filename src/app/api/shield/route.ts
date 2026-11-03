@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import Anthropic from "@anthropic-ai/sdk";
 import { getServiceClient } from "@/lib/supabase-server";
+import { shieldAnthropic } from "@/lib/shield-anthropic";
 import { decryptJson } from "@/lib/crypto";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { assertTextOnlyModelPayload } from "@/lib/model-outbound";
+import { isAiEnabled } from "@/lib/ai-flag";
 import {
+  aiOffBody,
   handleShieldPost,
   type ShieldModelRequest,
   type ShieldPatientRecord,
@@ -50,6 +53,10 @@ async function loadPatient(patientId: string): Promise<ShieldPatientRecord> {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAiEnabled()) {
+    return NextResponse.json(aiOffBody());
+  }
+
   const sessionId = headers().get("x-session-id") || "";
   const response = await handleShieldPost(req, {
     sessionId,
@@ -60,11 +67,12 @@ export async function POST(req: NextRequest) {
     loadPatient,
     logAudit,
     getApiKey: () => process.env.ANTHROPIC_API_KEY || "",
+    isAiEnabled: () => true,
     createMessage: async (body: ShieldModelRequest) => {
       // handleShieldPost already built this from Shield redaction.
       // Refuse document, image, and base64 attachments at the network edge.
       assertTextOnlyModelPayload(body);
-      const client = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY || "").trim() });
+      const client = shieldAnthropic.create((process.env.ANTHROPIC_API_KEY || "").trim());
       const result = await client.messages.create({
         model: body.model,
         max_tokens: body.max_tokens,

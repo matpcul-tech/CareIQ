@@ -9,7 +9,7 @@ function getCsrfToken(): string {
   return decodeURIComponent(m[1]).split(".")[0];
 }
 
-export default function InsightButton() {
+export default function InsightButton({ aiEnabled = false }: { aiEnabled?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [insight, setInsight] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -42,7 +42,7 @@ export default function InsightButton() {
   }
 
   return (
-    <div className="mt-3">
+    <div className="mt-3" data-ai-enabled={aiEnabled ? "true" : "false"}>
       <button type="button" onClick={generate} disabled={busy} className="btn-primary">
         {busy ? "Generating..." : "Generate AI Health Insight"}
       </button>

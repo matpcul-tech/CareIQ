@@ -6,6 +6,7 @@
  */
 
 import { createHash } from "crypto";
+import { isAiEnabled } from "./ai-flag";
 import { assertTextOnlyModelPayload } from "./model-outbound";
 import {
   buildShieldUserContent,
@@ -128,6 +129,23 @@ export interface ShieldDeps {
   getApiKey: () => string;
   createMessage: (body: ShieldModelRequest) => Promise<ShieldModelResponse>;
   classifyError?: (err: unknown) => { reason: string; status: number };
+  /** Defaults to the CAREIQ_AI_ENABLED env flag. */
+  isAiEnabled?: () => boolean;
+}
+
+export const AI_OFF_INSIGHT = "AI is off.";
+
+export function aiOffBody() {
+  return {
+    insight: AI_OFF_INSIGHT,
+    ok: false as const,
+    aiEnabled: false as const,
+    meta: {
+      shieldVersion: SHIELD_VERSION,
+      aiEnabled: false as const,
+      reason: "ai_off",
+    },
+  };
 }
 
 const SEVERITY_RANK: Record<Severity, number> = {
@@ -160,6 +178,11 @@ function json(body: unknown, status = 200): Response {
 }
 
 export async function handleShieldPost(req: Request, deps: ShieldDeps): Promise<Response> {
+  const aiEnabled = deps.isAiEnabled ? deps.isAiEnabled() : isAiEnabled();
+  if (!aiEnabled) {
+    return json(aiOffBody());
+  }
+
   const session = deps.readSession();
   if (!session.patientId) {
     return json({ error: "authentication required" }, 401);

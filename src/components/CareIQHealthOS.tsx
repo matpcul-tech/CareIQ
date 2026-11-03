@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
+import type { ResolvedLabs } from "@/lib/lab-values";
 
 const ZK_SALT = "CARE-IQ-ZK-SHIELD-2026";
 const ZK_TERMS = ["fqhc","careiq","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
@@ -283,7 +284,12 @@ export interface ClinicalData {
   wearDays: string[];
   wearableSource: "demo" | "upload" | "none";
   primaryDeviceLabel?: string;
+  /** Labs already decrypted on the server. Optional so demo mode can omit them. */
+  labs?: ResolvedLabs;
+  sex?: "male" | "female" | "unknown";
 }
+
+const AiEnabledContext = createContext(false);
 
 const DEMO_DATA: ClinicalData = {
   patient: DEMO_PATIENT,
@@ -859,9 +865,10 @@ const RING_C=2*Math.PI*RING_R;
 interface CareIQHealthOSProps {
   clinicalData?: ClinicalData;
   demoMode?: boolean;
+  aiEnabled?: boolean;
 }
 
-export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareIQHealthOSProps = {}) {
+export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabled = false }: CareIQHealthOSProps = {}) {
   const data = clinicalData ?? DEMO_DATA;
   // Banner shows whenever no real clinical data was passed, or whenever the
   // caller explicitly asks for demo mode.
@@ -924,6 +931,7 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
   const offset=RING_C*(1-ringPct/100);
 
   return(
+    <AiEnabledContext.Provider value={aiEnabled}>
     <ClinicalDataContext.Provider value={data}>
       <style>{CSS}</style>
       <div className={`hos${elder?" elder":""}`}>
@@ -1002,5 +1010,6 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false }: CareI
         </div>
       </div>
     </ClinicalDataContext.Provider>
+    </AiEnabledContext.Provider>
   );
 }

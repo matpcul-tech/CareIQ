@@ -17,6 +17,8 @@ export interface ResolvedLabs {
   bpDiastolic?: number;
   triglycerides?: number;
   egfr?: number;
+  tsh?: number;
+  vitaminD?: number;
 }
 
 export interface LabHistoryLike {
@@ -46,6 +48,8 @@ const KEY_MAP: Record<keyof ResolvedLabs, [string[], string[]]> = {
   bpSystolic: [["bp_systolic"], ["bpSystolic"]],
   bpDiastolic: [["bp_diastolic"], ["bpDiastolic"]],
   egfr: [["egfr"], ["egfr"]],
+  tsh: [["tsh"], ["tsh"]],
+  vitaminD: [["vitamin_d"], ["vitaminD", "vitamin_d"]],
 };
 
 export function resolveLabs(history: LabHistoryLike | null | undefined): ResolvedLabs {

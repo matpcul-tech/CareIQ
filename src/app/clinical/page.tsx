@@ -1,3 +1,4 @@
+import { isAiEnabled } from "@/lib/ai-flag";
 import { resolveLabs } from "@/lib/lab-values";
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
@@ -19,6 +20,7 @@ interface ProfilePlaintext {
   lastName?: string;
   dateOfBirth?: string;
   communityAffiliation?: string;
+  sex?: "male" | "female";
 }
 
 interface ManualLabs {
@@ -103,8 +105,10 @@ export default async function ClinicalPage() {
     success: true,
   });
 
+  const aiEnabled = isAiEnabled();
+
   if (!hasAnyData) {
-    return <CareIQHealthOS demoMode={true} />;
+    return <CareIQHealthOS demoMode={true} aiEnabled={aiEnabled} />;
   }
 
   const clinicalData = buildClinicalData({
@@ -115,9 +119,10 @@ export default async function ClinicalPage() {
     metrics,
     deviceType,
     enrolledAt: patRes.data?.created_at ?? null,
+    sex: profile?.sex === "male" || profile?.sex === "female" ? profile.sex : "unknown",
   });
 
-  return <CareIQHealthOS demoMode={false} clinicalData={clinicalData} />;
+  return <CareIQHealthOS demoMode={false} clinicalData={clinicalData} aiEnabled={aiEnabled} />;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -132,8 +137,9 @@ function buildClinicalData(args: {
   metrics: DailyMetric[];
   deviceType: string;
   enrolledAt: string | null;
+  sex: "male" | "female" | "unknown";
 }): ClinicalData {
-  const { patientId, profile, history, labFileCount, metrics, deviceType, enrolledAt } = args;
+  const { patientId, profile, history, labFileCount, metrics, deviceType, enrolledAt, sex } = args;
 
   const fullName = [profile?.firstName, profile?.lastName]
     .map((s) => (s || "").trim())
@@ -313,6 +319,8 @@ function buildClinicalData(args: {
     wearDays,
     wearableSource: deviceType ? "upload" : "none",
     primaryDeviceLabel: deviceType ? humanDevice(deviceType) : undefined,
+    labs: manual,
+    sex,
   };
   return result;
 }

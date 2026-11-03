@@ -176,6 +176,7 @@ test("synthetic PHI through the Shield does not reach the model payload", async 
       }),
       logAudit: async () => {},
       getApiKey: () => "sk-ant-synthetic",
+      isAiEnabled: () => true,
       createMessage: async (body) => {
         calls.push(body);
         return {
@@ -226,6 +227,7 @@ test("CRITICAL synthetic SSN blocks the model call", async () => {
       },
       logAudit: async () => {},
       getApiKey: () => "sk-ant-synthetic",
+      isAiEnabled: () => true,
       createMessage: async (body) => {
         calls.push(body);
         return {
