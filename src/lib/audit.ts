@@ -31,7 +31,12 @@ export type AuditAction =
   | "clinic.alert.created"
   | "clinic.alert.acknowledged"
   | "clinic.alert.resolved"
-  | "clinic.alert.listed";
+  | "clinic.alert.listed"
+  | "clinic.appointments.imported"
+  | "clinic.reminders.viewed"
+  | "clinic.reminders.dispatched"
+  | "clinic.reminders.template"
+  | "clinic.reminders.inbound";
 
 export type DataType =
   | "none"
@@ -43,7 +48,8 @@ export type DataType =
   | "auth"
   | "ai_inference"
   | "care_circle_invites"
-  | "clinic_alert";
+  | "clinic_alert"
+  | "clinic_reminder";
 
 export interface AuditEntry {
   sessionId: string;

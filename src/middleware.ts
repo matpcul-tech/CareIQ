@@ -31,6 +31,12 @@ const rateBuckets = new Map<string, Bucket>();
 
 const STAFF_COOKIE = "sov_clinic";
 
+const STAFF_ONLY_CLINIC_APIS = new Set<string>([
+  "/api/clinic/uds",
+  "/api/clinic/alerts",
+  "/api/clinic/appointments",
+]);
+
 // These routes skip the CSRF check. Clinic staff sign-in is not in this set.
 const CSRF_EXEMPT_API_PATHS = new Set<string>([
   "/api/auth/magic-link",
@@ -38,6 +44,7 @@ const CSRF_EXEMPT_API_PATHS = new Set<string>([
   "/api/shield/decrypt",
   // Twilio cannot send the app CSRF cookie. The route checks X-Twilio-Signature.
   "/api/clinic/wellness/inbound",
+  "/api/clinic/reminders/inbound",
   // Fictional clinic snapshot. The route itself rejects every write.
   "/api/demo",
 ]);
@@ -267,7 +274,8 @@ export async function middleware(req: NextRequest) {
   // /demo stays public. It is not a dashboard, clinical, or protected API path.
   const needsIdentity = isDashboardPath(pathname) || isClinicalPath(pathname) || isProtectedApi(pathname);
   // The staff cookie authorizes only /api/clinic. It does not open patient routes.
-  const staffClinicApi = pathname === "/api/clinic" && Boolean(existingStaff);
+  // Staff-only clinic APIs check the staff session themselves; they do not need the patient cookie.
+  const staffClinicApi = (pathname === "/api/clinic" || STAFF_ONLY_CLINIC_APIS.has(pathname)) && Boolean(existingStaff);
   if (needsIdentity) {
     if (!existingAuth && !staffClinicApi) {
       if (isApi) {

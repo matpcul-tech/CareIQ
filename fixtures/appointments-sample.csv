@@ -1,0 +1,66 @@
+appointment_id,patient_id,appointment_date,appointment_time,provider,location,visit_type,patient_phone,preferred_language,contact_preference,care_gap_consent
+APT-1001,SYN-0001,2026-11-28,10:00,Dr Chen,Eastside Health Center,well woman,312-555-0124,en,text,yes
+APT-1002,SYN-0001,2026-11-20,16:15,NP Okafor,Eastside Health Center,checkup,312-555-0162,es,text,no
+APT-1003,SYN-0002,2026-12-11,15:15,Dr Chen,Eastside Health Center,checkup,,es,text,yes
+APT-1004,SYN-0003,2026-12-03,13:00,Dr Chen,Mobile Unit,checkup,312-555-0159,es,text,yes
+APT-1005,SYN-0004,2026-11-07,12:45,NP Okafor,Main Street Clinic,well woman,312-555-0190,en,text,no
+APT-1006,SYN-0005,2026-11-25,11:45,Dr Rivera,Mobile Unit,checkup,,en,text,yes
+APT-1007,SYN-0006,2026-11-10,10:30,NP Okafor,Main Street Clinic,checkup,312-555-0172,es,text,yes
+APT-1008,SYN-0007,2026-11-14,08:15,NP Okafor,Mobile Unit,well woman,312-555-0125,en,text,yes
+APT-1009,SYN-0008,2026-11-18,10:30,Dr Patel,Mobile Unit,well woman,312-555-0150,es,text,yes
+APT-1010,SYN-0009,2026-11-07,09:15,NP Okafor,Mobile Unit,diabetes visit,312-555-0191,en,none,yes
+APT-1011,SYN-0009,2026-11-16,13:30,NP Okafor,Mobile Unit,well woman,312-555-0124,es,text,yes
+APT-1012,SYN-0010,2026-11-10,15:30,Dr Rivera,Eastside Health Center,well woman,312-555-0184,es,voice,no
+APT-1013,SYN-0010,2026-12-05,14:45,Dr Patel,Eastside Health Center,checkup,,es,text,yes
+APT-1014,SYN-0011,2026-12-09,14:00,Dr Patel,Eastside Health Center,diabetes visit,312-555-0178,en,voice,yes
+APT-1015,SYN-0011,2026-11-08,15:30,Dr Rivera,Main Street Clinic,follow up,312-555-0139,en,text,yes
+APT-1016,SYN-0012,2026-11-11,08:45,Dr Rivera,Main Street Clinic,checkup,312-555-0144,en,text,yes
+APT-1017,SYN-0012,2026-12-10,10:45,Dr Rivera,Main Street Clinic,well woman,312-555-0171,es,text,yes
+APT-1018,SYN-0013,2026-11-07,08:30,Dr Rivera,Mobile Unit,diabetes visit,312-555-0123,en,text,yes
+APT-1019,SYN-0014,2026-11-28,09:45,Dr Chen,Main Street Clinic,diabetes visit,312-555-0154,en,text,yes
+APT-1020,SYN-0014,2026-12-01,09:30,Dr Patel,Eastside Health Center,diabetes visit,312-555-0145,es,text,yes
+APT-1021,SYN-0015,2026-11-13,15:30,NP Okafor,Eastside Health Center,follow up,312-555-0164,en,text,yes
+APT-1022,SYN-0016,2026-11-28,09:45,Dr Chen,Mobile Unit,well woman,312-555-0181,en,text,yes
+APT-1023,SYN-0017,2026-12-03,13:45,Dr Chen,Mobile Unit,well woman,312-555-0154,es,none,yes
+APT-1024,SYN-0018,2026-11-12,15:45,NP Okafor,Eastside Health Center,well woman,312-555-0142,vi,text,no
+APT-1025,SYN-0019,2026-12-08,11:15,Dr Rivera,Main Street Clinic,diabetes visit,312-555-0103,es,text,no
+APT-1026,SYN-0020,2026-11-21,10:45,NP Okafor,Mobile Unit,diabetes visit,312-555-0124,es,text,yes
+APT-1027,SYN-0020,2026-11-21,10:30,NP Okafor,Main Street Clinic,checkup,312-555-0129,es,voice,no
+APT-1028,SYN-0021,2026-11-08,10:15,Dr Rivera,Mobile Unit,diabetes visit,312-555-0191,en,text,no
+APT-1029,SYN-0022,2026-11-13,08:30,Dr Rivera,Main Street Clinic,checkup,312-555-0147,en,none,no
+APT-1030,SYN-0023,2026-11-04,10:30,NP Okafor,Main Street Clinic,well woman,312-555-0193,vi,voice,yes
+APT-1031,SYN-0024,2026-12-02,09:30,Dr Patel,Main Street Clinic,follow up,312-555-0188,vi,text,no
+APT-1032,SYN-0024,2026-12-05,13:30,Dr Patel,Eastside Health Center,diabetes visit,312-555-0142,en,text,yes
+APT-1033,SYN-0025,2026-11-24,09:30,Dr Patel,Mobile Unit,follow up,312-555-0160,en,text,no
+APT-1034,SYN-0026,2026-11-22,12:45,Dr Chen,Main Street Clinic,follow up,312-555-0127,en,text,no
+APT-1035,SYN-0027,2026-11-16,10:45,Dr Patel,Mobile Unit,checkup,312-555-0195,en,none,yes
+APT-1036,SYN-0028,2026-11-04,12:15,Dr Patel,Mobile Unit,follow up,312-555-0117,en,none,no
+APT-1037,SYN-0029,2026-12-07,15:45,Dr Rivera,Eastside Health Center,diabetes visit,312-555-0130,es,none,yes
+APT-1038,SYN-0029,2026-11-18,10:15,NP Okafor,Main Street Clinic,checkup,312-555-0116,en,text,no
+APT-1039,SYN-0030,2026-11-23,16:45,Dr Rivera,Mobile Unit,checkup,312-555-0161,en,text,yes
+APT-1040,SYN-0031,2026-11-19,15:15,Dr Chen,Main Street Clinic,checkup,312-555-0116,en,text,yes
+APT-1041,SYN-0031,2026-11-25,08:45,NP Okafor,Eastside Health Center,diabetes visit,312-555-0121,en,text,no
+APT-1042,SYN-0032,2026-11-17,13:30,Dr Chen,Eastside Health Center,checkup,312-555-0184,en,text,yes
+APT-1043,SYN-0032,2026-11-18,11:00,Dr Patel,Main Street Clinic,diabetes visit,312-555-0151,en,text,yes
+APT-1044,SYN-0033,2026-11-30,09:00,Dr Patel,Eastside Health Center,well woman,312-555-0183,en,text,yes
+APT-1045,SYN-0034,2026-11-11,09:15,Dr Patel,Main Street Clinic,diabetes visit,,es,text,yes
+APT-1046,SYN-0034,2026-11-08,15:45,Dr Patel,Eastside Health Center,follow up,312-555-0132,vi,text,yes
+APT-1047,SYN-0035,2026-11-11,14:15,Dr Chen,Eastside Health Center,checkup,312-555-0113,en,text,yes
+APT-1048,SYN-0036,2026-11-22,16:15,Dr Chen,Mobile Unit,well woman,312-555-0134,en,text,no
+APT-1049,SYN-0037,2026-11-09,12:45,NP Okafor,Main Street Clinic,well woman,312-555-0158,es,text,yes
+APT-1050,SYN-0038,2026-12-06,09:30,NP Okafor,Eastside Health Center,diabetes visit,312-555-0136,en,text,yes
+APT-1051,SYN-0039,2026-11-28,13:30,Dr Rivera,Main Street Clinic,well woman,312-555-0196,en,text,yes
+APT-1052,SYN-0040,2026-12-04,09:15,Dr Chen,Main Street Clinic,diabetes visit,312-555-0169,en,none,yes
+APT-1053,SYN-0040,2026-12-01,11:30,Dr Chen,Main Street Clinic,well woman,312-555-0116,en,none,no
+APT-1054,SYN-0041,2026-12-11,10:30,NP Okafor,Main Street Clinic,checkup,312-555-0145,en,text,no
+APT-1055,SYN-0041,2026-12-05,15:00,NP Okafor,Eastside Health Center,diabetes visit,312-555-0174,es,text,yes
+APT-1056,SYN-0042,2026-11-11,14:30,Dr Rivera,Eastside Health Center,checkup,312-555-0114,es,text,no
+APT-1057,SYN-0043,2026-11-06,12:00,NP Okafor,Eastside Health Center,follow up,312-555-0143,es,text,no
+APT-1058,SYN-0044,2026-11-14,10:00,NP Okafor,Mobile Unit,well woman,312-555-0134,en,voice,no
+APT-1059,SYN-0045,2026-11-26,15:15,Dr Chen,Main Street Clinic,well woman,312-555-0107,vi,voice,yes
+APT-1060,SYN-0045,2026-11-27,12:00,Dr Chen,Main Street Clinic,well woman,312-555-0149,en,text,yes
+APT-1061,SYN-0046,2026-12-05,15:00,NP Okafor,Mobile Unit,checkup,312-555-0114,es,none,yes
+APT-1062,SYN-0047,2026-11-27,16:30,Dr Patel,Mobile Unit,checkup,312-555-0128,vi,text,no
+APT-1063,SYN-0048,2026-11-14,11:45,Dr Chen,Mobile Unit,checkup,312-555-0119,en,text,no
+APT-1064,SYN-0049,2026-11-19,10:45,NP Okafor,Main Street Clinic,checkup,312-555-0127,es,text,no
+APT-1065,SYN-0050,2026-12-01,16:45,Dr Patel,Main Street Clinic,diabetes visit,312-555-0149,en,text,yes

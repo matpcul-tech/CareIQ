@@ -125,6 +125,7 @@ export interface ScreenRecord {
 
 export interface ClinicStore {
   createClinic(name: string): Promise<ClinicRecord>;
+  getClinic(clinicId: string): Promise<ClinicRecord | null>;
   addStaff(clinicId: string, role: StaffRole, displayName: string, phone?: string | null, extras?: StaffInsertExtras): Promise<StaffRecord>;
   getStaff(staffId: string): Promise<StaffRecord | null>;
   listStaff(clinicId: string): Promise<StaffRecord[]>;
@@ -188,6 +189,10 @@ export class MemoryClinicStore implements ClinicStore {
   safety: SafetyEvent[] = [];
   careSettings = new Map<string, CareSettings>();
   inboundSids = new Set<string>();
+
+  async getClinic(clinicId: string): Promise<ClinicRecord | null> {
+    return this.clinics.find((c) => c.id === clinicId) ?? null;
+  }
 
   async createClinic(name: string): Promise<ClinicRecord> {
     const row = { id: id(), name: name.slice(0, 120) };
