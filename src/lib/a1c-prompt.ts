@@ -1,16 +1,23 @@
 /**
  * A1C screening prompt.
  *
- * ADA Standards of Care start routine diabetes screening at age 35, and
- * earlier when risk is higher. This product shows the same prompt to
- * every adult age 18 and over. It does not collect race or ethnicity
- * and it does not change the prompt for anyone.
+ * Source: American Diabetes Association, Standards of Care in Diabetes,
+ * Section 2 (Diagnosis and Classification of Diabetes): testing for
+ * prediabetes and type 2 diabetes should begin at age 35 for all adults,
+ * regardless of risk factors. Earlier testing for people under 35 is a
+ * risk-based decision for the care team, so this product shows no
+ * automatic prompt under 35.
+ *
+ * The same prompt is shown to every adult age 35 and over. This product
+ * does not collect race or ethnicity and it does not change the prompt
+ * for anyone.
  */
 
-export const ADULT_A1C_MIN_AGE = 18;
+/** ADA Standards of Care: screen all adults starting at age 35. */
+export const ADULT_A1C_MIN_AGE = 35;
 
 export const ADULT_A1C_PROMPT =
-  "Ask your care team about an A1C test. This is general information, not a diagnosis.";
+  "Adults age 35 and over are advised to get an A1C test. Ask your care team about one. This is general information, not a diagnosis.";
 
 export function ageInYears(dateOfBirth: string, today: Date): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return null;
