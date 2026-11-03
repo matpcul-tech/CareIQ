@@ -2,6 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ADULT_A1C_PROMPT, adultA1cPrompt } from "@/lib/a1c-prompt";
+
+const MEPA_FIELDS = [
+  { key: "oliveOilPerDay", label: "Olive oil, servings per day (1 tablespoon)" },
+  { key: "leafyVegetablesPerWeek", label: "Green leafy vegetables, servings per week" },
+  { key: "otherVegetablesPerDay", label: "Other vegetables, servings per day" },
+  { key: "berriesPerWeek", label: "Berries, servings per week" },
+  { key: "otherFruitPerDay", label: "Other fruit, servings per day" },
+  { key: "redMeatPerWeek", label: "Red meat, hamburger, bacon, or sausage, servings per week" },
+  { key: "fishPerWeek", label: "Fish, not fried, servings per week" },
+  { key: "chickenPerWeek", label: "Chicken, not fried, servings per week" },
+  { key: "cheesePerWeek", label: "Full-fat cheese, servings per week" },
+  { key: "butterPerWeek", label: "Butter or cream, servings per week" },
+  { key: "beansPerWeek", label: "Beans, servings per week" },
+  { key: "wholeGrainsPerDay", label: "Whole grains, servings per day" },
+  { key: "sweetsPerWeek", label: "Sweets, pastries, cookies, or cakes, servings per week" },
+  { key: "nutsPerWeek", label: "Nuts, servings per week" },
+  { key: "fastFoodPerWeek", label: "Fast food meals per week" },
+  { key: "alcoholPerDay", label: "Alcohol, servings per day" },
+] as const;
 
 const CONDITIONS = [
   { value: "diabetes", label: "Diabetes" },
@@ -510,6 +530,11 @@ function Step2Profile({
           Used by the longevity panel to resolve sex-dependent reference ranges. Optional.
         </p>
       </div>
+      {adultA1cPrompt(dob, new Date()) && (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-ink">
+          {ADULT_A1C_PROMPT}
+        </p>
+      )}
       <label className="field-label">Community affiliation (optional)</label>
       <input
         value={community}
@@ -537,6 +562,14 @@ function Step3History({
   const [meds, setMeds] = useState("");
   const [allergies, setAllergies] = useState("");
   const [family, setFamily] = useState("");
+  const [moderate, setModerate] = useState("");
+  const [vigorous, setVigorous] = useState("");
+  const [nicotine, setNicotine] = useState("");
+  const [indoor, setIndoor] = useState("");
+  const [sleepHours, setSleepHours] = useState("");
+  const [lipidTreated, setLipidTreated] = useState("");
+  const [bpTreated, setBpTreated] = useState("");
+  const [mepa, setMepa] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -563,11 +596,35 @@ function Step3History({
     setBusy(true);
     setErr("");
     try {
+      const mepaPayload: Record<string, number> = {};
+      for (const item of MEPA_FIELDS) {
+        const raw = (mepa[item.key] ?? "").trim();
+        if (raw === "") continue;
+        const n = Number(raw);
+        if (Number.isFinite(n)) mepaPayload[item.key] = n;
+      }
+      const num = (raw: string) => {
+        const trimmed = raw.trim();
+        if (trimmed === "") return undefined;
+        const n = Number(trimmed);
+        return Number.isFinite(n) ? n : undefined;
+      };
+      const yesNo = (raw: string) => raw === "yes" ? true : raw === "no" ? false : undefined;
       const res = await postJson("/api/onboard/health-history", {
         chronicConditions: Array.from(conditions),
         medications: meds,
         allergies,
         familyHistory: family,
+        le8: {
+          mepa: mepaPayload,
+          moderateMinutesPerWeek: num(moderate),
+          vigorousMinutesPerWeek: num(vigorous),
+          nicotine: nicotine || undefined,
+          livesWithIndoorSmoker: yesNo(indoor),
+          sleepHours: num(sleepHours),
+          lipidTreated: yesNo(lipidTreated),
+          bpTreated: yesNo(bpTreated),
+        },
       });
       if (!res.ok) {
         setErr("Could not save your health history. Please try again.");
@@ -630,6 +687,60 @@ function Step3History({
         className="field-textarea"
       />
 
+      <fieldset className="rounded-xl border border-slate-200 p-4">
+        <legend className="px-1 text-xs font-semibold text-ink-soft">Heart health questions</legend>
+        <p className="mb-3 text-sm text-ink-soft">
+          These answers stay in the encrypted record. They are the diet, activity, nicotine, and sleep questions used for the Heart Health Score. Talk with your care team before changing medicines. This is general information, not a diagnosis.
+        </p>
+        <label className="field-label">Moderate activity minutes in a usual week</label>
+        <input value={moderate} onChange={(e) => setModerate(e.target.value)} type="number" min="0" className="field-input" />
+        <label className="field-label mt-2">Vigorous activity minutes in a usual week</label>
+        <input value={vigorous} onChange={(e) => setVigorous(e.target.value)} type="number" min="0" className="field-input" />
+        <label className="field-label mt-2">Nicotine</label>
+        <select value={nicotine} onChange={(e) => setNicotine(e.target.value)} className="field-input">
+          <option value="">Not answered</option>
+          <option value="never">Never smoker</option>
+          <option value="quit_5y_or_more">Former smoker, quit 5 years ago or more</option>
+          <option value="quit_1_to_under_5y">Former smoker, quit 1 year up to less than 5 years</option>
+          <option value="quit_under_1y_or_nds">Quit less than 1 year ago, or current inhaled nicotine product</option>
+          <option value="current_smoker">Current smoker</option>
+        </select>
+        <label className="field-label mt-2">Lives with someone who smokes indoors</label>
+        <select value={indoor} onChange={(e) => setIndoor(e.target.value)} className="field-input">
+          <option value="">Not answered</option>
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+        <label className="field-label mt-2">Usual hours of sleep a night</label>
+        <input value={sleepHours} onChange={(e) => setSleepHours(e.target.value)} type="number" min="0" max="24" step="0.5" className="field-input" />
+        <label className="field-label mt-2">Taking a medicine for cholesterol</label>
+        <select value={lipidTreated} onChange={(e) => setLipidTreated(e.target.value)} className="field-input">
+          <option value="">Not answered</option>
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+        <label className="field-label mt-2">Taking a medicine for blood pressure</label>
+        <select value={bpTreated} onChange={(e) => setBpTreated(e.target.value)} className="field-input">
+          <option value="">Not answered</option>
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+        <div className="mt-3 font-semibold text-sm">Diet screener</div>
+        {MEPA_FIELDS.map((item) => (
+          <label key={item.key} className="mt-2 block text-sm">
+            <span className="field-label">{item.label}</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={mepa[item.key] ?? ""}
+              onChange={(e) => setMepa((prev) => ({ ...prev, [item.key]: e.target.value }))}
+              className="field-input"
+            />
+          </label>
+        ))}
+      </fieldset>
+
       <button type="submit" disabled={busy} className="btn-primary mt-2">
         {busy ? "Saving..." : "Continue"}
       </button>
@@ -665,6 +776,8 @@ function Step4Upload({
 
   // Blood pressure (vitals, kept legacy flat shape)
   const [bpSystolic, setBpSystolic] = useState<string>("");
+  const [weightLb, setWeightLb] = useState("");
+  const [heightIn, setHeightIn] = useState("");
   const [bpDiastolic, setBpDiastolic] = useState<string>("");
 
   const [labsStatus, setLabsStatus] = useState<{ ok: boolean; message: string } | null>(null);
@@ -857,11 +970,23 @@ function Step4Upload({
       const n = Number(diaTrim);
       if (Number.isFinite(n)) payload.bpDiastolic = n;
     }
+    const weightTrim = weightLb.trim();
+    const heightTrim = heightIn.trim();
+    if (weightTrim !== "") {
+      const n = Number(weightTrim);
+      if (Number.isFinite(n)) payload.weight = n;
+    }
+    if (heightTrim !== "") {
+      const n = Number(heightTrim);
+      if (Number.isFinite(n)) payload.height = n;
+    }
 
     const enteredCount =
       Object.keys(biomarkers).length +
       (payload.bpSystolic !== undefined ? 1 : 0) +
-      (payload.bpDiastolic !== undefined ? 1 : 0);
+      (payload.bpDiastolic !== undefined ? 1 : 0) +
+      (payload.weight !== undefined ? 1 : 0) +
+      (payload.height !== undefined ? 1 : 0);
 
     if (enteredCount === 0) {
       onDone();
@@ -955,7 +1080,11 @@ function Step4Upload({
         <div className="mb-3 text-sm text-ink-soft">
           Optional. Stored as a vital sign and applied to your latest reading.
         </div>
-        <label className="field-label">Blood Pressure (mmHg)</label>
+        <label className="field-label">Weight (pounds)</label>
+        <input value={weightLb} onChange={(e) => setWeightLb(e.target.value)} type="number" min="50" max="700" className="field-input" />
+        <label className="field-label mt-2">Height (inches)</label>
+        <input value={heightIn} onChange={(e) => setHeightIn(e.target.value)} type="number" min="36" max="96" className="field-input" />
+        <label className="field-label mt-2">Blood Pressure (mmHg)</label>
         <div className="flex items-center gap-2">
           <input
             aria-label="Systolic"

@@ -51,6 +51,16 @@ test("vitamin D falls back to manualLabs vitaminD", () => {
   assert.equal(labs.tsh, 6.1);
 });
 
+test("reads total cholesterol, weight, and height", () => {
+  const labs = resolveLabs({
+    biomarkers: { total_cholesterol: { value: 180 } },
+    manualLabs: { weight: 168, height: 67 },
+  });
+  assert.equal(labs.totalCholesterol, 180);
+  assert.equal(labs.weight, 168);
+  assert.equal(labs.height, 67);
+});
+
 test("ignores missing or bad values", () => {
   assert.deepEqual(resolveLabs(null), {});
   assert.deepEqual(resolveLabs({}), {});

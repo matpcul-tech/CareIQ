@@ -19,6 +19,9 @@ export interface ResolvedLabs {
   egfr?: number;
   tsh?: number;
   vitaminD?: number;
+  totalCholesterol?: number;
+  weight?: number;
+  height?: number;
 }
 
 export interface LabHistoryLike {
@@ -50,6 +53,9 @@ const KEY_MAP: Record<keyof ResolvedLabs, [string[], string[]]> = {
   egfr: [["egfr"], ["egfr"]],
   tsh: [["tsh"], ["tsh"]],
   vitaminD: [["vitamin_d"], ["vitaminD", "vitamin_d"]],
+  totalCholesterol: [["total_cholesterol"], ["totalCholesterol", "total_cholesterol"]],
+  weight: [["weight"], ["weight"]],
+  height: [["height"], ["height"]],
 };
 
 export function resolveLabs(history: LabHistoryLike | null | undefined): ResolvedLabs {

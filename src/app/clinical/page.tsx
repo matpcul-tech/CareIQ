@@ -1,5 +1,7 @@
 import { isAiEnabled } from "@/lib/ai-flag";
+import { glucoseRangeSentence, glucoseRangeLabel, kdigoGStage, kdigoSentence, PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
 import { resolveLabs } from "@/lib/lab-values";
+import { scoreLe8, type Le8Input } from "@/lib/le8";
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -43,6 +45,7 @@ interface HistoryPlaintext {
   familyHistory?: string;
   manualLabs?: ManualLabs;
   biomarkers?: Record<string, unknown>;
+  le8?: Le8Input;
 }
 
 interface DailyMetric {
@@ -151,7 +154,7 @@ function buildClinicalData(args: {
     name: fullName || "Community Patient",
     id: `CIQ-${patientId.slice(0, 8).toUpperCase()}`,
     age: ageFromDob(profile?.dateOfBirth) ?? 0,
-    score: deriveHealthScore(history, metrics),
+    score: 0,
   };
 
   // Manually-entered labs override demo defaults wherever the patient typed
@@ -189,14 +192,29 @@ function buildClinicalData(args: {
 
   const conditions = (history?.chronicConditions ?? []).map((c) => c.toLowerCase());
   const has = (k: string) => conditions.some((c) => c.includes(k));
-  const domains: ClinicalDomain[] = [
-    { name: "Metabolic",       score: has("diabet") || has("metabolic") ? 48 : 78 },
-    { name: "Cardiovascular",  score: has("hypert") || has("heart") || has("cardio") ? 52 : 76 },
-    { name: "Cognitive",       score: has("dement") || has("alzheim") ? 50 : 84 },
-    { name: "Oncology",        score: has("cancer") ? 60 : 88 },
-    { name: "Renal",           score: has("kidney") || has("renal") ? 55 : 82 },
-    { name: "Mental Health",   score: has("anxiety") || has("depress") ? 60 : 80 },
-  ];
+  const domains: ClinicalDomain[] = [];
+  const heartHealth = scoreLe8({
+    sex,
+    mepa: history?.le8?.mepa,
+    moderateMinutesPerWeek: history?.le8?.moderateMinutesPerWeek,
+    vigorousMinutesPerWeek: history?.le8?.vigorousMinutesPerWeek,
+    nicotine: history?.le8?.nicotine,
+    livesWithIndoorSmoker: history?.le8?.livesWithIndoorSmoker,
+    sleepHours: history?.le8?.sleepHours,
+    weightLb: manual.weight,
+    heightIn: manual.height,
+    totalCholesterol: manual.totalCholesterol,
+    hdl: manual.hdl,
+    lipidTreated: history?.le8?.lipidTreated,
+    a1c: manual.a1c,
+    fastingGlucose: manual.fastingGlucose,
+    diabetesRecorded: has("diabet"),
+    bpSystolic: manual.bpSystolic,
+    bpDiastolic: manual.bpDiastolic,
+    bpTreated: history?.le8?.bpTreated,
+  });
+  const glucoseLabel = glucoseRangeLabel({ a1c: manual.a1c, fastingGlucose: manual.fastingGlucose });
+  const gStage = manual.egfr != null ? kdigoGStage(manual.egfr) : null;
 
   const insights: ClinicalInsight[] = [];
   if (has("diabet") || (manual.a1c != null && manual.a1c >= 5.7)) {
@@ -324,6 +342,11 @@ function buildClinicalData(args: {
     labs: manual,
     sex,
     recordedConditions: (history?.chronicConditions ?? []).map((c) => c.trim()).filter(Boolean),
+    heartHealth,
+    glucoseNote: glucoseLabel ? glucoseRangeSentence(glucoseLabel) : null,
+    kdigoNote: gStage && manual.egfr != null ? kdigoSentence(gStage, manual.egfr) : null,
+    preventTodo: PREVENT_TODO,
+    uspstfTodo: USPSTF_TODO,
   };
   return result;
 }
@@ -344,27 +367,6 @@ function ageFromDob(dob?: string): number | null {
   if (beforeBirthday) age -= 1;
   if (age < 0 || age > 120) return null;
   return age;
-}
-
-function deriveHealthScore(history: HistoryPlaintext | null, metrics: DailyMetric[]): number {
-  let score = 85;
-  const conditions = history?.chronicConditions?.length ?? 0;
-  score -= Math.min(conditions * 6, 24);
-  const last = metrics.length > 0 ? metrics[metrics.length - 1] : null;
-  if (last?.heartRate != null) {
-    if (last.heartRate < 50 || last.heartRate > 100) score -= 5;
-  }
-  if (last?.spo2 != null) {
-    if (last.spo2 < 95) score -= 6;
-    if (last.spo2 < 90) score -= 8;
-  }
-  const m = resolveLabs(history);
-  if (m.a1c != null && m.a1c >= 6.5) score -= 8;
-  else if (m.a1c != null && m.a1c >= 5.7) score -= 4;
-  if (m.ldl != null && m.ldl >= 190) score -= 8;
-  else if (m.ldl != null && m.ldl >= 130) score -= 4;
-  if (m.bpSystolic != null && (m.bpSystolic >= 140 || (m.bpDiastolic != null && m.bpDiastolic >= 90))) score -= 6;
-  return Math.max(40, Math.min(95, score));
 }
 
 function hrStatus(hr: number): string {

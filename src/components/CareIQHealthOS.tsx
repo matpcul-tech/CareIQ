@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect, useRef, useContext, createContext, Component, ReactNode } from "react";
 import type { ResolvedLabs } from "@/lib/lab-values";
+import { PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
+import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
 import { answerLocally, buildHealthNarrative, buildMealPlan, buildWorkoutPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 
 const C = { navy:"#07101f", teal:"#00d4b8", teal2:"#00b89e", gold:"#d4a843", rose:"#e8526e", violet:"#8060cc", green:"#4ade80", slate:"#7a9bbf", white:"#eef2f8" };
@@ -178,7 +180,7 @@ const CSS = `
 /* ----- Demo data (Matthew Culwell), used as fallback when no real patient
         data is available, exposed via ClinicalDataContext below. -------- */
 
-const DEMO_PATIENT = { name:"Matthew Culwell", id:"CIQ-2026-MATT", age:43, score:74 };
+const DEMO_PATIENT = { name:"Matthew Culwell", id:"CIQ-2026-MATT", age:43, score:0 };
 const DEMO_VITALS = [
   {icon:"BP",val:"118/76",unit:"mmHg",name:"Blood Pressure",s:"ok"},
   {icon:"A1C",val:"6.4",unit:"A1C %",name:"Glycemic",s:"warn"},
@@ -187,11 +189,7 @@ const DEMO_VITALS = [
   {icon:"O2",val:"96",unit:"SpO2 %",name:"Oxygen Sat",s:"ok"},
   {icon:"WT",val:"174",unit:"lbs",name:"Body Weight",s:"warn"},
 ];
-const DEMO_DOMAINS = [
-  {name:"Metabolic",score:58},{name:"Cardiovascular",score:62},
-  {name:"Cognitive",score:81},{name:"Oncology",score:88},
-  {name:"Renal",score:79},{name:"Mental Health",score:72},
-];
+const DEMO_HEART = scoreLe8({});
 const DEMO_INSIGHTS = [
   {type:"crit",icon:"!",title:"Sample LDL note",body:"Sample chart only. The 212 mg/dL figure is not a measured result and not this patient's lab.",cta:"",conf:""},
   {type:"watch",icon:"^",title:"Prediabetes Progression Risk",body:"Sample chart only. A1C at 6.4% is in the prediabetes range on this example. It is not a measured CareIQ outcome.",cta:"Example",conf:""},
@@ -237,6 +235,11 @@ export interface ClinicalData {
   labs?: ResolvedLabs;
   sex?: "male" | "female" | "unknown";
   recordedConditions?: string[];
+  heartHealth?: Le8Result;
+  glucoseNote?: string | null;
+  kdigoNote?: string | null;
+  preventTodo?: string;
+  uspstfTodo?: string;
 }
 
 const AiEnabledContext = createContext(false);
@@ -244,7 +247,12 @@ const AiEnabledContext = createContext(false);
 const DEMO_DATA: ClinicalData = {
   patient: DEMO_PATIENT,
   vitals: DEMO_VITALS,
-  domains: DEMO_DOMAINS,
+  domains: [],
+  heartHealth: DEMO_HEART,
+  glucoseNote: null,
+  kdigoNote: null,
+  preventTodo: PREVENT_TODO,
+  uspstfTodo: USPSTF_TODO,
   insights: DEMO_INSIGHTS,
   timeline: DEMO_TIMELINE,
   meals: DEMO_MEALS,
@@ -341,19 +349,41 @@ class TabErrorBoundary extends Component<{children:ReactNode},{hasError:boolean}
   }
 }
 
+function entryHref(id: string): string {
+  if (id === "diet" || id === "activity" || id === "nicotine" || id === "sleep") {
+    return "/onboard?step=3&edit=1";
+  }
+  return "/onboard?step=4&edit=1";
+}
+
 function Overview(){
-  const { domains } = useContext(ClinicalDataContext);
+  const { heartHealth } = useContext(ClinicalDataContext);
+  const heart = heartHealth ?? DEMO_HEART;
   return(
     <div className="pad">
       <div className="sec">Today, In Plain Language</div>
       <HealthNarrative/>
-      <div className="sec">Risk Domains</div>
+      <div className="sec">{LE8_TITLE}</div>
+      <div className="card">
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{le8Summary(heart)}</div>
+        {heart.missing.length > 0 && (
+          <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:4}}>
+            {heart.components.filter((item) => !item.entered).map((item) => (
+              <a key={item.id} href={entryHref(item.id)} style={{fontSize:12,color:"#00d4b8"}}>
+                Enter {item.label}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="dom-grid">
-        {domains.map((d,i)=>(
-          <div className="dom-item" key={i}>
-            <div className="dom-name">{d.name}</div>
-            <div className="dom-bg"><div className="dom-fill" style={{width:`${d.score}%`,background:`linear-gradient(90deg,${dc(d.score)},${dc(d.score)}77)`}}/></div>
-            <div className="dom-score" style={{color:dc(d.score)}}>{d.score}<span style={{fontSize:10,color:"#7a9bbf"}}>/100</span></div>
+        {heart.components.map((item) => (
+          <div className="dom-item" key={item.id}>
+            <div className="dom-name">{item.label}</div>
+            <div className="dom-score" style={{color:item.points === null ? "#7a9bbf" : dc(item.points)}}>
+              {item.points === null ? "Not entered" : item.points}
+              {item.points !== null && <span style={{fontSize:10,color:"#7a9bbf"}}>/100</span>}
+            </div>
           </div>
         ))}
       </div>
@@ -427,13 +457,27 @@ function Nutrition(){
 }
 
 function BloodPanel(){
+  const { glucoseNote, kdigoNote, preventTodo, uspstfTodo } = useContext(ClinicalDataContext);
   return(
     <div className="pad">
-      <div className="sec">Biomarker panel</div>
+      <div className="sec">Glucose category</div>
       <div className="card">
         <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
-          This tab does not read an EHR and it does not invent a panel grade. Lab values you type in appear on the health view. There is no UDS or CMS measure score here.
+          {glucoseNote ?? "No A1C or fasting glucose is on file. Talk with your care team about a result. This is general information, not a diagnosis."}
         </div>
+      </div>
+      <div className="sec">Kidney filtration category</div>
+      <div className="card">
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>
+          {kdigoNote ?? "No eGFR is on file. Talk with your care team about a result. This is general information, not a diagnosis."}
+        </div>
+      </div>
+      <div className="sec">Not calculated</div>
+      <div className="card">
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>{preventTodo ?? PREVENT_TODO}</div>
+      </div>
+      <div className="card">
+        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>{uspstfTodo ?? USPSTF_TODO}</div>
       </div>
     </div>
   );
@@ -758,7 +802,9 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
   // Banner shows whenever no real clinical data was passed, or whenever the
   // caller explicitly asks for demo mode.
   const showDemoBanner = !clinicalData || demoMode;
-  const { patient, vitals } = data;
+  const { patient, vitals, heartHealth } = data;
+  const heart = heartHealth ?? DEMO_HEART;
+  const ringValue = heart.total === null ? 0 : Math.round(heart.total);
 
   const [mode,setMode]=useState("patient");
   const [page,setPage]=useState("overview");
@@ -778,9 +824,9 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
   },[elder]);
 
   useEffect(()=>{
-    const t=setTimeout(()=>setRingPct(patient.score),120);
+    const t=setTimeout(()=>setRingPct(ringValue),120);
     return()=>clearTimeout(t);
-  },[patient.score]);
+  },[ringValue]);
 
   useEffect(()=>{
     const nav=mode==="patient"?PNAV:CNAV;
@@ -849,13 +895,13 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
                   </linearGradient></defs>
                 </svg>
                 <div className="ring-inner">
-                  <div className="ring-num">{patient.score}</div>
-                  <div className="ring-lbl">Score</div>
+                  <div className="ring-num">{heart.total === null ? "--" : ringValue}</div>
+                  <div className="ring-lbl">{heart.total === null ? `${heart.enteredCount}/8` : "Score"}</div>
                 </div>
               </div>
               <div className="score-info">
-                <div className="score-title">Health score</div>
-                <div className="score-sub">A local summary of data on file. Not a diagnosis, and not a UDS or CMS measure.</div>
+                <div className="score-title">{LE8_TITLE}</div>
+                <div className="score-sub">{heart.total === null ? `Score incomplete, ${heart.enteredCount} of 8 entered.` : LE8_NOT_DIAGNOSIS}</div>
               </div>
             </div>
             <div className="vitals-row">

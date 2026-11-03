@@ -68,11 +68,49 @@ const FREE_TEXT = z
     "control characters not allowed",
   );
 
+const mepaSchema = z.object({
+  oliveOilPerDay: z.number().min(0).max(40).optional(),
+  leafyVegetablesPerWeek: z.number().min(0).max(100).optional(),
+  otherVegetablesPerDay: z.number().min(0).max(40).optional(),
+  berriesPerWeek: z.number().min(0).max(100).optional(),
+  otherFruitPerDay: z.number().min(0).max(40).optional(),
+  redMeatPerWeek: z.number().min(0).max(100).optional(),
+  fishPerWeek: z.number().min(0).max(100).optional(),
+  chickenPerWeek: z.number().min(0).max(100).optional(),
+  cheesePerWeek: z.number().min(0).max(100).optional(),
+  butterPerWeek: z.number().min(0).max(100).optional(),
+  beansPerWeek: z.number().min(0).max(100).optional(),
+  wholeGrainsPerDay: z.number().min(0).max(40).optional(),
+  sweetsPerWeek: z.number().min(0).max(100).optional(),
+  nutsPerWeek: z.number().min(0).max(100).optional(),
+  fastFoodPerWeek: z.number().min(0).max(50).optional(),
+  alcoholPerDay: z.number().min(0).max(40).optional(),
+});
+
+export const le8AnswersSchema = z.object({
+  mepa: mepaSchema.optional(),
+  moderateMinutesPerWeek: z.number().min(0).max(5000).optional(),
+  vigorousMinutesPerWeek: z.number().min(0).max(5000).optional(),
+  nicotine: z.enum([
+    "never",
+    "quit_5y_or_more",
+    "quit_1_to_under_5y",
+    "quit_under_1y_or_nds",
+    "current_smoker",
+  ]).optional(),
+  livesWithIndoorSmoker: z.boolean().optional(),
+  sleepHours: z.number().min(0).max(24).optional(),
+  lipidTreated: z.boolean().optional(),
+  bpTreated: z.boolean().optional(),
+});
+export type Le8AnswersInput = z.infer<typeof le8AnswersSchema>;
+
 export const healthHistorySchema = z.object({
   chronicConditions: z.array(z.enum(CHRONIC_CONDITIONS)).max(8),
   medications: FREE_TEXT.optional().default(""),
   allergies: FREE_TEXT.optional().default(""),
   familyHistory: FREE_TEXT.optional().default(""),
+  le8: le8AnswersSchema.optional(),
 });
 export type HealthHistoryInput = z.infer<typeof healthHistorySchema>;
 
@@ -116,6 +154,9 @@ export const manualLabsSchema = z.object({
   bpDiastolic:    z.number().int().min(20).max(200).optional(),
   triglycerides:  z.number().min(0).max(3000).optional(),
   egfr:           z.number().min(0).max(250).optional(),
+  totalCholesterol: z.number().min(0).max(1000).optional(),
+  weight:         z.number().min(50).max(700).optional(),
+  height:         z.number().min(36).max(96).optional(),
   // New structured biomarker entries, keyed by canonical biomarker key.
   biomarkers: biomarkersBlobSchema,
 });

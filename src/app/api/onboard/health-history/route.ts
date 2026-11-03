@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { healthHistorySchema } from "@/lib/validate";
-import { encryptJson } from "@/lib/crypto";
+import { decryptJson, encryptJson } from "@/lib/crypto";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
@@ -35,16 +35,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid health history" }, { status: 400 });
   }
 
-  const history = parsed.data;
-  const encrypted = encryptJson(history, `history:${session.patientId}`);
-
   const sb = getServiceClient();
-  // Upsert one row per patient (idempotent)
+  const aad = `history:${session.patientId}`;
   const { data: existing } = await sb
     .from("health_history")
-    .select("id")
+    .select("id, data_encrypted")
     .eq("patient_id", session.patientId)
     .maybeSingle();
+
+  let prior: Record<string, unknown> = {};
+  if (existing?.data_encrypted) {
+    try {
+      prior = decryptJson<Record<string, unknown>>(existing.data_encrypted, aad);
+    } catch {
+      prior = {};
+    }
+  }
+  const history: Record<string, unknown> = { ...prior, ...parsed.data };
+  if (parsed.data.le8 && prior.le8 && typeof prior.le8 === "object") {
+    history.le8 = { ...(prior.le8 as object), ...parsed.data.le8 };
+  }
+  const encrypted = encryptJson(history, aad);
 
   let dbError = null as null | { code?: string };
   if (existing?.id) {
