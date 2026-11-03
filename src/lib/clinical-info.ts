@@ -64,8 +64,50 @@ export function kdigoSentence(stage: KdigoGStage, egfr: number): string {
   ].join(" ");
 }
 
-export const PREVENT_TODO =
-  "TODO: PREVENT (the AHA 2023 predicting risk equations) is not calculated here.";
+/** Inputs for PREVENT and the USPSTF list, built from data already on file. Missing stays missing. */
+export interface RiskInputs {
+  age?: number | null;
+  sex?: "female" | "male" | "unknown";
+  totalCholesterol?: number | null;
+  hdl?: number | null;
+  systolic?: number | null;
+  bpTreated?: boolean | null;
+  diabetes?: boolean | null;
+  currentSmoker?: boolean | null;
+  smoking?: "never" | "former" | "current" | "unknown";
+  egfr?: number | null;
+  statin?: boolean | null;
+  bmi?: number | null;
+}
 
-export const USPSTF_TODO =
-  "TODO: A USPSTF screening list is not calculated here.";
+type NicotineAnswer = "never" | "quit_5y_or_more" | "quit_1_to_under_5y" | "quit_under_1y_or_nds" | "current_smoker";
+
+export function buildRiskInputs(src: {
+  age: number | null;
+  sex: "female" | "male" | "unknown";
+  labs: { totalCholesterol?: number; hdl?: number; bpSystolic?: number; egfr?: number };
+  conditions?: string[] | null;
+  nicotine?: NicotineAnswer;
+  bpTreated?: boolean;
+  lipidTreated?: boolean;
+  bmi?: number;
+}): RiskInputs {
+  const conds = src.conditions ? src.conditions.map((c) => c.toLowerCase()) : null;
+  const smoking = src.nicotine === undefined ? "unknown" : src.nicotine === "never" ? "never" : src.nicotine === "current_smoker" ? "current" : "former";
+  return {
+    age: src.age,
+    sex: src.sex,
+    totalCholesterol: src.labs.totalCholesterol ?? null,
+    hdl: src.labs.hdl ?? null,
+    systolic: src.labs.bpSystolic ?? null,
+    bpTreated: src.bpTreated ?? null,
+    // A recorded diabetes diagnosis. When the conditions list was answered and has none, that is "no".
+    diabetes: conds ? conds.some((c) => c.includes("diabet")) : null,
+    currentSmoker: smoking === "unknown" ? null : smoking === "current",
+    smoking,
+    egfr: src.labs.egfr ?? null,
+    // The history form asks about cholesterol medicine; PREVENT uses statin use. Closest answer on file.
+    statin: src.lipidTreated ?? null,
+    bmi: src.bmi ?? null,
+  };
+}

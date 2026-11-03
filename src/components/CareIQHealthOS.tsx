@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect, useRef, useContext, createContext, Component, ReactNode } from "react";
 import type { ResolvedLabs } from "@/lib/lab-values";
-import { PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
+import type { RiskInputs } from "@/lib/clinical-info";
+import { PREVENT_SOURCE, preventTotalCvd10 } from "@/lib/prevent";
+import { USPSTF_SOURCE, uspstfList } from "@/lib/uspstf";
 import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
 import { answerLocally, buildHealthNarrative, buildMealPlan, buildWeeklyPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 import WearableUpload from "@/components/WearableUpload";
@@ -264,8 +266,8 @@ export interface ClinicalData {
   heartHealth?: Le8Result;
   glucoseNote?: string | null;
   kdigoNote?: string | null;
-  preventTodo?: string;
-  uspstfTodo?: string;
+  /** PREVENT and USPSTF inputs. Computed on the device; nothing is sent anywhere. */
+  riskInputs?: RiskInputs;
 }
 
 const AiEnabledContext = createContext(false);
@@ -275,10 +277,10 @@ const DEMO_DATA: ClinicalData = {
   vitals: DEMO_VITALS,
   domains: [],
   heartHealth: DEMO_HEART,
+  // Synthetic demo values (the PREVENT published example patient).
+  riskInputs: { age: 50, sex: "female", totalCholesterol: 200, hdl: 45, systolic: 160, bpTreated: true, diabetes: true, currentSmoker: false, smoking: "never", egfr: 90, statin: false, bmi: 35 },
   glucoseNote: null,
   kdigoNote: null,
-  preventTodo: PREVENT_TODO,
-  uspstfTodo: USPSTF_TODO,
   insights: DEMO_INSIGHTS,
   timeline: DEMO_TIMELINE,
   meals: DEMO_MEALS,
@@ -534,8 +536,64 @@ function Nutrition(){
   );
 }
 
+const NOTE_STYLE = {fontSize:12,color:"#a3b5cc",lineHeight:1.6} as const;
+const CATEGORY_TEXT = { low: "low (under 5%)", borderline: "borderline (5 to 7.4%)", intermediate: "intermediate (7.5 to 19.9%)", high: "high (20% or more)" } as const;
+
+function PreventCard(){
+  const { riskInputs } = useContext(ClinicalDataContext);
+  const r = preventTotalCvd10(riskInputs ?? {});
+  return(
+    <>
+      <div className="sec">10-year heart and stroke risk (AHA PREVENT)</div>
+      <div className="card">
+        {r.ok ? (
+          <div style={NOTE_STYLE}>
+            <div style={{fontSize:22,fontWeight:700,color:"#e6eef8"}}>{r.percent}</div>
+            <div>Estimated chance of a heart attack, stroke, or heart failure in the next 10 years: {CATEGORY_TEXT[r.category]}.</div>
+          </div>
+        ) : (
+          <div style={NOTE_STYLE}>
+            <div>Not enough data to estimate.</div>
+            {r.missing.length > 0 && <div>Missing: {r.missing.join(", ")}.</div>}
+            {r.outOfRange.length > 0 && <div>Outside the equation's range: {r.outOfRange.join("; ")}.</div>}
+          </div>
+        )}
+        <div style={{...NOTE_STYLE,marginTop:8}}>
+          Base PREVENT equations, ages 30 to 79, calculated on this device from data on file. General guidance, not a diagnosis. Talk with your care team. Source: <a href={PREVENT_SOURCE.url} target="_blank" rel="noreferrer">{PREVENT_SOURCE.label}</a>.
+        </div>
+      </div>
+    </>
+  );
+}
+
+function UspstfCard(){
+  const { riskInputs } = useContext(ClinicalDataContext);
+  const { items, needsAge } = uspstfList({ age: riskInputs?.age, sex: riskInputs?.sex, bmi: riskInputs?.bmi, smoking: riskInputs?.smoking });
+  return(
+    <>
+      <div className="sec">Screenings to ask about (USPSTF)</div>
+      <div className="card">
+        {needsAge ? (
+          <div style={NOTE_STYLE}>Add your date of birth to see the screenings that fit your age.</div>
+        ) : (
+          <ul style={{...NOTE_STYLE,paddingLeft:16,margin:0}}>
+            {items.map((i) => (
+              <li key={i.id} style={{marginBottom:6}}>
+                <a href={i.source} target="_blank" rel="noreferrer" style={{color:"#e6eef8",fontWeight:600}}>{i.title}</a> (grade {i.grade}). {i.detail}{i.caveat ? ` ${i.caveat}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div style={{...NOTE_STYLE,marginTop:8}}>
+          Based only on age, sex, and data on file. Grade A and B recommendations. General guidance, not a diagnosis; your care team may advise differently. Source: <a href={USPSTF_SOURCE.url} target="_blank" rel="noreferrer">{USPSTF_SOURCE.label}</a>.
+        </div>
+      </div>
+    </>
+  );
+}
+
 function BloodPanel(){
-  const { glucoseNote, kdigoNote, preventTodo, uspstfTodo } = useContext(ClinicalDataContext);
+  const { glucoseNote, kdigoNote } = useContext(ClinicalDataContext);
   return(
     <div className="pad">
       <div className="sec">Glucose category</div>
@@ -550,13 +608,8 @@ function BloodPanel(){
           {kdigoNote ?? "No eGFR is on file. Talk with your care team about a result. This is general information, not a diagnosis."}
         </div>
       </div>
-      <div className="sec">Not calculated</div>
-      <div className="card">
-        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>{preventTodo ?? PREVENT_TODO}</div>
-      </div>
-      <div className="card">
-        <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>{uspstfTodo ?? USPSTF_TODO}</div>
-      </div>
+      <PreventCard />
+      <UspstfCard />
     </div>
   );
 }
