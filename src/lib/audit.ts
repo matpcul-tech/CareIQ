@@ -45,7 +45,9 @@ export type AuditAction =
   | "clinic.invite_link.revoked"
   | "clinic.followups.viewed"
   | "clinic.followups.call_logged"
-  | "clinic.settings.time_zone";
+  | "clinic.settings.time_zone"
+  | "patient.e2e.migration.read"
+  | "patient.e2e.migration.finished";
 
 export type DataType =
   | "none"
@@ -60,7 +62,8 @@ export type DataType =
   | "clinic_alert"
   | "clinic_reminder"
   | "clinic_onboarding"
-  | "clinic_followup";
+  | "clinic_followup"
+  | "e2e_migration";
 
 export interface AuditEntry {
   sessionId: string;
@@ -112,6 +115,10 @@ const ALLOWED_META_KEYS = new Set<string>([
   "requester_role",
   "alert_id",
   "severity",
+  "migrated_count",
+  "superseded_count",
+  "failed_count",
+  "outcome",
 ]);
 
 function sanitizeMetadata(

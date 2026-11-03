@@ -20,3 +20,9 @@ Design step: phase 2 (PR 3, tables) together with the first part of phase 4 (PR 
 ## Recovery and loss
 
 Solo patients must type their recovery code back before any health entry can be written. If a patient loses every device and the recovery code, and did not consent to a clinic wrap, their encrypted entries cannot be recovered by anyone, including CareIQ. Clinic contracts must state the same for clinic keys.
+
+## PR 8: patient-run move of legacy records (flag off, NOT APPLIED)
+
+Migration `supabase/migrations/0021_e2e_legacy_migration.sql` adds `e2e_legacy_migrations`, a ledger of ids and outcome only. It depends on 0016. Needs owner approval before it runs against komimlqbxekranbijtat.
+
+How it works: the patient opens `/secure-setup/migrate` (only while NEXT_PUBLIC_CAREIQ_CLIENT_ENC_V1 is "true"). The page needs a confirmed recovery code and an unlocked device. `POST /api/e2e/migrate` opens only the signed-in patient's own legacy rows (profile, health history, manual labs inside the history row, biomarker_log, wearable_data). The browser re-encrypts each with the patient's active data key, saves it, reads it back, decrypts it, and only then the server records a ledger row. Rerunning is safe. Legacy rows are kept; a later cleanup step needs separate owner approval. Uploaded lab files (Storage objects) are not moved yet.
