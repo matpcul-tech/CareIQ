@@ -1,5 +1,7 @@
 import Link from "next/link";
 import WearableUpload from "@/components/WearableUpload";
+import { SafetyDisclaimer } from "@/components/SyncStatus";
+import { isWithingsEnabled } from "@/lib/withings/flag";
 
 export const dynamic = "force-static";
 export const revalidate = false;
@@ -84,6 +86,24 @@ export default function ConnectDevicePage() {
       <section className="card mx-auto mb-6 max-w-3xl">
         <WearableUpload />
       </section>
+
+      {isWithingsEnabled() && (
+        <section className="card mx-auto mb-6 max-w-3xl">
+          <h2 className="text-base font-bold">Withings account</h2>
+          <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+            Link a Withings account to receive scale and blood pressure readings after
+            your device syncs to Withings. New readings usually arrive within minutes,
+            but can take hours. Each source shows when it last synced.
+          </p>
+          <a className="mt-3 inline-block text-sm font-semibold underline" href="/api/withings/connect">
+            Connect Withings
+          </a>
+        </section>
+      )}
+
+      <div className="mx-auto mb-6 max-w-3xl">
+        <SafetyDisclaimer theme="light" />
+      </div>
 
       <section className="mx-auto grid max-w-3xl gap-4">
         {DEVICES.map((d) => (

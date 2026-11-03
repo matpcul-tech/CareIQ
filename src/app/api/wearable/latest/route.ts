@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { decryptJson } from "@/lib/crypto";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
+import { loadSyncSources } from "@/lib/sync-sources-server";
+import type { SyncSource } from "@/lib/sync-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Lightweight live wearable endpoint, designed for 5-second polling.
+ * Lightweight wearable endpoint. The dashboard checks it about once a
+ * minute (CHECK_INTERVAL_MS). The readings are only as new as the last
+ * upload or sync, so the response carries per-source "last synced" times
+ * and the UI shows those instead of a live indicator.
  *
  * Reads the most recent wearable_data row + the patient's manualLabs +
  * a couple of biomarker keys (fasting_glucose, body_temperature) so
@@ -101,9 +106,10 @@ export async function GET() {
 
   const { data: hh } = await sb
     .from("health_history")
-    .select("data_encrypted")
+    .select("data_encrypted, updated_at")
     .eq("patient_id", session.patientId)
     .maybeSingle();
+  const historyUpdatedAt = (hh as { updated_at?: string } | null)?.updated_at ?? null;
   if (hh?.data_encrypted) {
     try {
       const blob = decryptJson<HistoryPlaintext>(
@@ -121,9 +127,17 @@ export async function GET() {
     }
   }
 
+  let syncSources: SyncSource[] = [];
+  try {
+    syncSources = await loadSyncSources(sb, session.patientId, historyUpdatedAt);
+  } catch {
+    syncSources = [];
+  }
+
   return NextResponse.json(
     {
       device,
+      sync_sources: syncSources,
       decrypted_at: new Date().toISOString(),
       updated_at: updatedAt,
       metric_date: latest?.date ?? null,

@@ -7,6 +7,8 @@ import { USPSTF_SOURCE, uspstfList } from "@/lib/uspstf";
 import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
 import { answerLocally, buildHealthNarrative, buildMealPlan, buildWeeklyPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 import WearableUpload from "@/components/WearableUpload";
+import { SafetyDisclaimer, SyncSourceList, useNow } from "@/components/SyncStatus";
+import { lastSyncedText, newestSync, syncFreshness, type SyncSource } from "@/lib/sync-status";
 import UdsPanel from "@/app/clinic/uds/UdsPanel";
 import FollowUpCalls from "@/app/clinic/uds/FollowUpCalls";
 
@@ -257,6 +259,8 @@ export interface ClinicalData {
   wearDays: string[];
   wearableSource: "demo" | "upload" | "none";
   primaryDeviceLabel?: string;
+  /** One entry per data source with the time CareIQ last received data. */
+  syncSources?: SyncSource[];
   /** Labs already decrypted on the server. Optional so demo mode can omit them. */
   labs?: ResolvedLabs;
   sex?: "male" | "female" | "unknown";
@@ -849,7 +853,7 @@ function Profile(){
 }
 
 function Wearable(){
-  const { wearHr7Day, wearSteps7Day, wearDays, wearableSource, primaryDeviceLabel } = useContext(ClinicalDataContext);
+  const { wearHr7Day, wearSteps7Day, wearDays, wearableSource, primaryDeviceLabel, syncSources } = useContext(ClinicalDataContext);
   const hasSeries = wearHr7Day.length > 0 || wearSteps7Day.length > 0;
   const hrMax = wearHr7Day.length ? Math.max(...wearHr7Day) : 0;
   const hrMin = wearHr7Day.length ? Math.min(...wearHr7Day) : 0;
@@ -866,6 +870,13 @@ function Wearable(){
       <div className="card">
         <div style={{fontSize:12,color:"#a3b5cc",lineHeight:1.6}}>{note}</div>
       </div>
+      {wearableSource !== "demo" && (
+        <>
+          <div className="sec">Last synced by source</div>
+          <SyncSourceList sources={syncSources} />
+        </>
+      )}
+      <SafetyDisclaimer />
       {hasSeries && (
         <>
           <div className="sec">Heart rate and steps on file</div>
@@ -930,6 +941,20 @@ interface CareIQHealthOSProps {
   clinicalData?: ClinicalData;
   demoMode?: boolean;
   aiEnabled?: boolean;
+}
+
+/** One line under the vitals: newest sync time, colored by staleness. */
+function SyncSummary({ sources }: { sources?: SyncSource[] }) {
+  const now = useNow();
+  const at = newestSync(sources ?? []);
+  const f = syncFreshness(at, now);
+  const color = f === "recent" ? "#4ade80" : f === "stale" ? "#d4a843" : f === "old" ? "#e8526e" : "#7a9bbf";
+  const tail = f === "stale" ? " Readings are not recent." : f === "old" ? " Readings are out of date." : "";
+  return (
+    <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color,margin:"6px 0 0"}} data-sync-freshness={f}>
+      {lastSyncedText(at, now)}.{tail} See the Wearable tab for each source.
+    </div>
+  );
 }
 
 export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabled = false }: CareIQHealthOSProps = {}) {
@@ -1049,6 +1074,8 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
                 </div>
               ))}
             </div>
+            {!showDemoBanner && <SyncSummary sources={data.syncSources} />}
+            <SafetyDisclaimer compact />
           </>
         )}
         <div className="mode-bar">

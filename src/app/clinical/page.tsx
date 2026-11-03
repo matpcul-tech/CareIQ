@@ -8,6 +8,8 @@ import { readSession } from "@/lib/session";
 import { getServiceClient } from "@/lib/supabase-server";
 import { decryptJson } from "@/lib/crypto";
 import { logAudit } from "@/lib/audit";
+import { loadSyncSources } from "@/lib/sync-sources-server";
+import type { SyncSource } from "@/lib/sync-status";
 import CareIQHealthOS, {
   type ClinicalData,
   type ClinicalVital,
@@ -69,7 +71,7 @@ export default async function ClinicalPage() {
 
   const [patRes, hhRes, labRes, wdRes] = await Promise.all([
     sb.from("patients").select("profile_encrypted, created_at").eq("id", session.patientId).maybeSingle(),
-    sb.from("health_history").select("data_encrypted").eq("patient_id", session.patientId).maybeSingle(),
+    sb.from("health_history").select("data_encrypted, updated_at").eq("patient_id", session.patientId).maybeSingle(),
     sb.from("lab_files").select("id, file_type, uploaded_at").eq("patient_id", session.patientId).order("uploaded_at", { ascending: false }),
     sb.from("wearable_data").select("data_encrypted, device_type, uploaded_at").eq("patient_id", session.patientId).order("uploaded_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
@@ -128,6 +130,18 @@ export default async function ClinicalPage() {
     enrolledAt: patRes.data?.created_at ?? null,
     sex: profile?.sex === "male" || profile?.sex === "female" ? profile.sex : "unknown",
   });
+
+  let syncSources: SyncSource[] = [];
+  try {
+    syncSources = await loadSyncSources(
+      sb,
+      session.patientId,
+      (hhRes.data as { updated_at?: string } | null)?.updated_at ?? null,
+    );
+  } catch {
+    syncSources = [];
+  }
+  clinicalData.syncSources = syncSources;
 
   return <CareIQHealthOS demoMode={false} clinicalData={clinicalData} aiEnabled={aiEnabled} />;
 }

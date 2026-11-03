@@ -171,9 +171,16 @@ function isClinicalPath(pathname: string): boolean {
   return pathname === "/clinical" || pathname.startsWith("/clinical/");
 }
 
+// Withings posts here with no cookies. The route checks the path token and
+// returns 404 while WITHINGS_ENABLED is off.
+function isWithingsNotifyPath(pathname: string): boolean {
+  return pathname.startsWith("/api/withings/notify/");
+}
+
 function isProtectedApi(pathname: string): boolean {
   if (!pathname.startsWith("/api/")) return false;
   if (NO_PATIENT_SESSION_API_PATHS.has(pathname)) return false;
+  if (isWithingsNotifyPath(pathname)) return false;
   return true;
 }
 
@@ -237,7 +244,7 @@ export async function middleware(req: NextRequest) {
 
   const isApi = pathname.startsWith("/api/");
   const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
-  const isCsrfExempt = isApi && CSRF_EXEMPT_API_PATHS.has(pathname);
+  const isCsrfExempt = isApi && (CSRF_EXEMPT_API_PATHS.has(pathname) || isWithingsNotifyPath(pathname));
   if (isApi && isMutating && !isCsrfExempt) {
     const headerToken = req.headers.get("x-csrf-token") || "";
     const cookieToken = existingCsrf;
