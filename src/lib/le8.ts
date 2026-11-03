@@ -9,6 +9,10 @@
  * Overall bands from the same paper: high 80 to 100, moderate 50 to 79,
  * low 0 to 49.
  *
+ * Life's Essential 8 was validated mostly in non-Native populations.
+ * That note stays in this comment and the pull request. It is not
+ * shown in the app.
+ *
  * Adult tables used here, written with words instead of dashes:
  *
  * Diet, individual MEPA points (0 to 16):
@@ -407,15 +411,12 @@ export function scoreLe8(input: Le8Input): Le8Result {
 
 export const LE8_TITLE = "Heart Health Score (AHA Life's Essential 8)";
 export const LE8_NOT_DIAGNOSIS = "Not a diagnosis.";
-export const LE8_VALIDATION_NOTE =
-  "Life's Essential 8 was validated mostly in non-Native populations.";
 export const LE8_DISCLAIMER = "This is general information, not a diagnosis.";
 
 export function le8Summary(result: Le8Result): string {
   const lines = [
     LE8_TITLE,
     LE8_NOT_DIAGNOSIS,
-    LE8_VALIDATION_NOTE,
   ];
   if (result.total === null) {
     lines.push(`Score incomplete, ${result.enteredCount} of 8 entered.`);

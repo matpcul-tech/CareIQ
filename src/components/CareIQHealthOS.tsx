@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useContext, createContext, Component, ReactNode } from "react";
 import type { ResolvedLabs } from "@/lib/lab-values";
 import { PREVENT_TODO, USPSTF_TODO } from "@/lib/clinical-info";
-import { LE8_NOT_DIAGNOSIS, LE8_TITLE, LE8_VALIDATION_NOTE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
+import { LE8_NOT_DIAGNOSIS, LE8_TITLE, le8Summary, scoreLe8, type Le8Result } from "@/lib/le8";
 import { answerLocally, buildHealthNarrative, buildMealPlan, buildWorkoutPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 
 const C = { navy:"#07101f", teal:"#00d4b8", teal2:"#00b89e", gold:"#d4a843", rose:"#e8526e", violet:"#8060cc", green:"#4ade80", slate:"#7a9bbf", white:"#eef2f8" };
@@ -901,7 +901,7 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
               </div>
               <div className="score-info">
                 <div className="score-title">{LE8_TITLE}</div>
-                <div className="score-sub">{heart.total === null ? `Score incomplete, ${heart.enteredCount} of 8 entered.` : `${LE8_NOT_DIAGNOSIS} ${LE8_VALIDATION_NOTE}`}</div>
+                <div className="score-sub">{heart.total === null ? `Score incomplete, ${heart.enteredCount} of 8 entered.` : LE8_NOT_DIAGNOSIS}</div>
               </div>
             </div>
             <div className="vitals-row">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ADULT_A1C_PROMPT, adultA1cPrompt } from "@/lib/a1c-prompt";
 
 const MEPA_FIELDS = [
   { key: "oliveOilPerDay", label: "Olive oil, servings per day (1 tablespoon)" },
@@ -440,7 +441,6 @@ function Step2Profile({
   const [lastName, setLastName] = useState("");
   const [dob, setDob] = useState("");
   const [sex, setSex] = useState<"male" | "female" | "">("");
-  const [aian, setAian] = useState(false);
   const [community, setCommunity] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -464,7 +464,6 @@ function Step2Profile({
         lastName,
         dateOfBirth: dob,
         sex: sex || undefined,
-        americanIndianOrAlaskaNative: aian,
         communityAffiliation: community || undefined,
       });
       if (!res.ok) {
@@ -531,18 +530,9 @@ function Step2Profile({
           Used by the longevity panel to resolve sex-dependent reference ranges. Optional.
         </p>
       </div>
-      <label className="flex items-start gap-2 text-sm text-ink">
-        <input
-          type="checkbox"
-          checked={aian}
-          onChange={(e) => setAian(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-slate-300"
-        />
-        <span>American Indian or Alaska Native</span>
-      </label>
-      {aian && (
+      {adultA1cPrompt(dob, new Date()) && (
         <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-ink">
-          Ask your care team about an A1C test. ADA screening guidance treats this answer as a higher-risk group for that test. This is general information, not a diagnosis.
+          {ADULT_A1C_PROMPT}
         </p>
       )}
       <label className="field-label">Community affiliation (optional)</label>

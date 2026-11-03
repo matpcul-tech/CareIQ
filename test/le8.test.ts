@@ -171,7 +171,7 @@ test("missing components are not imputed and the total stays hidden", () => {
   assert.match(text, /Score incomplete, 2 of 8 entered/);
   assert.match(text, /Heart Health Score \(AHA Life's Essential 8\)/);
   assert.match(text, /Not a diagnosis/);
-  assert.match(text, /validated mostly in non-Native populations/);
+  assert.equal(text.includes("non-Native"), false);
   assert.ok(text.endsWith(LE8_DISCLAIMER));
   const stripped = text.split(LE8_DISCLAIMER).join("").split("Not a diagnosis.").join("");
   assert.deepEqual(wordingProblems(stripped), []);

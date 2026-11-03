@@ -43,7 +43,6 @@ export const profileSchema = z.object({
   // hemoglobin, etc.). When unset, sex-dependent biomarkers fall back to
   // the union of male + female normal ranges with optimal cleared.
   sex: z.enum(["male", "female"]).optional(),
-  americanIndianOrAlaskaNative: z.boolean().optional(),
 });
 export type ProfileInput = z.infer<typeof profileSchema>;
 
