@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { dispatchToday, importAppointments, reminderOverview, sendingState, setReminderTemplate, type ReminderDeps } from "../src/lib/clinic/reminders/actions";
 import { normalizePhone, parseAppointmentCsv, appointmentTemplateCsv } from "../src/lib/clinic/reminders/csv";
-import { buildSms, buildVoice, DEFAULT_TEMPLATES, inboundKeyword, inSendWindow, pickTemplate, planReminders, SMS_MAX, type Appointment } from "../src/lib/clinic/reminders/engine";
+import { buildSms, buildVoice, DEFAULT_TEMPLATES, messageClinicName, inboundKeyword, inSendWindow, pickTemplate, planReminders, SMS_MAX, type Appointment } from "../src/lib/clinic/reminders/engine";
 import { MemoryReminderStore } from "../src/lib/clinic/reminders/store";
 import { handleReminderInbound, reminderEnv, twilioConfigured, sendingFlagOn } from "../src/lib/clinic/reminders/twilio";
 import { MemoryClinicStore } from "../src/lib/clinic/store";
@@ -193,4 +193,27 @@ test("middleware: reminder webhook is CSRF exempt and appointments API is staff 
   const src = readFileSync("src/middleware.ts", "utf8");
   assert.match(src, /"\/api\/clinic\/reminders\/inbound"/);
   assert.match(src, /STAFF_ONLY_CLINIC_APIS = new Set<string>\(\[[^\]]*"\/api\/clinic\/appointments"/);
+});
+
+test("clinic name comes from the clinic record, blank falls back, long names are cut and SMS stays 160", async () => {
+  assert.equal(messageClinicName("  "), "Your clinic");
+  assert.equal(messageClinicName(null), "Your clinic");
+  assert.equal(messageClinicName("Synthetic Community Health"), "Synthetic Community Health");
+  const long = messageClinicName("Synthetic Northside Community Health Center of Greater Springfield");
+  assert.ok(long.length <= 40);
+  assert.equal(long, "Synthetic Northside Community Health");
+  const huge = "X".repeat(300);
+  for (const lang of ["en", "es"]) {
+    const body = planReminders({ appointments: [appt({ language: lang, careGapConsent: true, provider: "P".repeat(50), location: "L".repeat(60) })], today: "2026-11-02", options: { clinicName: messageClinicName(huge) }, gapsByPatient: { "SYN-0001": ["CMS125"] }, optedOutPhones: new Set(), sent: [] })[0].body;
+    assert.ok(body.length <= SMS_MAX);
+    assert.match(body, /STOP/);
+  }
+  const clinicStore = new MemoryClinicStore();
+  const c = await clinicStore.createClinic("Synthetic Eastside FQHC");
+  assert.equal(messageClinicName((await clinicStore.getClinic(c.id))?.name), "Synthetic Eastside FQHC");
+  assert.equal(await clinicStore.getClinic("nope"), null);
+  const { deps, adminActor } = await setup();
+  await importAppointments(deps, adminActor, [appt({ date: "2026-11-05" })], "replace");
+  const ov = await reminderOverview(deps, adminActor, { today: "2026-11-02", clinicName: "Synthetic Eastside FQHC", sending: sendingState(false, false) });
+  assert.ok(ov.ok && ov.data.upcoming[0].reminders.some((r) => r.body.startsWith("Synthetic Eastside FQHC:")));
 });

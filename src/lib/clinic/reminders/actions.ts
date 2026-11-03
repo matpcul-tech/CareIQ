@@ -8,7 +8,7 @@ import type { ClinicStore } from "../store";
 import { evaluateCareGapPanel } from "../uds/care-gaps";
 import { calendarYearPeriod, isIsoDate } from "../uds/measures";
 import type { UdsPanelStore } from "../uds/panel-store";
-import { DEFAULT_TEMPLATES, planReminders, type Appointment, type PlannedReminder, type ReminderTemplate } from "./engine";
+import { DEFAULT_TEMPLATES, messageClinicName, planReminders, type Appointment, type PlannedReminder, type ReminderTemplate } from "./engine";
 import type { ReminderStore } from "./store";
 
 type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
@@ -148,7 +148,7 @@ export async function buildPlan(deps: ReminderDeps, clinicId: string, today: str
   const plan = planReminders({
     appointments: hashed,
     today,
-    options: { clinicName, templates },
+    options: { clinicName: messageClinicName(clinicName), templates },
     gapsByPatient,
     optedOutPhones: optHashes,
     sent: logs.map((l) => ({ phone: l.phoneHash, sentOn: l.sendOn })),

@@ -13,6 +13,8 @@ import { SupabaseUdsPanelStore } from "@/lib/clinic/uds/supabase-panel-store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+import { messageClinicName } from "@/lib/clinic/reminders/engine";
+
 const HEADERS = { "cache-control": "private, no-store" };
 const CLINIC_TZ = "America/Chicago";
 
@@ -36,8 +38,10 @@ async function context(req: NextRequest) {
   };
   const env = reminderEnv(process.env);
   const sending = sendingState(sendingFlagOn(env), twilioConfigured(env));
-  // Clinic display name for messages. A per-clinic name can be added later with the templates.
-  const clinicName = "Your clinic";
+  // Clinic display name from the clinics record. The clinics table has no time zone column,
+  // so reminders use America/Chicago.
+  const clinic = actor && actor.kind === "staff" ? await clinicStore.getClinic(actor.clinicId).catch(() => null) : null;
+  const clinicName = messageClinicName(clinic?.name);
   return { actor, deps, env, sending, clinicName };
 }
 

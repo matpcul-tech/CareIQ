@@ -69,6 +69,18 @@ export const GAP_TOPICS: Record<string, Record<string, string>> = {
 };
 
 export const SMS_MAX = 160;
+export const CLINIC_NAME_MAX = 40;
+export const FALLBACK_CLINIC_NAME = "Your clinic";
+
+/** Clinic name for messages: blank falls back, long names are cut at a word boundary. */
+export function messageClinicName(raw: string | null | undefined): string {
+  const name = String(raw ?? "").replace(/\s+/g, " ").trim();
+  if (!name) return FALLBACK_CLINIC_NAME;
+  if (name.length <= CLINIC_NAME_MAX) return name;
+  const cut = name.slice(0, CLINIC_NAME_MAX + 1);
+  const space = cut.lastIndexOf(" ");
+  return (space >= 12 ? cut.slice(0, space) : name.slice(0, CLINIC_NAME_MAX)).replace(/[\s,.;:&-]+$/, "");
+}
 export const DAILY_CAP = 1;
 export const WEEKLY_CAP = 3;
 export const DEFAULT_OFFSETS_DAYS = [3, 1];

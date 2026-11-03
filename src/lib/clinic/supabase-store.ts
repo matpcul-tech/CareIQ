@@ -99,6 +99,12 @@ export class SupabaseClinicStore implements ClinicStore {
     return getServiceClient();
   }
 
+  async getClinic(clinicId: string): Promise<ClinicRecord | null> {
+    const { data, error } = await this.sb().from("clinics").select("id,name").eq("id", clinicId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? { id: data.id, name: data.name ?? "" } : null;
+  }
+
   async createClinic(name: string): Promise<ClinicRecord> {
     const { data, error } = await this.sb().from("clinics").insert({ name }).select("id,name").single();
     if (error || !data) throw new Error(error?.message || "clinic insert failed");
