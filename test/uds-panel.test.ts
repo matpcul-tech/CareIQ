@@ -22,6 +22,7 @@ import {
 } from "../src/lib/clinic/uds/measures";
 import { MemoryUdsPanelStore } from "../src/lib/clinic/uds/panel-store";
 import { MemoryClinicStore } from "../src/lib/clinic/store";
+import { CARE_GAP_UNSUPPORTED } from "../src/lib/clinic/uds/care-gaps";
 
 const P = calendarYearPeriod(2026);
 
@@ -214,7 +215,7 @@ test("panel is staff only and import is clinic admin only", async () => {
   const otherStaff = await store.addStaff(other.id, "provider", "O");
   const otherView = await viewUdsPanel(store, panel, { kind: "staff", clinicId: other.id, staffId: otherStaff.id, role: "provider" }, P);
   assert.ok(otherView.ok && otherView.data.rows.length === 0);
-  assert.ok(view.ok && view.data.unsupported_exclusions.length === UNSUPPORTED_EXCLUSIONS.length);
+  assert.ok(view.ok && view.data.unsupported_exclusions.length === CARE_GAP_UNSUPPORTED.length);
 });
 
 test("readings from linked CareIQ app users merge in and most recent wins", async () => {

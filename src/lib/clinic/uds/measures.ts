@@ -48,20 +48,45 @@ export interface PanelPatient {
   dialysis?: boolean;
   kidneyTransplant?: boolean;
   pregnancy?: boolean;
+  // Care gap measures (all optional).
+  sexAtBirth?: "female" | "male" | null;
+  mammograms?: string[];
+  colorectalScreens?: { date: string; type: ColorectalType }[];
+  cervicalScreens?: { date: string; type: CervicalType }[];
+  phqResults?: { date: string; tool: "phq2" | "phq9"; score: number }[];
+  depressionFollowUps?: string[];
+  tobaccoScreens?: { date: string; user: boolean }[];
+  tobaccoInterventions?: string[];
+  ascvd?: boolean;
+  ldl190OrFh?: boolean;
+  ascvdRisk20?: boolean;
+  statin?: boolean;
+  bilateralMastectomy?: boolean;
+  hysterectomy?: boolean;
+  colorectalCancer?: boolean;
+  totalColectomy?: boolean;
+  bipolar?: boolean;
+  depressionScreenException?: boolean;
+  breastfeeding?: boolean;
+  rhabdomyolysis?: boolean;
+  statinException?: boolean;
 }
+
+export type ColorectalType = "colonoscopy" | "fit" | "fit_dna" | "ct_colonography" | "flex_sig";
+export type CervicalType = "cytology" | "hpv" | "cotest";
 
 export interface Period {
   start: string;
   end: string;
 }
 
-export type MeasureId = "CMS165" | "CMS122";
+export type MeasureId = "CMS165" | "CMS122" | "CMS125" | "CMS130" | "CMS124" | "CMS2" | "CMS138" | "CMS347";
 
 /**
  * Per-patient status shown to staff.
  * CMS165: controlled is good. CMS122 is inverse: "not_controlled" (A1C over 9 or missing) is the bad outcome.
  */
-export type PatientStatus = "controlled" | "not_controlled" | "missing_reading" | "excluded" | "not_in_denominator";
+export type PatientStatus = "controlled" | "not_controlled" | "missing_reading" | "excluded" | "not_in_denominator" | "met" | "due";
 
 export interface MeasureResult {
   measure: MeasureId;
@@ -98,13 +123,13 @@ export function inPeriod(date: string, period: Period): boolean {
   return isIsoDate(date) && date >= period.start && date <= period.end;
 }
 
-function hadVisit(p: PanelPatient, period: Period): boolean {
+export function hadVisit(p: PanelPatient, period: Period): boolean {
   if (!p.visitDates || p.visitDates.length === 0) return true;
   return p.visitDates.some((d) => inPeriod(d, period));
 }
 
 /** Exclusions shared by CMS165 and CMS122. Returns a reason or null. */
-function commonExclusion(p: PanelPatient, age: number): string | null {
+export function commonExclusion(p: PanelPatient, age: number): string | null {
   if (p.hospice) return "hospice";
   if (p.palliativeCare) return "palliative care";
   // 66 and over living long term in a nursing home.
@@ -208,6 +233,17 @@ export function evaluateCms122(p: PanelPatient, period: Period): MeasureResult {
   };
 }
 
+export const MEASURE_TITLES: Record<MeasureId, string> = {
+  CMS165: "Controlling High Blood Pressure",
+  CMS122: "Diabetes: HbA1c Poor Control (over 9%)",
+  CMS125: "Breast Cancer Screening",
+  CMS130: "Colorectal Cancer Screening",
+  CMS124: "Cervical Cancer Screening",
+  CMS2: "Depression Screening and Follow-Up Plan",
+  CMS138: "Tobacco Use: Screening and Cessation Intervention",
+  CMS347: "Statin Therapy for Cardiovascular Disease",
+};
+
 export interface MeasureRate {
   measure: MeasureId;
   title: string;
@@ -224,7 +260,7 @@ export function rate(measure: MeasureId, results: MeasureResult[]): MeasureRate 
   const denominator = inDenom.length;
   return {
     measure,
-    title: measure === "CMS165" ? "Controlling High Blood Pressure" : "Diabetes: HbA1c Poor Control (over 9%)",
+    title: MEASURE_TITLES[measure],
     inverse: measure === "CMS122",
     numerator,
     denominator,

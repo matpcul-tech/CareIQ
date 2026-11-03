@@ -8,14 +8,12 @@ import { isActiveStaff, type Actor } from "../logic";
 import type { ClinicStore } from "../store";
 import {
   calendarYearPeriod,
-  evaluatePanel,
   isIsoDate,
-  UNSUPPORTED_EXCLUSIONS,
   type PanelPatient,
-  type PanelSummary,
   type Period,
 } from "./measures";
 import type { UdsPanelStore } from "./panel-store";
+import { CARE_GAP_UNSUPPORTED, evaluateCareGapPanel, type CareGapSummary } from "./care-gaps";
 
 type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
@@ -105,7 +103,53 @@ function sanitize(raw: unknown): PanelPatient | null {
     dialysis: bool(r.dialysis),
     kidneyTransplant: bool(r.kidneyTransplant),
     pregnancy: bool(r.pregnancy),
+    sexAtBirth: r.sexAtBirth === "female" || r.sexAtBirth === "male" ? r.sexAtBirth : null,
+    mammograms: dates(r.mammograms),
+    colorectalScreens: typedList(r.colorectalScreens, COLORECTAL_TYPES) as PanelPatient["colorectalScreens"],
+    cervicalScreens: typedList(r.cervicalScreens, CERVICAL_TYPES) as PanelPatient["cervicalScreens"],
+    phqResults: (Array.isArray(r.phqResults) ? r.phqResults : []).slice(0, 200).flatMap((x) => {
+      const q = x as Record<string, unknown>;
+      const tool = q.tool === "phq2" || q.tool === "phq9" ? q.tool : null;
+      const score = Number(q.score);
+      if (!tool || typeof q.date !== "string" || !isIsoDate(q.date) || !Number.isInteger(score) || score < 0 || score > (tool === "phq2" ? 6 : 27)) return [];
+      return [{ date: q.date, tool, score }];
+    }),
+    depressionFollowUps: dates(r.depressionFollowUps),
+    tobaccoScreens: (Array.isArray(r.tobaccoScreens) ? r.tobaccoScreens : []).slice(0, 200).flatMap((x) => {
+      const t = x as Record<string, unknown>;
+      if (typeof t.date !== "string" || !isIsoDate(t.date) || typeof t.user !== "boolean") return [];
+      return [{ date: t.date, user: t.user }];
+    }),
+    tobaccoInterventions: dates(r.tobaccoInterventions),
+    ascvd: bool(r.ascvd),
+    ldl190OrFh: bool(r.ldl190OrFh),
+    ascvdRisk20: bool(r.ascvdRisk20),
+    statin: bool(r.statin),
+    bilateralMastectomy: bool(r.bilateralMastectomy),
+    hysterectomy: bool(r.hysterectomy),
+    colorectalCancer: bool(r.colorectalCancer),
+    totalColectomy: bool(r.totalColectomy),
+    bipolar: bool(r.bipolar),
+    depressionScreenException: bool(r.depressionScreenException),
+    breastfeeding: bool(r.breastfeeding),
+    rhabdomyolysis: bool(r.rhabdomyolysis),
+    statinException: bool(r.statinException),
   };
+}
+
+const COLORECTAL_TYPES = new Set(["colonoscopy", "fit", "fit_dna", "ct_colonography", "flex_sig"]);
+const CERVICAL_TYPES = new Set(["cytology", "hpv", "cotest"]);
+
+function dates(v: unknown): string[] {
+  return (Array.isArray(v) ? v : []).filter((d): d is string => typeof d === "string" && isIsoDate(d)).slice(0, 200);
+}
+
+function typedList(v: unknown, allowed: Set<string>): { date: string; type: string }[] {
+  return (Array.isArray(v) ? v : []).slice(0, 200).flatMap((x) => {
+    const t = x as Record<string, unknown>;
+    if (typeof t.date !== "string" || !isIsoDate(t.date) || typeof t.type !== "string" || !allowed.has(t.type)) return [];
+    return [{ date: t.date, type: t.type }];
+  });
 }
 
 /**
@@ -149,9 +193,9 @@ export async function viewUdsPanel(
   panelStore: UdsPanelStore,
   actor: Actor,
   period: Period,
-): Promise<Result<PanelSummary & { unsupported_exclusions: string[] }>> {
+): Promise<Result<CareGapSummary & { unsupported_exclusions: string[] }>> {
   if (!isActiveStaff(actor)) return fail(403, "clinic staff only");
   const panel = await panelStore.listPanel(actor.clinicId);
   const merged = await mergeAppReadings(clinicStore, actor.clinicId, panel);
-  return { ok: true, data: { ...evaluatePanel(merged, period), unsupported_exclusions: UNSUPPORTED_EXCLUSIONS } };
+  return { ok: true, data: { ...evaluateCareGapPanel(merged, period), unsupported_exclusions: CARE_GAP_UNSUPPORTED } };
 }

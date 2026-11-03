@@ -12,7 +12,8 @@ import {
   type FieldKey,
   type ParseResult,
 } from "@/lib/clinic/uds/csv";
-import type { MeasureRate, PanelRow, PatientStatus } from "@/lib/clinic/uds/measures";
+import type { CareGapRow } from "@/lib/clinic/uds/care-gaps";
+import { MEASURE_LABEL, type MeasureId, type MeasureRate, type PatientStatus } from "@/lib/clinic/uds/measures";
 
 function csrf(): string {
   if (typeof document === "undefined") return "";
@@ -35,13 +36,15 @@ const STATUS_LABEL: Record<PatientStatus, string> = {
   missing_reading: "Missing reading",
   excluded: "Excluded",
   not_in_denominator: "",
+  met: "Met",
+  due: "Due",
 };
 
 interface PanelData {
   period: { start: string; end: string };
   label: string;
   rates: MeasureRate[];
-  rows: PanelRow[];
+  rows: CareGapRow[];
   unsupported_exclusions: string[];
 }
 
@@ -54,7 +57,7 @@ export default function UdsPanel() {
   const [end, setEnd] = useState(`${thisYear}-12-31`);
   const [data, setData] = useState<PanelData | null>(null);
   const [status, setStatus] = useState("");
-  const [filter, setFilter] = useState<"all" | "outreach" | "cms165" | "cms122">("outreach");
+  const [filter, setFilter] = useState<"all" | "outreach" | MeasureId>("outreach");
   const [fileText, setFileText] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -113,11 +116,10 @@ export default function UdsPanel() {
 
   const rows = useMemo(() => {
     if (!data) return [];
-    const inAny = data.rows.filter((r) => r.cms165.status !== "not_in_denominator" || r.cms122.status !== "not_in_denominator");
+    const inAny = data.rows.filter((r) => Object.values(r.measures).some((m) => m && m.status !== "not_in_denominator"));
     if (filter === "outreach") return inAny.filter((r) => r.needsOutreach);
-    if (filter === "cms165") return inAny.filter((r) => r.cms165.status !== "not_in_denominator");
-    if (filter === "cms122") return inAny.filter((r) => r.cms122.status !== "not_in_denominator");
-    return inAny;
+    if (filter === "all") return inAny;
+    return inAny.filter((r) => r.measures[filter]?.needsOutreach);
   }, [data, filter]);
 
   if (denied) {
@@ -148,32 +150,39 @@ export default function UdsPanel() {
 
       {data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {data.rates.map((r) => (
               <div key={r.measure} className="rounded-xl border border-slate-200 p-4">
                 <p className="font-mono text-xs text-ink-mute">{r.measure}</p>
                 <p className="font-semibold">{r.title}</p>
                 <p className="mt-2 text-3xl font-bold">{r.percent === null ? "No patients" : `${r.percent}%`}</p>
                 <p className="text-sm text-ink-soft">{r.numerator} of {r.denominator} patients. {r.exclusions} excluded.</p>
-                <p className="text-xs text-ink-mute">{r.inverse ? "Inverse measure: lower is better. Missing A1C counts as poor control." : "Higher is better. Missing BP counts as not controlled."}</p>
+                <p className="text-xs text-ink-mute">{r.inverse ? "Inverse measure: lower is better. Missing A1C counts as poor control." : r.measure === "CMS165" ? "Higher is better. Missing BP counts as not controlled." : "Higher is better."}</p>
               </div>
             ))}
           </div>
-          <p className="text-xs text-ink-mute">{data.label}</p>
+          <p className="text-xs text-ink-mute">{data.label || MEASURE_LABEL}</p>
 
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              {(["outreach", "all", "cms165", "cms122"] as const).map((f) => (
+              {(["outreach", "all"] as const).map((f) => (
                 <button key={f} type="button" onClick={() => setFilter(f)} className={`rounded-full border px-3 py-1 text-sm ${filter === f ? "bg-slate-900 text-white" : ""}`}>
-                  {f === "outreach" ? "Needs outreach" : f === "all" ? "All in a measure" : f.toUpperCase()}
+                  {f === "outreach" ? "Needs outreach" : "All in a measure"}
                 </button>
               ))}
+              <label className="text-sm">
+                Due for
+                <select className="field-input" value={filter === "outreach" || filter === "all" ? "" : filter} onChange={(e) => setFilter((e.target.value || "outreach") as MeasureId | "outreach")}>
+                  <option value="">Any measure</option>
+                  {data.rates.map((r) => <option key={r.measure} value={r.measure}>{r.measure} {r.title}</option>)}
+                </select>
+              </label>
               <button type="button" className="ml-auto rounded-full border px-3 py-1 text-sm" onClick={() => download(`uds-gap-list-${data.period.start}-${data.period.end}.csv`, gapListCsv(data.rows))}>
-                Export gap list CSV
+                Export gaps CSV
               </button>
             </div>
             <table className="mt-3 w-full text-left text-sm">
-              <thead><tr><th>Patient</th><th>Age</th><th>CMS165 BP</th><th>Last BP</th><th>CMS122 A1C</th><th>Last A1C</th><th>Source</th></tr></thead>
+              <thead><tr><th>Patient</th><th>Age</th><th>Gaps due</th><th>CMS165 BP</th><th>Last BP</th><th>CMS122 A1C</th><th>Last A1C</th><th>Source</th></tr></thead>
               <tbody>
                 {rows.map((r) => {
                   const bp = r.cms165.latest as { date: string; systolic: number; diastolic: number } | null;
@@ -182,6 +191,7 @@ export default function UdsPanel() {
                     <tr key={r.patientId} className="border-t border-slate-100">
                       <td>{r.patientId}</td>
                       <td>{r.age}</td>
+                      <td>{r.gapsDue.length ? <ul className="list-disc pl-4">{r.gapsDue.map((g) => <li key={g}>{g}</li>)}</ul> : "None"}</td>
                       <td>{STATUS_LABEL[r.cms165.status]}{r.cms165.exclusion ? ` (${r.cms165.exclusion})` : ""}</td>
                       <td>{bp ? `${bp.systolic}/${bp.diastolic} on ${bp.date}` : ""}</td>
                       <td>{STATUS_LABEL[r.cms122.status]}{r.cms122.exclusion ? ` (${r.cms122.exclusion})` : ""}</td>
@@ -196,7 +206,7 @@ export default function UdsPanel() {
           </div>
 
           <details className="rounded-xl border border-slate-200 p-4 text-sm">
-            <summary className="font-semibold">Exclusions this panel cannot check</summary>
+            <summary className="font-semibold">Exclusions and rules this panel cannot check</summary>
             <ul className="mt-2 list-disc pl-5">{data.unsupported_exclusions.map((u) => <li key={u}>{u}</li>)}</ul>
           </details>
         </>
