@@ -12,6 +12,7 @@ const ROOTS = [
   "test/ai-flag.test.ts",
   "test/local-health.test.ts",
   "test/local-narrative.test.ts",
+  "test/local-plans.test.ts",
   "test/local-copy.test.ts",
 ];
 
