@@ -6,16 +6,19 @@ import { loadFollowUpSignals } from "@/lib/clinic/followups/signals";
 import { SupabaseFollowUpCallStore } from "@/lib/clinic/followups/supabase-store";
 import { enforceStaffClinic } from "@/lib/clinic/staff-auth";
 import { SupabaseClinicStore } from "@/lib/clinic/supabase-store";
+import { clinicTimeZone, localDateHour } from "@/lib/clinic/time-zone";
 import { readClinicActor } from "@/lib/clinic/token";
+import type { Actor } from "@/lib/clinic/logic";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const HEADERS = { "cache-control": "private, no-store" };
-const CLINIC_TZ = "America/Chicago";
 
-function today(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: CLINIC_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+/** Today's date in the clinic's own time zone (falls back to America/Chicago). */
+async function today(clinicStore: SupabaseClinicStore, actor: Actor): Promise<string> {
+  const clinic = actor.kind === "staff" ? await clinicStore.getClinic(actor.clinicId) : null;
+  return localDateHour(clinicTimeZone(clinic)).today;
 }
 
 async function setup(req: NextRequest) {
@@ -30,7 +33,7 @@ async function setup(req: NextRequest) {
     signals: loadFollowUpSignals,
     now: () => new Date(),
   };
-  return { actor, deps };
+  return { actor, deps, clinicStore };
 }
 
 function reply(r: { ok: true; data: unknown } | { ok: false; status: number; error: string }) {
@@ -44,9 +47,9 @@ function down(err: unknown) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { actor, deps } = await setup(req);
+    const { actor, deps, clinicStore } = await setup(req);
     if (!actor) return NextResponse.json({ error: "authentication required" }, { status: 401, headers: HEADERS });
-    return reply(await viewFollowUps(deps, actor, today()));
+    return reply(await viewFollowUps(deps, actor, await today(clinicStore, actor)));
   } catch (err) {
     return down(err);
   }
@@ -58,9 +61,9 @@ export async function POST(req: NextRequest) {
   if (failure) return NextResponse.json({ error: "CSRF token " + failure }, { status: 403, headers: HEADERS });
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   try {
-    const { actor, deps } = await setup(req);
+    const { actor, deps, clinicStore } = await setup(req);
     if (!actor) return NextResponse.json({ error: "authentication required" }, { status: 401, headers: HEADERS });
-    return reply(await logFollowUpCall(deps, actor, { patientId: body.patientId, outcome: body.outcome, note: body.note }, today()));
+    return reply(await logFollowUpCall(deps, actor, { patientId: body.patientId, outcome: body.outcome, note: body.note }, await today(clinicStore, actor)));
   } catch (err) {
     return down(err);
   }
