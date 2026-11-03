@@ -1,59 +1,7 @@
 "use client";
-import { useState, useEffect, useRef, useCallback, useContext, createContext, Component, ReactNode } from "react";
+import { useState, useEffect, useRef, useContext, createContext, Component, ReactNode } from "react";
 import type { ResolvedLabs } from "@/lib/lab-values";
-import { buildHealthNarrative, buildMealPlan, buildWorkoutPlan } from "@/lib/local-health";
-
-const ZK_SALT = "CARE-IQ-ZK-SHIELD-2026";
-const ZK_TERMS = ["fqhc","careiq","communityhealth","safetynet","medicaid","sliding-scale","communityclinic","federallyqualified","ryanwhite","title-x","section-330","hrsa","communitycare"];
-
-async function zkHash(term: string): Promise<string> {
-  try {
-    const enc = new TextEncoder();
-    const buf = await window.crypto.subtle.digest("SHA-256", enc.encode(term.toLowerCase().trim() + ZK_SALT));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
-  } catch { return ""; }
-}
-
-/**
- * Salted SHA-256 of a raw user query, used as the only client-side
- * representation that ever appears in the Shield log UI. The raw query
- * MUST NEVER be stored in component state or rendered. HIPAA: any
- * change here is security-relevant, review carefully before editing.
- */
-async function hashQuery(query: string): Promise<string> {
-  try {
-    const enc = new TextEncoder();
-    const buf = await window.crypto.subtle.digest("SHA-256", enc.encode(query + ZK_SALT));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
-  } catch { return ""; }
-}
-
-let zkDict: Map<string,string> | null = null;
-async function getZKDict(): Promise<Map<string,string>> {
-  if (zkDict) return zkDict;
-  zkDict = new Map();
-  for (const t of ZK_TERMS) { const h = await zkHash(t); if (h) zkDict.set(h, t); }
-  return zkDict;
-}
-
-interface ZKResult { shieldedPrompt: string; protectedTerms: Array<{token:string}>; zeroKnowledge: boolean; }
-
-async function runZKShield(prompt: string): Promise<ZKResult> {
-  const dict = await getZKDict();
-  let shielded = prompt;
-  const found: Array<{token:string}> = [];
-  for (const word of prompt.split(/\s+/)) {
-    const clean = word.replace(/[.,!?;:'"()]/g,"").toLowerCase().trim();
-    if (clean.length < 3) continue;
-    const h = await zkHash(clean);
-    if (h && dict.has(h)) {
-      const token = `[ZK_${h.substring(0,6)}]`;
-      shielded = shielded.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi"), token);
-      found.push({ token });
-    }
-  }
-  return { shieldedPrompt: shielded, protectedTerms: found, zeroKnowledge: found.length > 0 };
-}
+import { answerLocally, buildHealthNarrative, buildMealPlan, buildWorkoutPlan, SUGGESTED_QUESTIONS } from "@/lib/local-health";
 
 const C = { navy:"#07101f", teal:"#00d4b8", teal2:"#00b89e", gold:"#d4a843", rose:"#e8526e", violet:"#8060cc", green:"#4ade80", slate:"#7a9bbf", white:"#eef2f8" };
 void C;
@@ -619,87 +567,72 @@ function ShieldDash({logs}:{logs:SLog[]}){
   );
 }
 
-function AIChat({onLog}:{onLog:(log:SLog)=>void}){
-  const { patient } = useContext(ClinicalDataContext);
-  const firstName = patient.name.split(" ")[0] || "friend";
-  const [msgs,setMsgs]=useState([{role:"ai",text:`Hello, ${firstName}. Critical identifier queries are blocked. The typed question is not sent to the model.`,zkCount:0,flagCount:0}]);
-  const [input,setInput]=useState("");
-  const [sending,setSending]=useState(false);
-  const scrollRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{scrollRef.current?.scrollTo({top:scrollRef.current.scrollHeight});},[msgs]);
-  const send=async()=>{
-    const msg=input.trim();
-    if(!msg||sending)return;
-    setSending(true);
-    setInput("");
-    const userMsg={role:"user",text:msg,zkCount:0,flagCount:0};
-    setMsgs(p=>[...p,userMsg]);
-    let zk:ZKResult={shieldedPrompt:msg,protectedTerms:[],zeroKnowledge:false};
-    try{ zk=await runZKShield(msg); }catch{}
-    const zkCount=zk.protectedTerms.length;
-    const queryHash = await hashQuery(msg);
-    const queryChars = msg.length;
-    try{
-      const res=await fetch("/api/shield",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({prompt:msg})
-      });
-      const shield=await res.json();
-      const flags=Array.isArray(shield.pii_detected)?shield.pii_detected:Array.isArray(shield.flags)?shield.flags:[];
-      const flagCount=typeof shield.flagCount==="number"?shield.flagCount:flags.length;
-      const riskScore=typeof shield.serverRiskScore==="number"?shield.serverRiskScore:0;
-      const riskLevel=typeof shield.riskLevel==="string"?shield.riskLevel:"LOW";
-      const action=typeof shield.action==="string"?shield.action:"allow";
-      const blocked=Boolean(shield?.meta?.blocked)||riskLevel==="CRITICAL";
-      const shieldVersion=typeof shield?.meta?.shieldVersion==="string"?shield.meta.shieldVersion:undefined;
+function vitalNumber(vitals: ClinicalVital[], needle: string): number | undefined {
+  const found = vitals.find((v) => v.name.toLowerCase().includes(needle) || v.unit.toLowerCase().includes(needle));
+  if (!found || found.val === "-") return undefined;
+  const n = Number(String(found.val).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : undefined;
+}
 
-      let aiText:string;
-      if(blocked){
-        const types=flags.map((f:{type?:string})=>typeof f?.type==="string"?f.type:"").filter(Boolean).join(", ");
-        aiText=`Blocked: PII detected${types?` (${types})`:""}. Re-send your question without personally identifying information.`;
-      }else{
-        aiText=typeof shield.insight==="string"&&shield.insight.length>0
-          ?shield.insight
-          :"Shield is active. AI response unavailable right now.";
-      }
+interface ChatMsg { role: "ai" | "user"; text: string; suggestions: string[]; }
 
-      setMsgs(p=>[...p,{role:"ai",text:aiText,zkCount,flagCount}]);
-      onLog({timestamp:new Date().toISOString(),riskLevel,riskScore,flagCount,action,queryHash,queryChars,zkCount,shieldVersion});
-    }catch{
-      const aiText="Shield offline. Your prompt was not scored or sent to the AI. Try again.";
-      setMsgs(p=>[...p,{role:"ai",text:aiText,zkCount,flagCount:0}]);
-      onLog({timestamp:new Date().toISOString(),riskLevel:"UNKNOWN",riskScore:0,flagCount:0,action:"shield_offline",queryHash,queryChars,zkCount});
-    }finally{
-      setSending(false);
-    }
+function AIChat(){
+  const data = useContext(ClinicalDataContext);
+  const aiEnabled = useContext(AiEnabledContext);
+  const intro = aiEnabled
+    ? "The model flag is on. This tab still answers on this device."
+    : "AI is off. This tab answers on this device.";
+  const [msgs, setMsgs] = useState<ChatMsg[]>([
+    { role: "ai", text: intro, suggestions: [...SUGGESTED_QUESTIONS] },
+  ]);
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [msgs]);
+  const facts = {
+    labs: data.labs,
+    sex: data.sex,
+    conditions: data.recordedConditions,
+    steps: latestSteps(data.wearSteps7Day),
+    heartRate: vitalNumber(data.vitals, "heart"),
+    spo2: vitalNumber(data.vitals, "oxygen"),
+    weight: vitalNumber(data.vitals, "weight"),
+    egfr: data.labs?.egfr,
   };
-  return(
+  const ask = (raw: string) => {
+    const msg = raw.trim();
+    if (!msg) return;
+    const answer = answerLocally(msg, facts);
+    setMsgs((prev) => [
+      ...prev,
+      { role: "user", text: msg, suggestions: [] },
+      { role: "ai", text: answer.text, suggestions: answer.suggestions },
+    ]);
+    setInput("");
+  };
+  const last = msgs[msgs.length - 1];
+  return (
     <div className="chat-wrap">
       <div className="chat-msgs" ref={scrollRef}>
-        {msgs.map((m,i)=>(
-          <div key={i}>
-            <div className={`chat-msg ${m.role==="user"?"chat-user":"chat-ai"}`}>{m.text}</div>
-            {(m.zkCount>0||m.flagCount>0)&&(
-              <div className="chat-meta" style={{textAlign:m.role==="user"?"right":"left",marginTop:3}}>
-                {m.zkCount>0&&<span style={{color:"#00d4b8",marginRight:7}}>Terms: {m.zkCount}</span>}
-                {m.flagCount>0&&<span style={{color:"#d4a843"}}>Flags: {m.flagCount}</span>}
-              </div>
-            )}
-          </div>
+        {msgs.map((m, i) => (
+          <div key={i} className={`chat-msg ${m.role === "user" ? "chat-user" : "chat-ai"}`}>{m.text}</div>
         ))}
-        {sending&&<div className="chat-msg chat-ai" style={{fontStyle:"italic",opacity:.7}}>Thinking...</div>}
       </div>
+      {last?.suggestions.length ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "8px 0" }}>
+          {last.suggestions.map((q) => (
+            <button key={q} type="button" className="insight-cta" onClick={() => ask(q)}>{q}</button>
+          ))}
+        </div>
+      ) : null}
       <div className="chat-input-row">
         <input
           className="chat-input"
           value={input}
-          onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-          placeholder="Ask CareIQ AI..."
-          disabled={sending}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }}
+          placeholder="Ask a local question..."
         />
-        <button className="chat-send" onClick={send} disabled={sending||!input.trim()}>{sending?"...":"Send"}</button>
+        <button className="chat-send" onClick={() => ask(input)} disabled={!input.trim()}>Send</button>
       </div>
     </div>
   );
@@ -829,12 +762,11 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
 
   const [mode,setMode]=useState("patient");
   const [page,setPage]=useState("overview");
-  const [logs,setLogs]=useState<SLog[]>([]);
+  const [logs]=useState<SLog[]>([]);
   const [elder,setElder]=useState(false);
   const [ringPct,setRingPct]=useState(0);
 
   useEffect(()=>{
-    getZKDict();
     try{
       const saved=window.localStorage.getItem("careiq-elder-mode");
       if(saved==="1")setElder(true);
@@ -855,7 +787,6 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
     if(!nav.find(n=>n.id===page))setPage(nav[0].id);
   },[mode,page]);
 
-  const addLog=useCallback((log:SLog)=>setLogs(p=>[...p,log]),[]);
   const nav=mode==="patient"?PNAV:CNAV;
   const showRing=mode==="patient"&&page!=="ai"&&page!=="profile";
 
@@ -873,7 +804,7 @@ export default function CareIQHealthOS({ clinicalData, demoMode = false, aiEnabl
       case"profile":return<Profile/>;
       case"ai":return(
         <div style={{height:"100%",display:"flex",flexDirection:"column",padding:`12px 18px calc(110px + env(safe-area-inset-bottom,0px))`,minHeight:0}}>
-          <AIChat onLog={addLog}/>
+          <AIChat />
         </div>
       );
       default:return<Overview/>;

@@ -31,4 +31,12 @@ export {
 export { phraseFor } from "./phrases";
 export { buildHealthNarrative, type NarrativeInput, type NarrativeLabs } from "./narrative";
 export { buildMealPlan, buildWorkoutPlan, planBucket, type PlanInput } from "./plans";
+export {
+  answerLocally,
+  LOCAL_TEMPLATE_COUNT,
+  localTemplateId,
+  SUGGESTED_QUESTIONS,
+  type ChatContext,
+  type LocalAnswer,
+} from "./chat";
 export { DISCLAIMER, finishOutput, wordingProblems } from "./wording";
