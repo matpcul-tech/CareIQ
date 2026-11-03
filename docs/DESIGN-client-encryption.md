@@ -1,6 +1,6 @@
 # Design: On-Device Encryption with Clinic-Held Keys (CareIQ + care-os)
 
-Status: DRAFT for owner review. Step 1 only. No code, env, or database changes.
+Status: DRAFT for owner review. DECISION: custody option (a) passphrase plus printed recovery key, with optional 2 of 3 split, APPROVED by owner Matthew Culwell on 2026-11-02. Step 1 only. No code, env, or database changes.
 Author: Grok Bot for Matthew Culwell. Date: 2026-11-02.
 
 ## Plain language summary
@@ -84,7 +84,7 @@ New tables (later PR, not now): `clinic_keys(clinic_id, public_jwk, custody_mode
 - Pros: no single person can lose or abuse it; matches tribal governance well.
 - Cons: ceremony needed for recovery; Shamir is not in WebCrypto, so needs a small audited library (for example `shamir-secret-sharing` by Privy, audited) or our own GF(256) code.
 
-Recommendation for v1: (a) for daily unlock, with the recovery key optionally split 2 of 3 using (c) at clinic onboarding. This keeps daily use simple and gives tribal communities shared control of recovery. Offer (b) as a v2 enterprise add-on.
+APPROVED by owner on 2026-11-02. Recommendation for v1: (a) for daily unlock, with the recovery key optionally split 2 of 3 using (c) at clinic onboarding. This keeps daily use simple and gives tribal communities shared control of recovery. Offer (b) as a v2 enterprise add-on.
 
 ## 5. Who can decrypt and how sharing works
 
