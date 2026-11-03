@@ -1,3 +1,4 @@
+import { resolveLabs } from "@/lib/lab-values";
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
 import { getServiceClient } from "@/lib/supabase-server";
@@ -37,6 +38,7 @@ interface HistoryPlaintext {
   allergies?: string;
   familyHistory?: string;
   manualLabs?: ManualLabs;
+  biomarkers?: Record<string, unknown>;
 }
 
 interface DailyMetric {
@@ -146,7 +148,7 @@ function buildClinicalData(args: {
 
   // Manually-entered labs override demo defaults wherever the patient typed
   // a value. Status (ok/warn/alert) is derived from the typed value too.
-  const manual = history?.manualLabs ?? {};
+  const manual = resolveLabs(history);
   const last = metrics.length > 0 ? metrics[metrics.length - 1] : null;
 
   const bpVital: ClinicalVital = manual.bpSystolic != null && manual.bpDiastolic != null
@@ -345,7 +347,7 @@ function deriveHealthScore(history: HistoryPlaintext | null, metrics: DailyMetri
     if (last.spo2 < 95) score -= 6;
     if (last.spo2 < 90) score -= 8;
   }
-  const m = history?.manualLabs ?? {};
+  const m = resolveLabs(history);
   if (m.a1c != null && m.a1c >= 6.5) score -= 8;
   else if (m.a1c != null && m.a1c >= 5.7) score -= 4;
   if (m.ldl != null && m.ldl >= 190) score -= 8;
