@@ -3,3 +3,4 @@ export * from "./keystore";
 export * from "./recovery";
 export * from "./patient";
 export * from "./flag";
+export * from "./clinic";

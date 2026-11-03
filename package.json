@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
+    "@scure/bip39": "^1.6.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "fflate": "^0.8.3",
@@ -23,6 +24,7 @@
     "recharts": "^2.13.0",
     "resend": "^4.0.1",
     "server-only": "^0.0.1",
+    "shamir-secret-sharing": "^0.0.4",
     "unpdf": "^0.12.1",
     "zod": "^3.23.8"
   },

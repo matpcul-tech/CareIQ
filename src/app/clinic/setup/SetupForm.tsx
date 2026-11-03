@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { postJson, takeFragmentToken } from "../onboarding-client";
 
-export default function SetupForm() {
+export default function SetupForm({ encEnabled = false }: { encEnabled?: boolean }) {
   const [token, setToken] = useState("");
   const [clinicName, setClinicName] = useState("");
   const [adminName, setAdminName] = useState("");
@@ -28,6 +28,7 @@ export default function SetupForm() {
       <div className="rounded-xl border border-slate-200 p-4 text-sm">
         <p className="font-semibold">Clinic created. You are its admin.</p>
         <p className="mt-2">This setup link is now used up. <Link href="/clinic">Sign in on the clinic page</Link> with the email you entered. Then invite your team from the clinic page.</p>
+        {encEnabled && <p className="mt-2">Next, after you sign in: <Link href="/clinic/keys">create your clinic encryption key</Link>. You will set a passphrase and print a recovery key. Lost keys are unrecoverable.</p>}
       </div>
     );
   }
