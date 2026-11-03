@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { readSession } from "@/lib/session";
 import OnboardClient from "./OnboardClient";
+import { loadSavedHistory } from "@/lib/history-read";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
  *   - Session expired (?expired=1)
  *   - Authenticated user clicked an edit card on /dashboard (?edit=1)
  */
-export default function OnboardPage({
+export default async function OnboardPage({
   searchParams,
 }: {
   searchParams?: {
@@ -46,8 +47,12 @@ export default function OnboardPage({
   const initialStep =
     stepFromUrl ?? (session.patientId && editMode ? 2 : 1);
 
+  // Decrypted on the server for the signed-in patient only, so the form opens with saved answers.
+  const savedHistory = session.patientId ? await loadSavedHistory(session.patientId) : null;
+
   return (
     <OnboardClient
+      savedHistory={savedHistory}
       initialStep={initialStep}
       authenticated={Boolean(session.patientId)}
       expired={searchParams?.expired === "1"}
