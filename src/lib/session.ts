@@ -22,6 +22,9 @@ export interface ServerSession {
   sessionHash: string; // sha256 of session id (used in audit log)
   patientId: string | null;
   emailHash: string | null;
+  // Supabase auth user id from sign-in. Unsigned cookie value: verify it
+  // against server data before granting anything with it.
+  authUserId?: string | null;
 }
 
 /**
@@ -41,12 +44,13 @@ export function readSession(): ServerSession {
   try {
     const parsed = JSON.parse(
       Buffer.from(auth, "base64url").toString("utf8"),
-    ) as { patientId?: string; emailHash?: string };
+    ) as { patientId?: string; emailHash?: string; authUserId?: string };
     return {
       sessionId,
       sessionHash,
       patientId: typeof parsed.patientId === "string" ? parsed.patientId : null,
       emailHash: typeof parsed.emailHash === "string" ? parsed.emailHash : null,
+      authUserId: typeof parsed.authUserId === "string" ? parsed.authUserId : null,
     };
   } catch {
     return { sessionId, sessionHash, patientId: null, emailHash: null };
@@ -57,7 +61,7 @@ export function readSession(): ServerSession {
  * Establish the patient identity cookie after a verified magic link callback.
  * The cookie carries the patient_id and email_hash only. No name, no PHI.
  */
-export function writeAuthCookie(patientId: string, email: string): {
+export function writeAuthCookie(patientId: string, email: string, authUserId?: string | null): {
   name: string;
   value: string;
   options: {
@@ -70,7 +74,7 @@ export function writeAuthCookie(patientId: string, email: string): {
 } {
   const emailHash = hashEmail(email);
   const payload = Buffer.from(
-    JSON.stringify({ patientId, emailHash }),
+    JSON.stringify(authUserId ? { patientId, emailHash, authUserId } : { patientId, emailHash }),
     "utf8",
   ).toString("base64url");
   return {

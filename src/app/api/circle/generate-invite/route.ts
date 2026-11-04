@@ -5,6 +5,8 @@ import { getServiceClient } from "@/lib/supabase-server";
 import { resolveServiceRoleKey } from "@/lib/supabase-env";
 import { readSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
+import { ensureOwnerCircleRow } from "@/lib/circle-owner";
+import { hashEmail } from "@/lib/crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +41,7 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 const CARECIRCLE_APP_URL =
   process.env.NEXT_PUBLIC_CARECIRCLE_APP_URL ||
-  "https://care-os-uo7x.vercel.app";
+  "https://carecircleos.vercel.app";
 
 const RESEND_FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL || "CareIQ <noreply@sovereignhealthcareos.com>";
@@ -238,6 +240,15 @@ export async function POST(req: NextRequest) {
   ).toISOString();
 
   const sb = getServiceClient();
+
+  // Give the patient an owner row so they can open their own circle in
+  // CareCircle. Best-effort: never blocks invite creation.
+  const owner = await ensureOwnerCircleRow(sb, {
+    patientId: session.patientId,
+    authUserId: session.authUserId ?? null,
+    hashEmail,
+  });
+  if (!owner.ok) console.warn("[generate-invite]", tag, "owner row skipped:", owner.reason);
 
   let inviteRow: { id: string; code: string } | null = null;
   let lastErr: SupabaseInsertError | null = null;

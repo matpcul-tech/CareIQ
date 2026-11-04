@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-server";
 import { readSession } from "@/lib/session";
+import { ensureOwnerCircleRow } from "@/lib/circle-owner";
+import { hashEmail } from "@/lib/crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +22,12 @@ export async function GET() {
     );
   }
   const sb = getServiceClient();
+  // Opening Family Hub / Invite family also ensures the owner row.
+  await ensureOwnerCircleRow(sb, {
+    patientId: session.patientId,
+    authUserId: session.authUserId ?? null,
+    hashEmail,
+  });
   const { data, error } = await sb
     .from("care_circle")
     .select(

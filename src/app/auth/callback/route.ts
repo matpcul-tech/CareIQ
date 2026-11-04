@@ -171,6 +171,7 @@ export async function GET(req: NextRequest) {
       cookie = writeAuthCookie(
         patientId,
         email || `${userId}@unknown.local`,
+        userId,
       );
     } catch (err) {
       // eslint-disable-next-line no-console
